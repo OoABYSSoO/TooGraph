@@ -124,9 +124,27 @@ class ThinkingLevelTests(unittest.TestCase):
                 provider_id="lmstudio",
                 transport="openai-compatible",
                 model="openai/gpt-oss-20b",
+                thinking_level="off",
+            ),
+            {"reasoning_effort": "none"},
+        )
+        self.assertEqual(
+            build_native_thinking_payload(
+                provider_id="openai-codex",
+                transport="codex-responses",
+                model="gpt-5.4",
+                thinking_level="off",
+            ),
+            {},
+        )
+        self.assertEqual(
+            build_native_thinking_payload(
+                provider_id="lmstudio",
+                transport="openai-compatible",
+                model="openai/gpt-oss-20b",
                 thinking_level="xhigh",
             ),
-            {"reasoning_effort": "high"},
+            {"reasoning_effort": "xhigh"},
         )
 
 

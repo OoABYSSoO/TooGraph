@@ -116,6 +116,7 @@ def generate_agent_response(
         output_keys,
         input_values,
         action_context,
+        task_instruction=node.config.task_instruction,
         state_schema=state_schema,
     )
     structured_output_schema = build_agent_state_output_schema(output_keys, state_schema or {})

@@ -10,8 +10,10 @@ const componentSource = readFileSync(resolve(currentDirectory, "HomePage.vue"), 
 test("HomePage keeps dashboard panels paginated instead of letting template lists grow indefinitely", () => {
   assert.match(componentSource, /import \{ formatRunDisplayName, formatRunDisplayTimestamp \} from "@\/lib\/run-display-name";/);
   assert.match(componentSource, /import \{[\s\S]*paginateWorkspacePanelItems[\s\S]*\} from "\.\/workspaceDashboardModel\.ts";/);
+  assert.match(componentSource, /const WORKSPACE_DASHBOARD_RUN_LIMIT = 5;/);
   assert.match(componentSource, /const templatePage = ref\(0\);/);
   assert.match(componentSource, /const visibleTemplatePage = computed\(\(\) => paginateWorkspacePanelItems\(templates\.value,\s*templatePage\.value\)\);/);
+  assert.match(componentSource, /fetchRuns\(\{\s*limit:\s*WORKSPACE_DASHBOARD_RUN_LIMIT\s*\}\)/);
   assert.match(componentSource, /\{\{ formatRunDisplayName\(run\) \}\}/);
   assert.match(componentSource, /\{\{ formatRunDisplayTimestamp\(run\.started_at\) \}\}/);
   assert.match(componentSource, /v-for="template in visibleTemplatePage\.items"/);

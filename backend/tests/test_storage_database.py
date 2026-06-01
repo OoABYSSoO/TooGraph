@@ -72,6 +72,7 @@ class StorageDatabaseTests(unittest.TestCase):
                 "idx_agent_loop_events_stop_reason",
                 "idx_capability_usage_events_run",
                 "idx_capability_usage_events_key",
+                "idx_graph_model_calls_started",
                 "idx_provider_prompt_cache_resources_lookup",
                 "idx_provider_prompt_cache_resources_status",
                 "idx_scheduled_graph_jobs_due",
@@ -182,6 +183,72 @@ class StorageDatabaseTests(unittest.TestCase):
             self.assertIn("memory_events", table_names)
             self.assertNotIn("memories", table_names)
             self.assertNotIn("memories_fts", table_names)
+
+    def test_buddy_message_fts_schema_is_seeded_once_and_keeps_triggers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+                with sqlite3.connect(db_path) as connection:
+                    marker = connection.execute(
+                        "SELECT value_json FROM buddy_kv WHERE key = ?",
+                        ("schema.buddy_messages_fts",),
+                    ).fetchone()
+                    connection.execute(
+                        """
+                        INSERT INTO buddy_messages (
+                            message_id,
+                            session_id,
+                            role,
+                            content,
+                            include_in_context,
+                            metadata_json,
+                            created_at,
+                            updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            "msg_1",
+                            "session_1",
+                            "user",
+                            "hello",
+                            1,
+                            "{}",
+                            "2026-05-26T00:00:00Z",
+                            "2026-05-26T00:00:00Z",
+                        ),
+                    )
+                    connection.execute(
+                        "UPDATE buddy_messages SET content = ? WHERE message_id = ?",
+                        ("hello updated", "msg_1"),
+                    )
+                    connection.commit()
+                    fts_content = connection.execute(
+                        "SELECT content FROM buddy_messages_fts WHERE message_id = ?",
+                        ("msg_1",),
+                    ).fetchone()[0]
+                    trigram_count = connection.execute("SELECT COUNT(*) FROM buddy_messages_fts_trigram").fetchone()[0]
+
+                database.initialize_storage()
+                with sqlite3.connect(db_path) as connection:
+                    marker_after_second_init = connection.execute(
+                        "SELECT value_json FROM buddy_kv WHERE key = ?",
+                        ("schema.buddy_messages_fts",),
+                    ).fetchone()
+                    fts_count_after_second_init = connection.execute(
+                        "SELECT COUNT(*) FROM buddy_messages_fts"
+                    ).fetchone()[0]
+
+        self.assertIsNotNone(marker)
+        self.assertEqual(marker[0], '{"version":2,"triggers":"dual_fts"}')
+        self.assertEqual(fts_content, "hello updated")
+        self.assertEqual(trigram_count, 1)
+        self.assertEqual(marker_after_second_init[0], '{"version":2,"triggers":"dual_fts"}')
+        self.assertEqual(fts_count_after_second_init, 1)
 
     def test_initialize_storage_creates_message_platform_schema(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

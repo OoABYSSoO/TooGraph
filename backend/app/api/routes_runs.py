@@ -17,8 +17,14 @@ from app.core.runtime.run_events import publish_run_event, subscribe_run_events
 from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary, RunTreeNode
-from app.core.storage.run_store import build_run_tree, list_child_runs, list_runs, load_run
-from app.core.storage.run_store import save_run
+from app.core.storage.run_store import (
+    build_run_tree,
+    list_child_runs,
+    list_run_summaries,
+    load_current_graph_snapshots,
+    load_run,
+    save_run,
+)
 
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -40,33 +46,42 @@ def list_runs_endpoint(
     status: str = Query(default=""),
     template_id: str = Query(default=""),
     include_internal: bool = Query(default=False),
+    limit: int = Query(default=0, ge=0, le=5000),
 ) -> list[RunSummary]:
-    raw_runs = list_runs()
+    raw_runs = list_run_summaries()
     if not include_internal:
         raw_runs = [run for run in raw_runs if not _is_internal_run(run)]
 
-    runs = [
-        RunSummary.model_validate(
-            {
-                **run,
-                "restorable_snapshot_available": _has_restorable_graph_snapshot(run.get("graph_snapshot")),
-                "run_snapshot_options": _build_run_snapshot_options(run),
-            }
-        )
-        for run in raw_runs
-    ]
     graph_name_query = graph_name.strip().lower()
     status_query = status.strip().lower()
     template_id_query = template_id.strip().lower()
 
     if graph_name_query:
-        runs = [run for run in runs if graph_name_query in run.graph_name.lower()]
+        raw_runs = [run for run in raw_runs if graph_name_query in str(run.get("graph_name") or "").lower()]
     if status_query:
-        runs = [run for run in runs if run.status.lower() == status_query]
+        raw_runs = [run for run in raw_runs if str(run.get("status") or "").lower() == status_query]
     if template_id_query:
-        runs = [run for run in runs if run.template_id.lower() == template_id_query]
+        raw_runs = [run for run in raw_runs if str(run.get("template_id") or "").lower() == template_id_query]
+    if limit > 0:
+        raw_runs = raw_runs[:limit]
 
-    return runs
+    graph_snapshots_by_run_id = load_current_graph_snapshots([str(run.get("run_id") or "") for run in raw_runs])
+    return [
+        RunSummary.model_validate(
+            {
+                **run,
+                "restorable_snapshot_available": _has_restorable_graph_snapshot(
+                    graph_snapshots_by_run_id.get(str(run.get("run_id") or ""))
+                ),
+                "run_snapshot_options": (
+                    run.get("run_snapshot_options")
+                    if isinstance(run.get("run_snapshot_options"), list)
+                    else _build_run_snapshot_options(run)
+                ),
+            }
+        )
+        for run in raw_runs
+    ]
 
 
 def _is_internal_run(run: dict[str, Any]) -> bool:

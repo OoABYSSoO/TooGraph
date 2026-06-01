@@ -26,6 +26,7 @@ type BuddyChatSessionsOptions<Message extends BuddySessionMessage> = {
   scrollMessagesToBottom: () => Promise<void>;
   formatErrorMessage: (error: unknown) => string;
   hydrateLoadedRunDisplays?: (records: BuddyChatMessageRecord[]) => Promise<void>;
+  shouldHydrateLoadedRunDisplays?: () => boolean;
 };
 
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
@@ -93,6 +94,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
   scrollMessagesToBottom,
   formatErrorMessage,
   hydrateLoadedRunDisplays,
+  shouldHydrateLoadedRunDisplays,
 }: BuddyChatSessionsOptions<Message>) {
   const chatSessions = ref<BuddyChatSession[]>([]);
   const activeSessionId = ref<string | null>(null);
@@ -103,6 +105,8 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
   const sessionDeleteConfirmTimeoutRef = ref<number | null>(null);
   let chatSessionInitializationPromise: Promise<void> | null = null;
   let activeSessionMessageSignature = "";
+  let activeSessionRecords: BuddyChatMessageRecord[] = [];
+  let hydratedRunDisplaySignature = "";
 
   const isSessionSwitchLocked = computed(
     () =>
@@ -234,6 +238,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
     options: { mergeExisting?: boolean } = {},
   ) {
     activeSessionMessageSignature = buildChatMessageRecordsSignature(records);
+    activeSessionRecords = records;
     if (options.mergeExisting) {
       mergeLoadedChatMessages(records);
     } else {
@@ -241,7 +246,24 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
       resetVisibleBuddyRunState();
     }
     resetNextBuddyMessageClientOrder();
-    await hydrateLoadedRunDisplays?.(records);
+    await hydrateRunDisplaysForRecords(records);
+  }
+
+  async function hydrateActiveSessionRunDisplays() {
+    return hydrateRunDisplaysForRecords(activeSessionRecords);
+  }
+
+  async function hydrateRunDisplaysForRecords(records: BuddyChatMessageRecord[]) {
+    if (!hydrateLoadedRunDisplays || (shouldHydrateLoadedRunDisplays && !shouldHydrateLoadedRunDisplays())) {
+      return false;
+    }
+    const signature = buildChatMessageRecordsSignature(records);
+    if (signature === hydratedRunDisplaySignature) {
+      return false;
+    }
+    await hydrateLoadedRunDisplays(records);
+    hydratedRunDisplaySignature = signature;
+    return true;
   }
 
   function mergeLoadedChatMessages(records: BuddyChatMessageRecord[]) {
@@ -372,6 +394,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
     clearSessionDeleteConfirmTimeout,
     clearSessionDeleteConfirmState,
     handleSessionDeleteActionClick,
+    hydrateActiveSessionRunDisplays,
     waitForChatSessionInitialization,
   };
 }

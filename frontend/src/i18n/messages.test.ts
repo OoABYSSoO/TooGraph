@@ -79,6 +79,21 @@ test("i18n messages expose developer mode labels", () => {
   assert.match(messages["en-US"].settings.developerModeHelp, /Evidence Search/);
 });
 
+test("primary navigation names match the workflow-oriented sidebar", () => {
+  assert.equal(messages["zh-CN"].nav.home, "工作台");
+  assert.equal(messages["zh-CN"].nav.editor, "图编辑器");
+  assert.equal(messages["zh-CN"].nav.models, "模型供应商");
+  assert.equal(messages["zh-CN"].nav.modelLogs, "模型调用日志");
+  assert.equal(messages["zh-CN"].nav.actions, "能力动作");
+  assert.equal(messages["zh-CN"].nav.presets, "节点预设");
+  assert.equal(messages["en-US"].nav.home, "Workspace");
+  assert.equal(messages["en-US"].nav.editor, "Graph Editor");
+  assert.equal(messages["en-US"].nav.models, "Model Providers");
+  assert.equal(messages["en-US"].nav.modelLogs, "Model Calls");
+  assert.equal(messages["en-US"].nav.actions, "Actions");
+  assert.equal(messages["en-US"].nav.presets, "Node Presets");
+});
+
 test("Preset management labels localize node families in Chinese", () => {
   assert.equal(messages["zh-CN"].presets.agents, "LLM 预设");
   assert.equal(messages["zh-CN"].presets.input, "输入");
@@ -89,9 +104,9 @@ test("Preset management labels localize node families in Chinese", () => {
   assert.equal(messages["en-US"].presets.agent, "LLM");
 });
 
-test("Chinese UI labels Action as execution item", () => {
+test("Chinese UI labels Action as capability action", () => {
   const zh = messages["zh-CN"];
-  assert.equal(zh.nav.actions, "执行项");
+  assert.equal(zh.nav.actions, "能力动作");
   assert.equal(zh.actions.eyebrow, "执行项");
   assert.equal(zh.actions.title, "执行项管理");
   assert.equal(zh.actions.total, "全部执行项");

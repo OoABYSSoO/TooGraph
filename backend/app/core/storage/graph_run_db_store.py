@@ -237,6 +237,64 @@ def list_run_states() -> list[dict[str, Any]]:
     return [load_run_state(str(row["run_id"])) for row in rows]
 
 
+def list_run_summary_states() -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                run_id,
+                root_run_id,
+                parent_run_id,
+                parent_node_id,
+                invocation_kind,
+                invocation_key,
+                run_depth,
+                run_path_json,
+                graph_id,
+                graph_name,
+                template_id,
+                template_version,
+                status,
+                runtime_backend,
+                current_node_id,
+                started_at,
+                completed_at,
+                duration_ms,
+                metadata_json,
+                lifecycle_json,
+                checkpoint_metadata_json,
+                batch_group_id,
+                batch_item_index,
+                batch_item_label,
+                revision_round,
+                final_score,
+                json_extract(detail_json, '$.stop_reason') AS stop_reason
+            FROM graph_runs
+            ORDER BY started_at DESC, run_id DESC
+            """
+        ).fetchall()
+        run_ids = [str(row["run_id"]) for row in rows]
+        snapshot_options_by_run_id = _run_snapshot_options_by_run_id(connection, run_ids)
+
+    return [
+        _run_summary_payload(
+            row,
+            snapshot_options_by_run_id.get(str(row["run_id"]), []),
+        )
+        for row in rows
+    ]
+
+
+def load_current_graph_snapshot_states(run_ids: list[str]) -> dict[str, dict[str, Any]]:
+    normalized_run_ids = list(
+        dict.fromkeys(str(run_id or "").strip() for run_id in run_ids if str(run_id or "").strip())
+    )
+    if not normalized_run_ids:
+        return {}
+    with get_connection() as connection:
+        return _current_graph_snapshots_by_run_id(connection, normalized_run_ids)
+
+
 def list_child_run_states(parent_run_id: str) -> list[dict[str, Any]]:
     normalized_parent_run_id = str(parent_run_id or "").strip()
     if not normalized_parent_run_id:
@@ -887,6 +945,89 @@ def _build_run_state(
     state.setdefault("cycle_summary", {})
     state.setdefault("cycle_iterations", [])
     return state
+
+
+def _run_summary_payload(row: Any, snapshot_options: list[dict[str, Any]]) -> dict[str, Any]:
+    run = dict(row)
+    run_id = str(run.get("run_id") or "")
+    return {
+        "run_id": run_id,
+        "parent_run_id": run.get("parent_run_id") or "",
+        "root_run_id": run.get("root_run_id") or run_id,
+        "parent_node_id": run.get("parent_node_id") or "",
+        "invocation_kind": run.get("invocation_kind") or "",
+        "invocation_key": run.get("invocation_key") or "",
+        "run_depth": _int(run.get("run_depth"), default=0),
+        "run_path": _loads(run.get("run_path_json"), [run_id]),
+        "batch_group_id": run.get("batch_group_id") or "",
+        "batch_item_index": run.get("batch_item_index"),
+        "batch_item_label": run.get("batch_item_label") or "",
+        "graph_id": run.get("graph_id"),
+        "graph_name": run.get("graph_name") or "",
+        "template_id": run.get("template_id") or "",
+        "template_version": run.get("template_version") or "",
+        "status": run.get("status") or "",
+        "runtime_backend": run.get("runtime_backend") or "",
+        "current_node_id": run.get("current_node_id"),
+        "metadata": _loads(run.get("metadata_json"), {}),
+        "lifecycle": _loads(run.get("lifecycle_json"), {}),
+        "checkpoint_metadata": _loads(run.get("checkpoint_metadata_json"), {}),
+        "revision_round": _int(run.get("revision_round"), default=0),
+        "started_at": run.get("started_at") or "",
+        "completed_at": run.get("completed_at"),
+        "duration_ms": run.get("duration_ms"),
+        "final_score": run.get("final_score"),
+        "stop_reason": run.get("stop_reason") or "",
+        "run_snapshot_options": snapshot_options,
+    }
+
+
+def _run_snapshot_options_by_run_id(connection: Any, run_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    if not run_ids:
+        return {}
+    placeholders = ",".join("?" for _ in run_ids)
+    rows = connection.execute(
+        f"""
+        SELECT run_id, snapshot_id, kind, label, status, current_node_id
+        FROM graph_run_snapshots
+        WHERE kind != 'current' AND run_id IN ({placeholders})
+        ORDER BY created_at, snapshot_id
+        """,
+        tuple(run_ids),
+    ).fetchall()
+    options_by_run_id: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        snapshot = dict(row)
+        snapshot_id = str(snapshot.get("snapshot_id") or "").strip()
+        kind = str(snapshot.get("kind") or "").strip()
+        if not snapshot_id or kind not in {"pause", "completed", "failed"}:
+            continue
+        run_id = str(snapshot.get("run_id") or "")
+        options_by_run_id.setdefault(run_id, []).append(
+            {
+                "snapshot_id": snapshot_id,
+                "kind": kind,
+                "label": str(snapshot.get("label") or snapshot_id),
+                "status": str(snapshot.get("status") or ""),
+                "current_node_id": snapshot.get("current_node_id"),
+            }
+        )
+    return options_by_run_id
+
+
+def _current_graph_snapshots_by_run_id(connection: Any, run_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not run_ids:
+        return {}
+    placeholders = ",".join("?" for _ in run_ids)
+    rows = connection.execute(
+        f"""
+        SELECT run_id, graph_snapshot_json
+        FROM graph_run_snapshots
+        WHERE kind = 'current' AND run_id IN ({placeholders})
+        """,
+        tuple(run_ids),
+    ).fetchall()
+    return {str(row["run_id"]): _loads(row["graph_snapshot_json"], {}) for row in rows}
 
 
 def _current_snapshot(run_id: str, run_state: dict[str, Any]) -> dict[str, Any]:

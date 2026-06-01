@@ -557,6 +557,48 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertNotIn("return_progress", sent_payloads[0])
         self.assertEqual(meta["reasoning_format"], "lmstudio:reasoning_effort")
 
+    def test_local_lmstudio_thinking_off_sends_reasoning_effort_none(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:1234/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            sent_payloads: list[dict[str, object]] = []
+
+            def fake_request(payload: dict[str, object]) -> dict[str, object]:
+                sent_payloads.append(dict(payload))
+                return {
+                    "id": "chatcmpl-1",
+                    "model": "qwen/qwen3.6-27b",
+                    "choices": [{"message": {"content": '{"answer":"ok"}'}}],
+                }
+
+            with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(
+                    local_llm,
+                    "_request_lm_studio_model_metadata",
+                    return_value={
+                        "models": [
+                            {
+                                "key": "qwen/qwen3.6-27b",
+                                "loaded_instances": [{"id": "qwen/qwen3.6-27b"}],
+                                "capabilities": {"reasoning": {"allowed_options": ["off", "on"], "default": "on"}},
+                            }
+                        ]
+                    },
+                ):
+                    with patch.object(local_llm, "_request_local_chat_completion", side_effect=fake_request):
+                        _content, meta = local_llm._chat_with_local_model_with_meta(
+                            system_prompt="sys",
+                            user_prompt="user",
+                            model="qwen/qwen3.6-27b",
+                            thinking_enabled=False,
+                            thinking_level="off",
+                        )
+
+        self.assertEqual(sent_payloads[0]["reasoning_effort"], "none")
+        self.assertFalse(meta["thinking_enabled"])
+        self.assertEqual(meta["thinking_level"], "off")
+        self.assertEqual(meta["reasoning_format"], "lmstudio:reasoning_effort")
+
     def test_local_lmstudio_native_schema_reasoning_conflict_retries_without_schema(self) -> None:
         saved_settings = {
             "model_providers": {

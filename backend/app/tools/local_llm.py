@@ -430,9 +430,7 @@ def _get_lm_studio_model_reasoning_metadata(model: str) -> dict[str, Any] | None
 def _map_lm_studio_reasoning_effort(level: str) -> str | None:
     normalized = normalize_thinking_level(level, fallback=THINKING_LEVEL_OFF)
     if normalized == THINKING_LEVEL_OFF:
-        return None
-    if normalized == THINKING_LEVEL_XHIGH:
-        return THINKING_LEVEL_HIGH
+        return "none"
     return normalized
 
 
@@ -612,6 +610,12 @@ def _chat_with_local_model_with_meta(
             warnings=warnings,
         )
         request_payload.update(thinking_request_payload)
+    elif provider_id == "local" and resolved_thinking_level == THINKING_LEVEL_OFF:
+        lm_studio_metadata = _get_lm_studio_model_reasoning_metadata(str(request_payload["model"]))
+        if lm_studio_metadata is not None and lm_studio_metadata.get("advertises_reasoning"):
+            thinking_request_payload = {"reasoning_effort": "none"}
+            reasoning_format = "lmstudio:reasoning_effort"
+            request_payload.update(thinking_request_payload)
     elif thinking_enabled:
         warnings.append(
             f"Thinking mode was requested for provider '{provider_id}', but TooGraph currently only maps provider-specific thinking fields for the local gateway."
@@ -794,7 +798,7 @@ def _chat_with_local_model_with_meta(
         "temperature": temperature,
         "thinking_enabled": used_thinking,
         "thinking_level": resolved_thinking_level,
-        "reasoning_format": reasoning_format if used_thinking and provider_id == "local" else None,
+        "reasoning_format": reasoning_format if thinking_request_payload and provider_id == "local" else None,
         "reasoning": reasoning,
         "usage": response_payload.get("usage"),
         "timings": response_payload.get("timings"),

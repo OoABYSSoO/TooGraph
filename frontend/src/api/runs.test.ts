@@ -141,3 +141,23 @@ test("fetchRuns can request template runs and internal scheduled runs", async ()
 
   globalThis.fetch = originalFetch;
 });
+
+test("fetchRuns can limit recent runs for workspace summaries", async () => {
+  let requestedUrl = "";
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requestedUrl = String(input);
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  await fetchRuns({ limit: 5 });
+
+  assert.equal(requestedUrl, "/api/runs?limit=5");
+
+  globalThis.fetch = originalFetch;
+});

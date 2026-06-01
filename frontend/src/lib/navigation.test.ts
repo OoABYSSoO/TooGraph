@@ -14,6 +14,28 @@ test("navigation marks only unfinished pages as developer-only", () => {
   assert.equal(PRIMARY_NAVIGATION_ITEMS.find((item) => item.path === "/model-logs")?.visibility, "stable");
 });
 
+test("navigation orders stable product surfaces by primary workflow", () => {
+  assert.deepEqual(
+    buildVisibleNavigationItems(false).map((item) => [item.path, item.icon]),
+    [
+      ["/", "House"],
+      ["/editor", "EditPen"],
+      ["/library", "Collection"],
+      ["/buddy", "ChatDotRound"],
+      ["/runs", "Clock"],
+      ["/knowledge", "Reading"],
+      ["/scheduler", "Calendar"],
+      ["/message-platforms", "MessageBox"],
+      ["/models", "Cpu"],
+      ["/model-logs", "Memo"],
+      ["/actions", "Operation"],
+      ["/tools", "ToolWrench"],
+      ["/presets", "CollectionTag"],
+      ["/settings", "Setting"],
+    ],
+  );
+});
+
 test("navigation hides developer pages until developer mode is enabled", () => {
   assert.deepEqual(
     buildVisibleNavigationItems(false)

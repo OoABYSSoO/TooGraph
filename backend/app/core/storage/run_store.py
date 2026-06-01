@@ -6,6 +6,8 @@ from app.core.storage.graph_run_db_store import (
     build_run_tree_state,
     list_child_run_states,
     list_run_states,
+    list_run_summary_states,
+    load_current_graph_snapshot_states,
     load_run_state,
     save_run_state,
 )
@@ -21,6 +23,14 @@ def load_run(run_id: str) -> dict[str, Any]:
 
 def list_runs() -> list[dict[str, Any]]:
     return list_run_states()
+
+
+def list_run_summaries() -> list[dict[str, Any]]:
+    return list_run_summary_states()
+
+
+def load_current_graph_snapshots(run_ids: list[str]) -> dict[str, dict[str, Any]]:
+    return load_current_graph_snapshot_states(run_ids)
 
 
 def list_child_runs(parent_run_id: str) -> list[dict[str, Any]]:

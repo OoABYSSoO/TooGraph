@@ -98,12 +98,10 @@ def _map_openai_reasoning_effort(level: str, model: str) -> str | None:
     return normalized
 
 
-def _map_openai_compatible_reasoning_effort(level: str) -> str | None:
+def _map_lmstudio_reasoning_effort(level: str) -> str | None:
     normalized = normalize_thinking_level(level, fallback=THINKING_LEVEL_OFF)
     if normalized == THINKING_LEVEL_OFF:
-        return None
-    if normalized == THINKING_LEVEL_XHIGH:
-        return THINKING_LEVEL_HIGH
+        return "none"
     return normalized
 
 
@@ -115,11 +113,12 @@ def build_native_thinking_payload(
     thinking_level: Any,
 ) -> dict[str, Any]:
     level = normalize_thinking_level(thinking_level, fallback=THINKING_LEVEL_OFF)
-    if level == THINKING_LEVEL_OFF:
-        return {}
-
     provider = str(provider_id or "").strip().lower()
     normalized_transport = str(transport or "").strip()
+    if level == THINKING_LEVEL_OFF:
+        if normalized_transport == TRANSPORT_OPENAI_COMPATIBLE and provider == "lmstudio":
+            return {"reasoning_effort": "none"}
+        return {}
 
     if normalized_transport == TRANSPORT_CODEX_RESPONSES or provider == "openai-codex":
         effort = _map_openai_reasoning_effort(level, model)
@@ -130,7 +129,7 @@ def build_native_thinking_payload(
         return {"reasoning_effort": effort} if effort else {}
 
     if normalized_transport == TRANSPORT_OPENAI_COMPATIBLE and provider == "lmstudio":
-        effort = _map_openai_compatible_reasoning_effort(level)
+        effort = _map_lmstudio_reasoning_effort(level)
         return {"reasoning_effort": effort} if effort else {}
 
     if normalized_transport == TRANSPORT_OPENAI_COMPATIBLE and provider == "mistral" and str(model).lower().startswith("mistral-small"):

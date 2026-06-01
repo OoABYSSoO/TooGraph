@@ -390,6 +390,39 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(requested["json"]["messages"][0], {"role": "system", "content": "sys"})
 
+    def test_lmstudio_thinking_off_sends_reasoning_effort_none(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "id": "chatcmpl_lmstudio",
+                    "model": "qwen/qwen3.6-27b",
+                    "choices": [{"message": {"content": '{"answer":"ok"}'}}],
+                }
+            )
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="lmstudio",
+                transport="openai-compatible",
+                base_url="http://127.0.0.1:1234/v1",
+                api_key="",
+                model="qwen/qwen3.6-27b",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                thinking_enabled=False,
+                thinking_level="off",
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, '{"answer":"ok"}')
+        self.assertEqual(requested["json"]["reasoning_effort"], "none")
+        self.assertFalse(meta["thinking_enabled"])
+        self.assertEqual(meta["thinking_level"], "off")
+        self.assertEqual(meta["reasoning_format"], "reasoning_effort")
+
     def test_chat_openai_compatible_applies_prompt_cache_key_for_openai_provider(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 

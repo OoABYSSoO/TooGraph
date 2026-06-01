@@ -136,6 +136,7 @@ import {
   resolveWorkspaceEmptyAction,
 } from "./workspaceDashboardModel.ts";
 
+const WORKSPACE_DASHBOARD_RUN_LIMIT = 5;
 const graphs = ref<GraphDocument[]>([]);
 const templates = ref<TemplateRecord[]>([]);
 const runs = ref<RunSummary[]>([]);
@@ -170,7 +171,11 @@ const visibleGraphPage = computed(() => paginateWorkspacePanelItems(graphs.value
 
 onMounted(async () => {
   try {
-    const [graphPayload, runPayload, templatePayload] = await Promise.all([fetchGraphs(), fetchRuns(), fetchTemplates()]);
+    const [graphPayload, runPayload, templatePayload] = await Promise.all([
+      fetchGraphs(),
+      fetchRuns({ limit: WORKSPACE_DASHBOARD_RUN_LIMIT }),
+      fetchTemplates(),
+    ]);
     graphs.value = graphPayload;
     runs.value = runPayload;
     templates.value = templatePayload;

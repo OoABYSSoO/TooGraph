@@ -83,6 +83,45 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("字段说明中的 name/description 只用于理解语义，不要作为 JSON 字段输出。", prompt)
         self.assertNotIn('"name": "最终答案"', prompt)
 
+    def test_node_task_lives_in_system_prompt_while_runtime_state_lives_in_user_prompt(self) -> None:
+        state_schema = {
+            "question_state": NodeSystemStateDefinition(
+                name="用户问题",
+                description="本次运行传入的用户问题",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+            "answer": NodeSystemStateDefinition(
+                name="最终答案",
+                description="给用户看的回复",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+        }
+
+        system_prompt = build_auto_system_prompt(
+            ["answer"],
+            {"question_state": "你好，你是谁"},
+            {},
+            task_instruction="告诉用户你的角色。",
+            state_schema=state_schema,
+        )
+        user_prompt = build_auto_user_prompt(
+            "告诉用户你的角色。",
+            {"question_state": "你好，你是谁"},
+            {},
+            state_schema=state_schema,
+        )
+
+        self.assertIn("== Node Task ==", system_prompt)
+        self.assertIn("告诉用户你的角色。", system_prompt)
+        self.assertNotIn("TooGraph 工作流", system_prompt)
+        self.assertNotIn("LLM 节点", system_prompt)
+        self.assertIn("== Graph State Inputs ==", user_prompt)
+        self.assertIn("你好，你是谁", user_prompt)
+        self.assertNotIn("告诉用户你的角色。", user_prompt)
+        self.assertNotIn("你好，你是谁", system_prompt)
+
     def test_auto_prompt_emphasizes_output_state_value_formats(self) -> None:
         state_schema = {
             "state_1": NodeSystemStateDefinition(

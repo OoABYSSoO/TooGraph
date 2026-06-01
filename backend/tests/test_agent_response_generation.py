@@ -72,7 +72,6 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(reasoning, "")
         self.assertEqual(warnings, [])
         self.assertEqual(captured["system_prompt"], "system prompt")
-        self.assertIn("根据输入和Action 结果完成输出。", str(captured["user_prompt"]))
         self.assertIn("== Graph State Inputs ==", str(captured["user_prompt"]))
         self.assertIn("== Action Results ==", str(captured["user_prompt"]))
         self.assertEqual(captured["model"], "test-model")
@@ -155,10 +154,12 @@ class AgentResponseGenerationTests(unittest.TestCase):
         system_prompt = str(captured["system_prompt"])
         user_prompt = str(captured["user_prompt"])
         self.assertIn("== 必须返回的 JSON 字段 ==", system_prompt)
+        self.assertIn("== Node Task ==", system_prompt)
+        self.assertIn("请根据材料回答。", system_prompt)
         self.assertIn("每个字段必须使用上方的 key", system_prompt)
         self.assertNotIn("STATE_SECRET_VALUE", system_prompt)
         self.assertNotIn("ACTION_SECRET_VALUE", system_prompt)
-        self.assertIn("请根据材料回答。", user_prompt)
+        self.assertNotIn("请根据材料回答。", user_prompt)
         self.assertIn("== Graph State Inputs ==", user_prompt)
         self.assertIn("STATE_SECRET_VALUE", user_prompt)
         self.assertIn("== Action Results ==", user_prompt)
@@ -860,10 +861,15 @@ class AgentResponseGenerationTests(unittest.TestCase):
 
     def test_user_prompt_does_not_append_action_instruction_blocks_for_final_response(self) -> None:
         captured: dict[str, object] = {}
+        prompt_builder_kwargs: dict[str, object] = {}
 
         def chat_with_local_model_with_meta_func(**kwargs):
             captured.update(kwargs)
             return ('{"answer": "done"}', {"warnings": []})
+
+        def build_effective_system_prompt_func(*_args, **kwargs):
+            prompt_builder_kwargs.update(kwargs)
+            return f"system prompt\n{kwargs.get('task_instruction', '')}"
 
         node = NodeSystemAgentNode.model_validate(
             {
@@ -898,13 +904,15 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "resolved_thinking_level": "off",
                 "resolved_model_ref": "local/test-model",
             },
-            build_effective_system_prompt_func=lambda *args, **kwargs: "system prompt",
+            build_effective_system_prompt_func=build_effective_system_prompt_func,
             chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
             parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "done"},
             build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
         )
 
-        self.assertIn("Summarize the action result.", str(captured["user_prompt"]))
+        self.assertEqual(prompt_builder_kwargs["task_instruction"], "Summarize the action result.")
+        self.assertIn("Summarize the action result.", str(captured["system_prompt"]))
+        self.assertNotIn("Summarize the action result.", str(captured["user_prompt"]))
         self.assertIn("searched", str(captured["user_prompt"]))
         self.assertNotIn("Bound Action Instructions", str(captured["user_prompt"]))
         self.assertNotIn("Use this only while invoking the action.", str(captured["user_prompt"]))

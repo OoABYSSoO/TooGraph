@@ -565,6 +565,7 @@ const {
   clearSessionDeleteConfirmTimeout,
   clearSessionDeleteConfirmState,
   handleSessionDeleteActionClick,
+  hydrateActiveSessionRunDisplays,
   waitForChatSessionInitialization,
 } = useBuddyChatSessions({
   messages,
@@ -577,6 +578,7 @@ const {
   resetVisibleBuddyRunState,
   scrollMessagesToBottom,
   formatErrorMessage,
+  shouldHydrateLoadedRunDisplays: () => isPanelOpen.value,
   hydrateLoadedRunDisplays: hydrateLoadedBuddyRunDisplays,
 });
 const buddyModeLabel = computed(() => {
@@ -738,6 +740,7 @@ watch(
 watch(isPanelOpen, (open) => {
   if (open) {
     void refreshActiveChatSession();
+    void hydrateActiveSessionRunDisplays();
   }
 });
 

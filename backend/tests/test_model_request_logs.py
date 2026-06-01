@@ -1158,14 +1158,16 @@ class ModelRequestLogTests(unittest.TestCase):
         self.assertEqual(tree["kind"], "run")
         self.assertEqual(tree["label"], "Root Graph")
         self.assertEqual([child["id"] for child in tree["children"]], ["node:run_root:plan", "node:run_root:nested"])
+        root_entry = next(entry for entry in payload["entries"] if entry["model"] == "root-model")
+        child_entry = next(entry for entry in payload["entries"] if entry["model"] == "child-model")
         plan_node = tree["children"][0]
         self.assertEqual(plan_node["kind"], "graph_node")
-        self.assertEqual(plan_node["model_log_ids"], [payload["entries"][1]["id"]])
+        self.assertEqual(plan_node["model_log_ids"], [root_entry["id"]])
         nested_node = tree["children"][1]
         self.assertEqual(nested_node["node_type"], "subgraph")
         self.assertEqual(nested_node["children"][0]["kind"], "run")
         self.assertEqual(nested_node["children"][0]["run_id"], "run_child")
-        self.assertEqual(nested_node["children"][0]["children"][0]["model_log_ids"], [payload["entries"][0]["id"]])
+        self.assertEqual(nested_node["children"][0]["children"][0]["model_log_ids"], [child_entry["id"]])
 
     def test_prunes_model_request_logs_by_latest_root_runs(self) -> None:
         from app.core.runtime.model_call_context import use_model_call_context

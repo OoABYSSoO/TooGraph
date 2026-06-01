@@ -25,6 +25,13 @@ SETTINGS_DATA_DIR = DATA_DIR / "settings"
 ACTION_STATE_DATA_DIR = DATA_DIR / "actions"
 DB_PATH = DATA_DIR / "toograph.db"
 _SCHEMA_LOCK = threading.RLock()
+_BUDDY_MESSAGES_FTS_MARKER_KEY = "schema.buddy_messages_fts"
+_BUDDY_MESSAGES_FTS_MARKER_VALUE = '{"version":2,"triggers":"dual_fts"}'
+_BUDDY_MESSAGES_FTS_TRIGGER_NAMES = {
+    "buddy_messages_ai_fts",
+    "buddy_messages_ad_fts",
+    "buddy_messages_au_fts",
+}
 
 
 class ManagedConnection(sqlite3.Connection):
@@ -481,6 +488,8 @@ def _ensure_graph_run_schema(connection: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_graph_model_calls_run
             ON graph_model_calls(run_id, started_at);
+        CREATE INDEX IF NOT EXISTS idx_graph_model_calls_started
+            ON graph_model_calls(started_at DESC, model_call_id DESC);
 
         CREATE TABLE IF NOT EXISTS provider_rate_reservations (
             reservation_id TEXT PRIMARY KEY,
@@ -843,7 +852,17 @@ def _ensure_buddy_message_fts(connection: sqlite3.Connection) -> None:
             created_at UNINDEXED,
             tokenize='trigram'
         );
+        """
+    )
+    if _schema_marker_is_current(
+        connection,
+        _BUDDY_MESSAGES_FTS_MARKER_KEY,
+        _BUDDY_MESSAGES_FTS_MARKER_VALUE,
+    ) and _buddy_messages_fts_triggers_exist(connection):
+        return
 
+    connection.executescript(
+        """
         DROP TRIGGER IF EXISTS buddy_messages_ai_fts;
         DROP TRIGGER IF EXISTS buddy_messages_ad_fts;
         DROP TRIGGER IF EXISTS buddy_messages_au_fts;
@@ -870,6 +889,20 @@ def _ensure_buddy_message_fts(connection: sqlite3.Connection) -> None:
         END;
         """
     )
+    _ensure_buddy_message_fts_seeded(connection)
+    _set_schema_marker(
+        connection,
+        _BUDDY_MESSAGES_FTS_MARKER_KEY,
+        _BUDDY_MESSAGES_FTS_MARKER_VALUE,
+    )
+
+
+def _ensure_buddy_message_fts_seeded(connection: sqlite3.Connection) -> None:
+    message_count = _table_row_count(connection, "buddy_messages")
+    fts_count = _table_row_count(connection, "buddy_messages_fts")
+    trigram_count = _table_row_count(connection, "buddy_messages_fts_trigram")
+    if fts_count == message_count and trigram_count == message_count:
+        return
     connection.execute("DELETE FROM buddy_messages_fts")
     connection.execute("DELETE FROM buddy_messages_fts_trigram")
     connection.execute(
@@ -885,6 +918,43 @@ def _ensure_buddy_message_fts(connection: sqlite3.Connection) -> None:
         SELECT rowid, message_id, session_id, role, content, created_at
         FROM buddy_messages
         """
+    )
+
+
+def _buddy_messages_fts_triggers_exist(connection: sqlite3.Connection) -> bool:
+    rows = connection.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'trigger'
+          AND tbl_name = 'buddy_messages'
+          AND name IN (?, ?, ?)
+        """,
+        tuple(sorted(_BUDDY_MESSAGES_FTS_TRIGGER_NAMES)),
+    ).fetchall()
+    return {str(row[0] or "") for row in rows} == _BUDDY_MESSAGES_FTS_TRIGGER_NAMES
+
+
+def _table_row_count(connection: sqlite3.Connection, table_name: str) -> int:
+    row = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+    return int(row[0] or 0) if row is not None else 0
+
+
+def _schema_marker_is_current(connection: sqlite3.Connection, key: str, value: str) -> bool:
+    row = connection.execute("SELECT value_json FROM buddy_kv WHERE key = ?", (key,)).fetchone()
+    return row is not None and str(row[0] or "") == value
+
+
+def _set_schema_marker(connection: sqlite3.Connection, key: str, value: str) -> None:
+    connection.execute(
+        """
+        INSERT INTO buddy_kv (key, value_json, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            value_json = excluded.value_json,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (key, value),
     )
 
 

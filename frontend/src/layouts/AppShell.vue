@@ -62,21 +62,20 @@
 <script setup lang="ts">
 import { ElIcon } from "element-plus";
 import {
+  Calendar,
   ChatDotRound,
-  Connection,
   House,
   EditPen,
   Clock,
   Collection,
   CollectionTag,
-  DataLine,
+  Cpu,
   DocumentChecked,
-  Opportunity,
-  Tools,
+  Memo,
+  MessageBox,
+  Operation,
   Reading,
   Setting,
-  Tickets,
-  Timer,
   TrendCharts,
 } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from "vue";
@@ -85,6 +84,7 @@ import { useRoute } from "vue-router";
 
 import LanguageSwitcher from "./LanguageSwitcher.vue";
 import { fetchSettings } from "@/api/settings";
+import ToolWrenchIcon from "@/components/icons/ToolWrenchIcon.vue";
 import { resolvePrimaryNavigationSection, resolveShellLayoutMode } from "@/lib/layout-mode";
 import { buildVisibleNavigationItems } from "@/lib/navigation";
 import type { NavigationIconKey } from "@/lib/navigation";
@@ -93,21 +93,21 @@ const SIDEBAR_STORAGE_KEY = "toograph:sidebar-collapsed";
 const UI_PREFERENCES_UPDATED_EVENT = "toograph:ui-preferences-updated";
 
 const navigationIconComponents: Record<NavigationIconKey, Component> = {
+  Calendar,
   ChatDotRound,
   Clock,
   Collection,
   CollectionTag,
-  Connection,
-  DataLine,
+  Cpu,
   DocumentChecked,
   EditPen,
   House,
-  Opportunity,
+  Memo,
+  MessageBox,
+  Operation,
   Reading,
   Setting,
-  Tickets,
-  Timer,
-  Tools,
+  ToolWrench: ToolWrenchIcon,
   TrendCharts,
 };
 

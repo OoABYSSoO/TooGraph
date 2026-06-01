@@ -8,7 +8,7 @@ from app.core.runtime.structured_output import (
     build_openai_json_schema_response_format,
     should_retry_without_native_structured_output,
 )
-from app.core.thinking_levels import build_native_thinking_payload
+from app.core.thinking_levels import THINKING_LEVEL_OFF, build_native_thinking_payload, normalize_thinking_level
 from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers, normalize_request_timeout_seconds
 from app.tools.model_provider_multimodal import build_openai_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
@@ -141,6 +141,9 @@ def chat_openai_compatible(
         model=model,
         thinking_level=thinking_level,
     )
+    native_thinking_enabled = bool(native_thinking_payload) and (
+        normalize_thinking_level(thinking_level, fallback=THINKING_LEVEL_OFF) != THINKING_LEVEL_OFF
+    )
     request_payload.update(native_thinking_payload)
     provider_prompt_cache_result = _apply_openai_prompt_cache_key(
         provider_id=provider_id,
@@ -221,7 +224,7 @@ def chat_openai_compatible(
         "usage": response_payload.get("usage"),
         "timings": response_payload.get("timings"),
         "response_id": response_payload.get("id"),
-        "thinking_enabled": bool(native_thinking_payload),
+        "thinking_enabled": native_thinking_enabled,
         "thinking_level": thinking_level,
         "reasoning_format": "reasoning_effort" if native_thinking_payload else None,
         "stream_fallback_error": stream_fallback_error,

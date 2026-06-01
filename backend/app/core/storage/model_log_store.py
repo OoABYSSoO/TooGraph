@@ -19,7 +19,6 @@ from app.core.storage.provider_prompt_cache_store import (
     summarize_provider_prompt_cache_resources,
 )
 from app.core.storage.settings_store import load_app_settings, save_app_settings
-from app.core.storage import run_store
 
 
 DEFAULT_MODEL_LOG_RETENTION_ROOT_RUNS = 200
@@ -1204,17 +1203,149 @@ def build_model_log_run_trees(entries: list[dict[str, Any]]) -> list[dict[str, A
         root_run_id = str(entry.get("root_run_id") or entry.get("run_id") or "").strip()
         if root_run_id and root_run_id not in root_run_ids:
             root_run_ids.append(root_run_id)
+    if not root_run_ids:
+        return []
+
+    runs_by_id, executions_by_run = _read_model_log_run_context(root_run_ids)
+    children_by_parent: dict[str, list[dict[str, Any]]] = {}
+    for run in runs_by_id.values():
+        parent_run_id = str(run.get("parent_run_id") or "").strip()
+        if parent_run_id:
+            children_by_parent.setdefault(parent_run_id, []).append(run)
+    for children in children_by_parent.values():
+        children.sort(key=_model_log_run_sort_key)
+
+    def build_run_node(run: dict[str, Any], seen: set[str]) -> dict[str, Any]:
+        run_id = str(run.get("run_id") or "")
+        node = {**run, "children": []}
+        if not run_id or run_id in seen:
+            return node
+        next_seen = {*seen, run_id}
+        node["children"] = [
+            build_run_node(child, next_seen)
+            for child in children_by_parent.get(run_id, [])
+        ]
+        return node
 
     trees: list[dict[str, Any]] = []
     for root_run_id in root_run_ids:
-        try:
-            run_tree = run_store.build_run_tree(root_run_id)
-        except FileNotFoundError:
+        root_run = runs_by_id.get(root_run_id)
+        if root_run is None:
             continue
-        rendered = _build_tree_for_run(run_tree, entries_by_run)
+        rendered = _build_tree_for_run(build_run_node(root_run, set()), entries_by_run, executions_by_run)
         if rendered["children"] or rendered.get("model_log_ids"):
             trees.append(rendered)
     return trees
+
+
+def _read_model_log_run_context(root_run_ids: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    normalized_root_run_ids = [run_id for run_id in dict.fromkeys(str(item or "").strip() for item in root_run_ids) if run_id]
+    if not normalized_root_run_ids:
+        return {}, {}
+    root_placeholders = ",".join("?" for _item in normalized_root_run_ids)
+    with get_connection() as connection:
+        run_rows = connection.execute(
+            f"""
+            SELECT
+                run_id,
+                root_run_id,
+                parent_run_id,
+                parent_node_id,
+                invocation_kind,
+                invocation_key,
+                run_depth,
+                run_path_json,
+                graph_id,
+                graph_name,
+                status,
+                current_node_id,
+                started_at,
+                completed_at,
+                duration_ms,
+                final_result,
+                batch_group_id,
+                batch_item_index,
+                batch_item_label
+            FROM graph_runs
+            WHERE run_id IN ({root_placeholders})
+               OR root_run_id IN ({root_placeholders})
+            ORDER BY run_depth ASC, started_at ASC, run_id ASC
+            """,
+            (*normalized_root_run_ids, *normalized_root_run_ids),
+        ).fetchall()
+        runs_by_id = {_text(row["run_id"]): _model_log_run_summary(row) for row in run_rows if _text(row["run_id"])}
+        if not runs_by_id:
+            return {}, {}
+        run_ids = list(runs_by_id.keys())
+        run_placeholders = ",".join("?" for _item in run_ids)
+        execution_rows = connection.execute(
+            f"""
+            SELECT
+                run_id,
+                execution_id,
+                node_id,
+                node_type,
+                node_name,
+                status,
+                started_at,
+                duration_ms,
+                order_index
+            FROM graph_node_executions
+            WHERE run_id IN ({run_placeholders})
+            ORDER BY run_id ASC, order_index ASC, started_at ASC, execution_id ASC
+            """,
+            run_ids,
+        ).fetchall()
+    executions_by_run: dict[str, list[dict[str, Any]]] = {}
+    for row in execution_rows:
+        run_id = _text(row["run_id"])
+        if not run_id:
+            continue
+        executions_by_run.setdefault(run_id, []).append(
+            {
+                "execution_id": _text(row["execution_id"]),
+                "node_id": _text(row["node_id"]),
+                "node_type": _text(row["node_type"]),
+                "node_name": _text(row["node_name"]),
+                "status": _text(row["status"]),
+                "started_at": row["started_at"],
+                "duration_ms": row["duration_ms"],
+                "order_index": row["order_index"],
+            }
+        )
+    return runs_by_id, executions_by_run
+
+
+def _model_log_run_summary(row: Any) -> dict[str, Any]:
+    run_id = _text(row["run_id"])
+    return {
+        "run_id": run_id,
+        "graph_id": _text(row["graph_id"]),
+        "graph_name": _text(row["graph_name"]),
+        "status": _text(row["status"]),
+        "parent_run_id": _text(row["parent_run_id"]),
+        "root_run_id": _text(row["root_run_id"]) or run_id,
+        "parent_node_id": _text(row["parent_node_id"]),
+        "invocation_kind": _text(row["invocation_kind"]),
+        "invocation_key": _text(row["invocation_key"]),
+        "run_depth": _int(row["run_depth"], default=0),
+        "run_path": _loads(row["run_path_json"], [run_id]),
+        "batch_group_id": _text(row["batch_group_id"]),
+        "batch_item_index": row["batch_item_index"] if isinstance(row["batch_item_index"], int) else None,
+        "batch_item_label": _text(row["batch_item_label"]),
+        "current_node_id": row["current_node_id"],
+        "started_at": _text(row["started_at"]),
+        "completed_at": row["completed_at"],
+        "duration_ms": row["duration_ms"],
+        "final_result": _text(row["final_result"]),
+        "children": [],
+    }
+
+
+def _model_log_run_sort_key(run: dict[str, Any]) -> tuple[list[str], str, str]:
+    run_path = run.get("run_path")
+    normalized_path = [str(item or "") for item in run_path] if isinstance(run_path, list) else []
+    return (normalized_path, str(run.get("started_at") or ""), str(run.get("run_id") or ""))
 
 
 def sanitize_payload_for_log(value: Any) -> Any:
@@ -1365,7 +1496,11 @@ def _hydrate_log_entry(entry: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _build_tree_for_run(run_node: dict[str, Any], entries_by_run: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+def _build_tree_for_run(
+    run_node: dict[str, Any],
+    entries_by_run: dict[str, list[dict[str, Any]]],
+    executions_by_run: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
     run_id = str(run_node.get("run_id") or "")
     entries = entries_by_run.get(run_id, [])
     direct_call_ids = [entry["id"] for entry in entries if not str(entry.get("node_id") or "").strip()]
@@ -1382,11 +1517,7 @@ def _build_tree_for_run(run_node: dict[str, Any], entries_by_run: dict[str, list
         "children": [],
     }
 
-    try:
-        detail = run_store.load_run(run_id)
-    except FileNotFoundError:
-        detail = {}
-    executions = [item for item in detail.get("node_executions", []) if isinstance(item, dict)]
+    executions = executions_by_run.get(run_id, [])
     children_by_parent_node = _group_child_runs_by_parent_node(run_node.get("children") or [])
     emitted_child_runs: set[str] = set()
     emitted_log_ids: set[str] = set(direct_call_ids)
@@ -1400,7 +1531,7 @@ def _build_tree_for_run(run_node: dict[str, Any], entries_by_run: dict[str, list
         child_runs = children_by_parent_node.get(node_id, [])
         if not node_entries and not child_runs:
             continue
-        child_nodes = [_build_tree_for_run(child, entries_by_run) for child in child_runs]
+        child_nodes = [_build_tree_for_run(child, entries_by_run, executions_by_run) for child in child_runs]
         emitted_child_runs.update(str(child.get("run_id") or "") for child in child_runs)
         model_log_ids = [entry["id"] for entry in node_entries]
         emitted_log_ids.update(model_log_ids)
@@ -1447,7 +1578,7 @@ def _build_tree_for_run(run_node: dict[str, Any], entries_by_run: dict[str, list
                 "started_at": first_entry.get("started_at"),
                 "duration_ms": first_entry.get("duration_ms"),
                 "model_log_ids": [entry["id"] for entry in reversed(node_entries)],
-                "children": [_build_tree_for_run(child, entries_by_run) for child in child_runs],
+                "children": [_build_tree_for_run(child, entries_by_run, executions_by_run) for child in child_runs],
             }
         )
 
@@ -1455,7 +1586,7 @@ def _build_tree_for_run(run_node: dict[str, Any], entries_by_run: dict[str, list
         child_run_id = str(child_run.get("run_id") or "")
         if child_run_id in emitted_child_runs:
             continue
-        rendered_child = _build_tree_for_run(child_run, entries_by_run)
+        rendered_child = _build_tree_for_run(child_run, entries_by_run, executions_by_run)
         if rendered_child["children"] or rendered_child.get("model_log_ids"):
             tree["children"].append(rendered_child)
     return tree
@@ -1760,3 +1891,10 @@ def _normalize_string_list(value: Any) -> list[str]:
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _int(value: Any, *, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default

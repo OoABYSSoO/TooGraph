@@ -3,21 +3,21 @@ import type { PrimaryNavigationSection } from "./layout-mode.ts";
 export type NavigationVisibility = "stable" | "developer";
 
 export type NavigationIconKey =
+  | "Calendar"
   | "ChatDotRound"
   | "Clock"
   | "Collection"
   | "CollectionTag"
-  | "Connection"
-  | "DataLine"
+  | "Cpu"
   | "DocumentChecked"
   | "EditPen"
   | "House"
-  | "Opportunity"
+  | "Memo"
+  | "MessageBox"
+  | "Operation"
   | "Reading"
   | "Setting"
-  | "Tickets"
-  | "Timer"
-  | "Tools"
+  | "ToolWrench"
   | "TrendCharts";
 
 export type PrimaryNavigationItem = {
@@ -35,22 +35,22 @@ export type PrimaryNavigationItem = {
 export const PRIMARY_NAVIGATION_ITEMS: PrimaryNavigationItem[] = [
   navigationItem("/", "home", "nav.home", "House"),
   navigationItem("/editor", "editor", "nav.editor", "EditPen"),
-  navigationItem("/runs", "runs", "nav.runs", "Clock"),
   navigationItem("/library", "graphLibrary", "nav.graphLibrary", "Collection", "library"),
-  navigationItem("/scheduler", "scheduler", "nav.scheduler", "Timer"),
-  navigationItem("/knowledge", "knowledge", "nav.knowledge", "Reading"),
   {
     ...navigationItem("/buddy", "buddy", "nav.buddy", "ChatDotRound"),
     affordanceZone: "buddy-page",
     pathAfterClick: "",
     selfSurface: true,
   },
-  navigationItem("/message-platforms", "messagePlatforms", "nav.messagePlatforms", "Connection", "messagePlatforms"),
+  navigationItem("/runs", "runs", "nav.runs", "Clock"),
+  navigationItem("/knowledge", "knowledge", "nav.knowledge", "Reading"),
+  navigationItem("/scheduler", "scheduler", "nav.scheduler", "Calendar"),
+  navigationItem("/message-platforms", "messagePlatforms", "nav.messagePlatforms", "MessageBox", "messagePlatforms"),
+  navigationItem("/models", "models", "nav.models", "Cpu"),
+  navigationItem("/model-logs", "modelLogs", "nav.modelLogs", "Memo", "modelLogs"),
+  navigationItem("/actions", "actions", "nav.actions", "Operation"),
+  navigationItem("/tools", "tools", "nav.tools", "ToolWrench"),
   navigationItem("/presets", "presets", "nav.presets", "CollectionTag"),
-  navigationItem("/actions", "actions", "nav.actions", "Opportunity"),
-  navigationItem("/tools", "tools", "nav.tools", "Tools"),
-  navigationItem("/models", "models", "nav.models", "DataLine"),
-  navigationItem("/model-logs", "modelLogs", "nav.modelLogs", "Tickets", "modelLogs"),
   navigationItem("/evidence", "evidenceSearch", "nav.evidenceSearch", "DocumentChecked", "evidenceSearch", "developer"),
   navigationItem("/settings", "settings", "nav.settings", "Setting"),
 ];

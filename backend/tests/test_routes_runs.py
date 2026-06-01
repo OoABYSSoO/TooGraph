@@ -171,6 +171,18 @@ class RunRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([run["run_id"] for run in response.json()], ["run_hidden", "run_review", "run_compaction", "run_visible"])
 
+    def test_run_list_limit_is_applied_after_default_internal_filtering(self) -> None:
+        with _temporary_run_database():
+            run_store.save_run(_run_summary("run_hidden_latest", internal=True, role="buddy_background_review", started_at="2026-05-11T07:28:52Z"))
+            run_store.save_run(_run_summary("run_latest", started_at="2026-05-11T07:28:51Z"))
+            run_store.save_run(_run_summary("run_middle", started_at="2026-05-11T07:28:50Z"))
+            run_store.save_run(_run_summary("run_old", started_at="2026-05-11T07:28:49Z"))
+            with TestClient(app) as client:
+                response = client.get("/api/runs", params={"limit": "2"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([run["run_id"] for run in response.json()], ["run_latest", "run_middle"])
+
     def test_run_list_filters_by_template_id(self) -> None:
         with _temporary_run_database():
             run_store.save_run(

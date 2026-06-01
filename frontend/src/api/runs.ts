@@ -7,6 +7,7 @@ export async function fetchRuns(params?: {
   status?: string;
   templateId?: string;
   includeInternal?: boolean;
+  limit?: number;
 }): Promise<RunSummary[]> {
   const searchParams = new URLSearchParams();
   if (params?.graphName?.trim()) {
@@ -20,6 +21,9 @@ export async function fetchRuns(params?: {
   }
   if (params?.includeInternal) {
     searchParams.set("include_internal", "true");
+  }
+  if (typeof params?.limit === "number" && Number.isFinite(params.limit) && params.limit > 0) {
+    searchParams.set("limit", String(Math.floor(params.limit)));
   }
   const query = searchParams.toString();
   return apiGet<RunSummary[]>(`/api/runs${query ? `?${query}` : ""}`);
