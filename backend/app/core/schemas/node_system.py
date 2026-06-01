@@ -81,6 +81,7 @@ class NodeSystemStateBindingKind(str, Enum):
     ACTION_OUTPUT = "action_output"
     TOOL_OUTPUT = "tool_output"
     CAPABILITY_RESULT = "capability_result"
+    LLM_OUTPUT = "llm_output"
 
 
 class NodeSystemReadBindingKind(str, Enum):
@@ -137,6 +138,11 @@ class NodeSystemStateBindingMetadata(BaseModel):
             self.tool_key = _validate_identifier(self.tool_key, label="Tool key")
             self.action_key = ""
             self.field_key = _validate_identifier(self.field_key, label="Tool output field")
+            return self
+        if self.kind == NodeSystemStateBindingKind.LLM_OUTPUT:
+            self.action_key = ""
+            self.tool_key = ""
+            self.field_key = _validate_identifier(self.field_key, label="LLM output field")
             return self
 
         self.action_key = ""
@@ -455,6 +461,70 @@ class NodeSystemAgentConfig(BaseModel):
         return normalize_thinking_level(value)
 
 
+class NodeSystemNewLlmOutputChannels(BaseModel):
+    reasoning_content: bool = Field(default=False, alias="reasoningContent")
+    finish_reason: bool = Field(default=False, alias="finishReason")
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
+class NodeSystemNewLlmConfig(BaseModel):
+    tool_keys: list[str] = Field(default_factory=list, alias="toolKeys")
+    output_channels: NodeSystemNewLlmOutputChannels = Field(
+        default_factory=NodeSystemNewLlmOutputChannels,
+        alias="outputChannels",
+    )
+    task_instruction: str = Field(default="", alias="taskInstruction")
+    model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
+    model: str = ""
+    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.HIGH, alias="thinkingMode")
+    temperature: float = Field(default=0.2, ge=0, le=2)
+    provider_profile: NodeSystemAgentProviderProfile = Field(
+        default_factory=NodeSystemAgentProviderProfile,
+        alias="providerProfile",
+        exclude_if=lambda value: value.is_default(),
+    )
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_action_protocol_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field_name in (
+                "actionKey",
+                "action_key",
+                "actionBindings",
+                "action_bindings",
+                "actionInstructionBlocks",
+                "action_instruction_blocks",
+                "skills",
+                "skillKey",
+                "skillBindings",
+            ):
+                if field_name in data:
+                    raise ValueError(f"'{field_name}' is not supported for new_llm config. Use 'toolKeys' instead.")
+        return data
+
+    @field_validator("tool_keys")
+    @classmethod
+    def validate_tool_keys(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw_key in value:
+            key = _validate_identifier(str(raw_key), label="Tool key")
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(key)
+        return normalized
+
+    @field_validator("thinking_mode", mode="before")
+    @classmethod
+    def normalize_thinking_mode(cls, value: Any) -> str:
+        return normalize_thinking_level(value)
+
+
 class NodeSystemBatchSubgraphWorkerConfig(BaseModel):
     graph: "NodeSystemGraphCore"
     template_id: str = Field(default="", alias="templateId")
@@ -618,6 +688,16 @@ class NodeSystemAgentNode(BaseModel):
     config: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig)
 
 
+class NodeSystemNewLlmNode(BaseModel):
+    kind: Literal["new_llm"] = "new_llm"
+    name: str = ""
+    description: str = ""
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemNewLlmConfig = Field(default_factory=NodeSystemNewLlmConfig)
+
+
 class NodeSystemBatchNode(BaseModel):
     kind: Literal["batch"] = "batch"
     name: str = ""
@@ -671,6 +751,7 @@ class NodeSystemToolNode(BaseModel):
 NodeSystemNode = (
     NodeSystemInputNode
     | NodeSystemAgentNode
+    | NodeSystemNewLlmNode
     | NodeSystemBatchNode
     | NodeSystemConditionNode
     | NodeSystemOutputNode

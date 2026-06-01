@@ -10,7 +10,7 @@ import {
 } from "../../lib/virtual-any-input.ts";
 import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
 import { resolveManagedActionInputSlotKey, resolveManagedToolInputSlotKey } from "../../lib/managed-state-slots.ts";
-import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
+import type { AgentLikeNode, GraphNode, StateDefinition } from "../../types/node-system.ts";
 import type { ActionDefinition, ActionIoField } from "../../types/actions.ts";
 import type { ToolDefinition } from "../../types/tools.ts";
 import { resolveDisplayAgentActionInstructionBlocks } from "./actionPickerModel.ts";
@@ -123,6 +123,18 @@ export type NodeCardViewModel = {
         modelLabel: string;
         thinkingLabel: string;
         actionLabel: string;
+        primaryInput: NodePortViewModel | null;
+        primaryOutput: NodePortViewModel | null;
+      }
+    | {
+        kind: "new_llm";
+        taskInstruction: string;
+        modelLabel: string;
+        thinkingLabel: string;
+        selectedToolKeys: string[];
+        selectedToolLabels: string[];
+        showReasoningContentOutput: boolean;
+        showFinishReasonOutput: boolean;
         primaryInput: NodePortViewModel | null;
         primaryOutput: NodePortViewModel | null;
       }
@@ -265,7 +277,13 @@ export function buildNodeCardViewModel(
 }
 
 function formatNodeKindLabel(kind: GraphNode["kind"]): string {
-  return kind === "agent" ? "LLM" : kind.toUpperCase();
+  if (kind === "agent") {
+    return "LLM";
+  }
+  if (kind === "new_llm") {
+    return "New LLM";
+  }
+  return kind.toUpperCase();
 }
 
 function resolveBatchInputMode(node: Extract<GraphNode, { kind: "batch" }>, stateKey: string): "shared" | "batch" {
@@ -335,6 +353,23 @@ function buildBody(
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
       actionLabel: node.config.actionKey.trim() || "No action",
+      primaryInput: inputs[0] ?? null,
+      primaryOutput: outputs[0] ?? null,
+    };
+  }
+
+  if (node.kind === "new_llm") {
+    const selectedToolKeys = [...(node.config.toolKeys ?? [])];
+    const toolDefinitionMap = new Map((options.toolDefinitions ?? []).map((definition) => [definition.toolKey, definition]));
+    return {
+      kind: "new_llm",
+      taskInstruction: node.config.taskInstruction?.trim() || "",
+      modelLabel: resolveAgentModelLabel(node),
+      thinkingLabel: resolveThinkingLabel(node),
+      selectedToolKeys,
+      selectedToolLabels: selectedToolKeys.map((toolKey) => toolDefinitionMap.get(toolKey)?.name?.trim() || toolKey),
+      showReasoningContentOutput: Boolean(node.config.outputChannels?.reasoningContent),
+      showFinishReasonOutput: Boolean(node.config.outputChannels?.finishReason),
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -616,6 +651,13 @@ function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>
       const actionKey = innerNode.config.actionKey.trim();
       if (actionKey) {
         capabilities.add(actionKey);
+      }
+    }
+    if (innerNode.kind === "new_llm") {
+      for (const toolKey of innerNode.config.toolKeys ?? []) {
+        if (toolKey.trim()) {
+          capabilities.add(toolKey.trim());
+        }
       }
     }
     if (innerNode.kind === "subgraph") {
@@ -925,7 +967,7 @@ function resolveInputStateValue(
   return node.config.value;
 }
 
-function resolveAgentModelLabel(node: Extract<GraphNode, { kind: "agent" }>) {
+function resolveAgentModelLabel(node: AgentLikeNode) {
   if (node.config.model?.trim()) {
     return node.config.model.trim();
   }
@@ -935,7 +977,7 @@ function resolveAgentModelLabel(node: Extract<GraphNode, { kind: "agent" }>) {
   return "Global model";
 }
 
-function resolveThinkingLabel(node: Extract<GraphNode, { kind: "agent" }>) {
+function resolveThinkingLabel(node: AgentLikeNode) {
   const mode = String(node.config.thinkingMode === "on" ? "high" : node.config.thinkingMode || "off");
   if (mode === "xhigh") {
     return "thinking Extra High";

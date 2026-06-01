@@ -42,7 +42,7 @@
         data-virtual-affordance-actions="click"
         @click="$emit('select-entry', entry)"
       >
-        <span class="editor-node-creation-menu__entry-family">{{ entry.family }}</span>
+        <span class="editor-node-creation-menu__entry-family">{{ formatEntryFamilyLabel(entry.family) }}</span>
         <strong>{{ entry.label }}</strong>
         <p>{{ entry.description }}</p>
       </button>
@@ -96,6 +96,10 @@ const menuStyle = computed(() => {
     top: `${top}px`,
   };
 });
+
+function formatEntryFamilyLabel(family: NodeCreationEntry["family"]) {
+  return family === "new_llm" ? "new LLM" : family;
+}
 
 function isMenuSurfaceTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {

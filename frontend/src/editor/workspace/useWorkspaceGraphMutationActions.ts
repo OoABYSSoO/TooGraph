@@ -37,6 +37,7 @@ import type {
   GraphPayload,
   GraphPosition,
   InputNode,
+  NewLlmNode,
   NodeCreationContext,
   OutputNode,
   StateDefinition,
@@ -415,7 +416,7 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     );
   }
 
-  function updateAgentConfigForTab(tabId: string, nodeId: string, patch: Partial<AgentNode["config"]>) {
+  function updateAgentConfigForTab(tabId: string, nodeId: string, patch: Partial<AgentNode["config"] | NewLlmNode["config"]>) {
     commitDocumentMutationForTab(
       tabId,
       (document) =>

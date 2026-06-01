@@ -5,6 +5,7 @@ import {
   applyNodeCreationResult,
   buildGenericInputNode,
   buildGenericBatchNode,
+  buildGenericNewLlmNode,
   buildGenericOutputNode,
   buildNodeFromPreset,
   buildSubgraphNodeFromGraph,
@@ -494,6 +495,35 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
   });
   assert.equal(result.document.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(result.document.edges, [{ source: "empty_agent", target: "output_created" }]);
+});
+
+test("buildGenericNewLlmNode creates fixed content and tool-call outputs", () => {
+  const created = buildGenericNewLlmNode({
+    id: "new_llm_created",
+    position: { x: 120, y: 80 },
+  });
+
+  assert.equal(created.node.kind, "new_llm");
+  assert.deepEqual(created.node.writes, [
+    { state: "new_llm_created_content", mode: "replace" },
+    { state: "new_llm_created_tool_calls", mode: "replace" },
+  ]);
+  assert.deepEqual(Object.keys(created.state_schema), [
+    "new_llm_created_content",
+    "new_llm_created_tool_calls",
+  ]);
+  assert.equal(created.state_schema.new_llm_created_content.name, "content");
+  assert.equal(created.state_schema.new_llm_created_content.binding?.kind, "llm_output");
+  assert.equal(created.state_schema.new_llm_created_content.binding?.fieldKey, "content");
+  assert.equal(created.state_schema.new_llm_created_tool_calls.name, "tool_calls");
+  assert.equal(created.state_schema.new_llm_created_tool_calls.type, "json");
+  assert.equal(created.state_schema.new_llm_created_tool_calls.binding?.kind, "llm_output");
+  assert.equal(created.state_schema.new_llm_created_tool_calls.binding?.fieldKey, "tool_calls");
+  assert.deepEqual(created.node.config.toolKeys, []);
+  assert.deepEqual(created.node.config.outputChannels, {
+    reasoningContent: false,
+    finishReason: false,
+  });
 });
 
 test("applyNodeCreationResult materializes a virtual input output when it spawns a target node", () => {

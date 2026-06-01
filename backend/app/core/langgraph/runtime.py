@@ -74,6 +74,7 @@ from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemGraphDocument,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemOutputNode,
     NodeSystemSubgraphNode,
 )

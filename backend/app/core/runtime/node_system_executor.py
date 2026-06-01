@@ -92,6 +92,7 @@ from app.core.schemas.node_system import (
     NodeSystemConditionNode,
     NodeSystemGraphDocument,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemOutputNode,
     NodeSystemStateDefinition,
     NodeSystemToolNode,
@@ -147,7 +148,7 @@ def _execute_node(
 
     if isinstance(node, NodeSystemInputNode):
         return _execute_input_node(graph.state_schema, node, state)
-    if isinstance(node, NodeSystemAgentNode):
+    if isinstance(node, (NodeSystemAgentNode, NodeSystemNewLlmNode)):
         return _execute_agent_node(
             graph.state_schema,
             node,
@@ -192,7 +193,7 @@ def _execute_input_node(
 
 def _execute_agent_node(
     state_schema: dict[str, NodeSystemStateDefinition],
-    node: NodeSystemAgentNode,
+    node: NodeSystemAgentNode | NodeSystemNewLlmNode,
     input_values: dict[str, Any],
     graph_context: dict[str, Any],
     *,
@@ -282,13 +283,14 @@ def _execute_tool_node(
 
 
 def _generate_agent_response(
-    node: NodeSystemAgentNode,
+    node: NodeSystemAgentNode | NodeSystemNewLlmNode,
     input_values: dict[str, Any],
     action_context: dict[str, Any],
     runtime_config: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     on_delta: Any | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
     return generate_agent_response(
         node,
@@ -297,6 +299,7 @@ def _generate_agent_response(
         runtime_config,
         state_schema=state_schema,
         on_delta=on_delta,
+        tools=tools,
         build_effective_system_prompt_func=_build_effective_system_prompt,
         chat_with_local_model_with_meta_func=_chat_with_local_model_with_meta,
         chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta,
@@ -379,7 +382,7 @@ def _state_definition_to_subgraph_field(
     )
 
 
-def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
+def _resolve_agent_runtime_config(node: NodeSystemAgentNode | NodeSystemNewLlmNode) -> dict[str, Any]:
     return resolve_agent_runtime_config(
         node,
         get_default_text_model_ref_func=get_default_text_model_ref,

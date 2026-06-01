@@ -9,10 +9,11 @@ export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], 
   input: 0,
   output: 1,
   agent: 2,
-  batch: 3,
-  condition: 4,
-  tool: 5,
-  subgraph: 6,
+  new_llm: 3,
+  batch: 4,
+  condition: 5,
+  tool: 6,
+  subgraph: 7,
 };
 
 export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
@@ -45,6 +46,16 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
       mode: "preset",
       origin: "builtin",
       presetId: "preset.agent.empty.v0",
+      acceptsValueTypes: null,
+    },
+    {
+      id: "node-new-llm",
+      family: "new_llm",
+      label: "New LLM Node",
+      description: "Experimental one-turn LLM node for the next tool-calling protocol.",
+      mode: "node",
+      origin: "builtin",
+      nodeKind: "new_llm",
       acceptsValueTypes: null,
     },
     {

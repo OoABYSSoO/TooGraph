@@ -13,6 +13,7 @@ from app.core.schemas.node_system import (
     NodeSystemGraphCore,
     NodeSystemGraphPayload,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemOutputNode,
     NodeSystemStateDefinition,
     NodeSystemStateType,
@@ -21,6 +22,7 @@ from app.core.schemas.node_system import (
 )
 
 EDITOR_ONLY_METADATA_KEYS = {"toograph_state_key_counter"}
+LLM_NODE_TYPES = (NodeSystemAgentNode, NodeSystemNewLlmNode)
 
 
 STANDALONE_LANGGRAPH_SOURCE_TEMPLATE = r'''from __future__ import annotations
@@ -369,7 +371,7 @@ def _compile_graph_plan(graph: dict[str, Any]) -> dict[str, Any]:
     runtime_nodes = {
         node_name: node
         for node_name, node in nodes.items()
-        if str(dict(node).get("kind") or "") in {"agent", "subgraph"}
+        if str(dict(node).get("kind") or "") in {"agent", "new_llm", "subgraph"}
     }
     runtime_edges: list[dict[str, str]] = []
     runtime_condition_routes: list[dict[str, Any]] = []
@@ -380,7 +382,7 @@ def _compile_graph_plan(graph: dict[str, Any]) -> dict[str, Any]:
 
     def runtime_target_for_visual_node(target: str) -> str | None:
         target_kind = _node_kind(graph, target)
-        if target_kind in {"agent", "subgraph"}:
+        if target_kind in {"agent", "new_llm", "subgraph"}:
             return target
         if target_kind == "output":
             return RUNTIME_END
@@ -446,15 +448,15 @@ def _compile_graph_plan(graph: dict[str, Any]) -> dict[str, Any]:
         target = str(edge.get("target") or "")
         source_kind = _node_kind(graph, source)
         target_kind = _node_kind(graph, target)
-        if source_kind in {"agent", "subgraph"} and target_kind in {"agent", "subgraph"}:
+        if source_kind in {"agent", "new_llm", "subgraph"} and target_kind in {"agent", "new_llm", "subgraph"}:
             runtime_edges.append({"source": source, "target": target})
             runtime_outgoing_counts[source] += 1
             runtime_incoming_counts[target] += 1
             continue
-        if source_kind in {"agent", "subgraph"} and target_kind == "condition":
+        if source_kind in {"agent", "new_llm", "subgraph"} and target_kind == "condition":
             add_runtime_condition_route(source, target)
             continue
-        if source_kind == "input" and target_kind in {"agent", "subgraph"}:
+        if source_kind == "input" and target_kind in {"agent", "new_llm", "subgraph"}:
             runtime_entry_candidates.add(target)
             continue
         if source_kind == "input" and target_kind == "condition":
@@ -674,7 +676,7 @@ def _run_condition_node(graph: dict[str, Any], node_name: str, node: dict[str, A
 
 def _run_runtime_node(graph: dict[str, Any], node_name: str, node: dict[str, Any], input_values: dict[str, Any], state_values: dict[str, Any]) -> dict[str, Any]:
     kind = str(node.get("kind") or "")
-    if kind == "agent":
+    if kind in {"agent", "new_llm"}:
         return _run_agent_node(node_name, node, input_values)
     if kind == "subgraph":
         return _run_subgraph_node(node_name, node, input_values)
@@ -904,7 +906,7 @@ def _build_export_state_definition(definition: NodeSystemStateDefinition) -> dic
 
 
 def _build_export_node_payload(
-    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemNewLlmNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"kind": node.kind}
     if node.reads:
@@ -926,10 +928,12 @@ def _build_export_write_binding(binding: Any) -> dict[str, Any]:
 
 
 def _build_export_node_config(
-    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemNewLlmNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
 ) -> dict[str, Any]:
     if isinstance(node, NodeSystemAgentNode):
         return _build_export_agent_config(node)
+    if isinstance(node, NodeSystemNewLlmNode):
+        return _build_export_new_llm_config(node)
     if isinstance(node, NodeSystemConditionNode):
         return _build_export_condition_config(node)
     if isinstance(node, NodeSystemSubgraphNode):
@@ -941,6 +945,30 @@ def _build_export_agent_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     config: dict[str, Any] = {}
     if node.config.action_key:
         config["actionKey"] = node.config.action_key
+    if node.config.task_instruction:
+        config["taskInstruction"] = node.config.task_instruction
+    if node.config.model_source == AgentModelSource.OVERRIDE:
+        config["modelSource"] = node.config.model_source.value
+        if node.config.model:
+            config["model"] = node.config.model
+    if node.config.thinking_mode != AgentThinkingMode.OFF:
+        config["thinkingMode"] = node.config.thinking_mode.value
+    if node.config.temperature != 0.2:
+        config["temperature"] = node.config.temperature
+    return config
+
+
+def _build_export_new_llm_config(node: NodeSystemNewLlmNode) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    if node.config.tool_keys:
+        config["toolKeys"] = list(node.config.tool_keys)
+    output_channels: dict[str, bool] = {}
+    if node.config.output_channels.reasoning_content:
+        output_channels["reasoningContent"] = True
+    if node.config.output_channels.finish_reason:
+        output_channels["finishReason"] = True
+    if output_channels:
+        config["outputChannels"] = output_channels
     if node.config.task_instruction:
         config["taskInstruction"] = node.config.task_instruction
     if node.config.model_source == AgentModelSource.OVERRIDE:

@@ -29,7 +29,13 @@ export function shouldExposeVirtualAnyInput(node: Pick<GraphNode, "kind" | "read
 }
 
 export function shouldExposeVirtualAnyOutput(node: Pick<GraphNode, "kind" | "writes">) {
-  return (node.kind === "agent" || node.kind === "batch" || node.kind === "input" || node.kind === "tool") && node.writes.length === 0;
+  return (
+    node.kind === "agent" ||
+    node.kind === "new_llm" ||
+    node.kind === "batch" ||
+    node.kind === "input" ||
+    node.kind === "tool"
+  ) && node.writes.length === 0;
 }
 
 export function buildVirtualAnyInputPort() {

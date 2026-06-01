@@ -143,6 +143,47 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "agent_created" }]);
 });
 
+test("createNodeFromCreationEntry builds a generic New LLM node and auto-wires input state + flow", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "node-new-llm",
+    family: "new_llm" as NodeCreationEntry["family"],
+    label: "New LLM Node",
+    description: "Experimental one-turn LLM node for the next tool-calling protocol.",
+    mode: "node",
+    origin: "builtin",
+    nodeKind: "new_llm" as NodeCreationEntry["nodeKind"],
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "new_llm_created",
+    persistedPresets: [],
+    context: {
+      position: { x: 320, y: 80 },
+      sourceNodeId: "input_question",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: "question",
+      sourceValueType: "text",
+    },
+  });
+
+  const node = result.document.nodes.new_llm_created;
+  assert.equal(result.createdNodeId, "new_llm_created");
+  assert.equal(node.kind, "new_llm");
+  assert.equal(node.name, "New LLM Node");
+  assert.equal(node.kind === "new_llm" ? node.config.thinkingMode : null, "high");
+  assert.deepEqual(node.reads, [{ state: "question", required: true }]);
+  assert.deepEqual(node.writes, [
+    { state: "new_llm_created_content", mode: "replace" },
+    { state: "new_llm_created_tool_calls", mode: "replace" },
+  ]);
+  assert.equal(result.document.state_schema.new_llm_created_content?.binding?.kind, "llm_output");
+  assert.equal(result.document.state_schema.new_llm_created_tool_calls?.binding?.kind, "llm_output");
+  assert.deepEqual(result.document.edges, [{ source: "input_question", target: "new_llm_created" }]);
+});
+
 test("createNodeFromCreationEntry builds a generic tool node", () => {
   const document = createBaseDocument();
   const entry: NodeCreationEntry = {

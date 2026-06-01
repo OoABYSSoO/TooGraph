@@ -24,7 +24,7 @@ type VirtualCreatePortVisibilityInput = {
 };
 
 export function shouldShowAgentCreateInputPortByDefault(node: GraphNode | undefined) {
-  return (node?.kind === "agent" || node?.kind === "batch") && node.reads.length === 0;
+  return (node?.kind === "agent" || node?.kind === "new_llm" || node?.kind === "batch") && node.reads.length === 0;
 }
 
 function isDynamicCapabilityExecutorNode(
@@ -43,7 +43,7 @@ export function shouldShowAgentCreateOutputPortByDefault(
   if (isDynamicCapabilityExecutorNode(nodeId, node, stateSchema)) {
     return false;
   }
-  return (node?.kind === "agent" || node?.kind === "batch" || node?.kind === "input") && node.writes.length === 0;
+  return (node?.kind === "agent" || node?.kind === "new_llm" || node?.kind === "batch" || node?.kind === "input") && node.writes.length === 0;
 }
 
 export function isAgentCreateInputAnchorVisible(input: VirtualCreatePortVisibilityInput) {

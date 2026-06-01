@@ -169,7 +169,7 @@ export function updateStateFieldInDocument<T extends GraphPayload | GraphDocumen
   }
   if (nextDefinition.type !== current.type) {
     for (const [nodeId, node] of Object.entries(nextDocument.nodes)) {
-      if (node.kind === "agent" && node.reads.some((binding) => binding.state === stateKey)) {
+      if ((node.kind === "agent" || node.kind === "new_llm") && node.reads.some((binding) => binding.state === stateKey)) {
         reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
       }
     }

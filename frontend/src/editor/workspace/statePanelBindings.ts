@@ -42,9 +42,9 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
   const nextNode = nextDocument.nodes[nodeId];
 
   if (mode === "read") {
-    if (nextNode.kind === "agent" || nextNode.kind === "batch") {
+    if (nextNode.kind === "agent" || nextNode.kind === "new_llm" || nextNode.kind === "batch") {
       nextNode.reads = [...nextNode.reads, { state: stateKey, required: false }];
-      if (nextNode.kind === "agent") {
+      if (nextNode.kind === "agent" || nextNode.kind === "new_llm") {
         reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
       }
       return nextDocument;
@@ -69,9 +69,9 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
     return document;
   }
 
-  if (nextNode.kind === "agent" || nextNode.kind === "batch") {
+  if (nextNode.kind === "agent" || nextNode.kind === "new_llm" || nextNode.kind === "batch") {
     nextNode.writes = [...nextNode.writes, { state: stateKey, mode: "replace" }];
-    if (nextNode.kind === "agent") {
+    if (nextNode.kind === "agent" || nextNode.kind === "new_llm") {
       reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
     }
     return nextDocument;
@@ -102,7 +102,14 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
   }
 
   if (mode === "read") {
-    if (node.kind !== "agent" && node.kind !== "batch" && node.kind !== "condition" && node.kind !== "output" && node.kind !== "subgraph") {
+    if (
+      node.kind !== "agent" &&
+      node.kind !== "new_llm" &&
+      node.kind !== "batch" &&
+      node.kind !== "condition" &&
+      node.kind !== "output" &&
+      node.kind !== "subgraph"
+    ) {
       return document;
     }
     const readBinding = node.reads.find((binding) => binding.state === stateKey);
@@ -115,7 +122,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     const nextDocument = cloneGraphDocument(document);
     nextDocument.nodes[nodeId].reads = nextDocument.nodes[nodeId].reads.filter((binding) => binding.state !== stateKey);
     const nextNode = nextDocument.nodes[nodeId];
-    if (nextNode.kind === "agent") {
+    if (nextNode.kind === "agent" || nextNode.kind === "new_llm") {
       reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
     }
     if (nextNode.kind === "batch") {
@@ -127,10 +134,14 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     return nextDocument;
   }
 
-  if (node.kind !== "agent" && node.kind !== "batch" && node.kind !== "subgraph") {
+  if (node.kind !== "agent" && node.kind !== "new_llm" && node.kind !== "batch" && node.kind !== "subgraph") {
     return document;
   }
-  if (document.state_schema[stateKey]?.binding?.kind === "action_output" || document.state_schema[stateKey]?.binding?.kind === "capability_result") {
+  if (
+    document.state_schema[stateKey]?.binding?.kind === "action_output" ||
+    document.state_schema[stateKey]?.binding?.kind === "capability_result" ||
+    document.state_schema[stateKey]?.binding?.kind === "llm_output"
+  ) {
     return document;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {
@@ -168,7 +179,7 @@ function hasSharedStateBinding(sourceNode: GraphNode, targetNode: GraphNode) {
 
 function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNode, stateKey: string, mode: StateBindingMode) {
   if (mode === "read") {
-    if (node.kind === "agent") {
+    if (node.kind === "agent" || node.kind === "new_llm") {
       return !node.reads.some((binding) => binding.state === stateKey);
     }
     if (node.kind === "batch") {
@@ -186,7 +197,7 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
     return false;
   }
 
-  if (node.kind === "agent") {
+  if (node.kind === "agent" || node.kind === "new_llm") {
     if (isDynamicCapabilityExecutorNode(document, node)) {
       return false;
     }

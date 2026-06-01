@@ -451,6 +451,117 @@ test("updateSubgraphNodeGraphInDocument syncs subgraph boundary ports into paren
   assert.equal(unchangedDocument, document);
 });
 
+test("updateAgentNodeConfigInDocument reconciles New LLM optional output channels", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "New LLM outputs",
+    state_schema: {
+      new_llm_content: {
+        name: "content",
+        description: "Final assistant content.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+        binding: {
+          kind: "llm_output",
+          nodeId: "new_llm",
+          fieldKey: "content",
+          managed: true,
+        },
+      },
+      new_llm_tool_calls: {
+        name: "tool_calls",
+        description: "Tool calls requested by the model.",
+        type: "json",
+        value: [],
+        color: "#0f766e",
+        binding: {
+          kind: "llm_output",
+          nodeId: "new_llm",
+          fieldKey: "tool_calls",
+          managed: true,
+        },
+      },
+    },
+    nodes: {
+      new_llm: {
+        kind: "new_llm",
+        name: "New LLM Node",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [
+          { state: "new_llm_content", mode: "replace" },
+          { state: "new_llm_tool_calls", mode: "replace" },
+        ],
+        config: {
+          toolKeys: [],
+          outputChannels: {
+            reasoningContent: false,
+            finishReason: false,
+          },
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const withOptionalOutputs = updateAgentNodeConfigInDocument(document, "new_llm", (current) => ({
+    ...current,
+    outputChannels: {
+      reasoningContent: true,
+      finishReason: true,
+    },
+    toolKeys: ["memory_search_context_loader", "json_passthrough"],
+  }));
+  const nextNode = withOptionalOutputs.nodes.new_llm;
+
+  assert.equal(nextNode.kind, "new_llm");
+  assert.deepEqual(nextNode.config.toolKeys, ["memory_search_context_loader", "json_passthrough"]);
+  assert.deepEqual(nextNode.writes.map((binding) => withOptionalOutputs.state_schema[binding.state]?.name), [
+    "content",
+    "tool_calls",
+    "reasoning_content",
+    "finish_reason",
+  ]);
+  assert.equal(
+    Object.values(withOptionalOutputs.state_schema).find((definition) => definition.name === "reasoning_content")?.binding?.fieldKey,
+    "reasoning_content",
+  );
+  assert.equal(
+    Object.values(withOptionalOutputs.state_schema).find((definition) => definition.name === "finish_reason")?.binding?.fieldKey,
+    "finish_reason",
+  );
+
+  const withoutOptionalOutputs = updateAgentNodeConfigInDocument(withOptionalOutputs, "new_llm", (current) => ({
+    ...current,
+    outputChannels: {
+      reasoningContent: false,
+      finishReason: false,
+    },
+  }));
+
+  assert.deepEqual(withoutOptionalOutputs.nodes.new_llm.writes.map((binding) => withoutOptionalOutputs.state_schema[binding.state]?.name), [
+    "content",
+    "tool_calls",
+  ]);
+  assert.equal(
+    Object.values(withoutOptionalOutputs.state_schema).some((definition) => definition.name === "reasoning_content"),
+    false,
+  );
+  assert.equal(
+    Object.values(withoutOptionalOutputs.state_schema).some((definition) => definition.name === "finish_reason"),
+    false,
+  );
+});
+
 test("updateBatchNodeSubgraphWorkerInDocument lists template worker boundaries as batch ports", () => {
   const document: GraphPayload = {
     graph_id: null,

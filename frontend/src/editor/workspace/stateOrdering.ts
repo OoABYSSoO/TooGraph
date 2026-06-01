@@ -23,7 +23,7 @@ export function isUnlinkedAgentInputState(document: GraphLike, stateKey: string)
   let hasAgentReader = false;
   let hasWriter = false;
   for (const node of Object.values(document.nodes)) {
-    if (node.kind === "agent" && node.reads.some((read) => read.state === stateKey)) {
+    if ((node.kind === "agent" || node.kind === "new_llm") && node.reads.some((read) => read.state === stateKey)) {
       hasAgentReader = true;
     }
     if (node.writes.some((write) => write.state === stateKey)) {

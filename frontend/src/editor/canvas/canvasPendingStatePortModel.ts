@@ -66,7 +66,7 @@ export function buildPendingAgentInputSourceByNodeId(input: {
 
   return Object.fromEntries(
     Object.entries(input.document.nodes)
-      .filter(([, node]) => node.kind === "agent" || node.kind === "batch")
+      .filter(([, node]) => node.kind === "agent" || node.kind === "new_llm" || node.kind === "batch")
       .filter(([nodeId]) => input.canCompleteAgentInput(nodeId))
       .map(([nodeId]) => [nodeId, pendingSource]),
   );

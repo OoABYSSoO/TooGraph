@@ -191,6 +191,7 @@ function countNodesByKind(document: GraphPayload | GraphDocument): Record<GraphN
   const counts: Record<GraphNode["kind"], number> = {
     input: 0,
     agent: 0,
+    new_llm: 0,
     batch: 0,
     output: 0,
     condition: 0,

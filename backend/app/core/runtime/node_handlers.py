@@ -50,6 +50,7 @@ from app.core.schemas.node_system import (
     NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemReadBindingKind,
     NodeSystemStateDefinition,
     NodeSystemStateBindingKind,
@@ -58,6 +59,8 @@ from app.core.schemas.node_system import (
     NodeSystemToolNode,
     StateWriteMode,
 )
+
+AgentRuntimeNode = NodeSystemAgentNode | NodeSystemNewLlmNode
 from app.core.storage.capability_artifact_store import create_capability_artifact_context
 from app.actions.definitions import get_action_definition_registry
 from app.actions.registry import get_action_registry
@@ -489,7 +492,7 @@ def _pending_dynamic_subgraph_breakpoint(
 
 def execute_agent_node(
     state_schema: dict[str, NodeSystemStateDefinition],
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     input_values: dict[str, Any],
     graph_context: dict[str, Any],
     *,
@@ -513,6 +516,24 @@ def execute_agent_node(
     first_truthy_func: Callable[..., Any] = first_truthy,
     record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
 ) -> dict[str, Any]:
+    if isinstance(node, NodeSystemNewLlmNode):
+        return execute_new_llm_node(
+            state_schema,
+            node,
+            input_values,
+            graph_context,
+            node_name=node_name,
+            state=state,
+            get_tool_definition_registry_func=get_tool_definition_registry_func,
+            resolve_agent_runtime_config_func=resolve_agent_runtime_config_func,
+            build_agent_stream_delta_callback_func=build_agent_stream_delta_callback_func,
+            callable_accepts_keyword_func=callable_accepts_keyword_func,
+            generate_agent_response_func=generate_agent_response_func,
+            finalize_agent_stream_delta_func=finalize_agent_stream_delta_func,
+            first_truthy_func=first_truthy_func,
+            record_activity_event_func=record_activity_event_func,
+        )
+
     selected_actions: list[str] = []
     selected_capabilities: list[dict[str, str]] = []
     action_outputs: list[dict[str, Any]] = []
@@ -528,7 +549,7 @@ def execute_agent_node(
     def context_assembly_report() -> dict[str, Any]:
         return build_context_assembly_report(
             node_id=node_name,
-            node_type="agent",
+            node_type=str(getattr(node, "kind", "agent") or "agent"),
             input_values=input_values,
             state_schema=state_schema,
             action_context=action_context,
@@ -1226,6 +1247,124 @@ def execute_agent_node(
     }
 
 
+def execute_new_llm_node(
+    state_schema: dict[str, NodeSystemStateDefinition],
+    node: NodeSystemNewLlmNode,
+    input_values: dict[str, Any],
+    graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
+    get_tool_definition_registry_func: Callable[..., dict[str, Any]] = get_tool_definition_registry,
+    resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
+    build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
+    callable_accepts_keyword_func: Callable[..., bool] = callable_accepts_keyword,
+    generate_agent_response_func: Callable[..., tuple[dict[str, Any], str, list[str], dict[str, Any]]] = generate_agent_response,
+    finalize_agent_stream_delta_func: Callable[..., None] = finalize_agent_stream_delta,
+    first_truthy_func: Callable[..., Any] = first_truthy,
+    record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
+) -> dict[str, Any]:
+    selected_tool_keys = list(dict.fromkeys(str(tool_key).strip() for tool_key in node.config.tool_keys if str(tool_key).strip()))
+    tool_definitions = get_tool_definition_registry_func(include_disabled=False) if selected_tool_keys else {}
+    model_tools = [
+        _tool_definition_to_model_tool(tool_definitions[tool_key])
+        for tool_key in selected_tool_keys
+        if tool_key in tool_definitions
+    ]
+    missing_tool_keys = [tool_key for tool_key in selected_tool_keys if tool_key not in tool_definitions]
+    warnings = [
+        f"Tool '{tool_key}' is not registered or active."
+        for tool_key in missing_tool_keys
+    ]
+    runtime_config = resolve_agent_runtime_config_func(node)
+    graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
+    model_runtime_fixture = _resolve_model_runtime_fixture_from_graph_metadata(graph_metadata)
+    if model_runtime_fixture:
+        runtime_config = {
+            **runtime_config,
+            "model_runtime_fixture": model_runtime_fixture,
+        }
+
+    output_keys = [binding.state for binding in node.writes]
+    stream_delta_kwargs: dict[str, Any] = {
+        "state": state,
+        "node_name": node_name,
+        "output_keys": output_keys,
+    }
+    if callable_accepts_keyword_func(build_agent_stream_delta_callback_func, "stream_state_keys"):
+        stream_delta_kwargs["stream_state_keys"] = output_keys
+    stream_delta_callback = build_agent_stream_delta_callback_func(**stream_delta_kwargs)
+    generate_kwargs: dict[str, Any] = {
+        "state_schema": state_schema,
+        "tools": model_tools,
+    }
+    if callable_accepts_keyword_func(generate_agent_response_func, "on_delta"):
+        generate_kwargs["on_delta"] = stream_delta_callback
+    response_payload, response_reasoning, response_warnings, runtime_config = generate_agent_response_func(
+        node,
+        input_values,
+        {},
+        runtime_config,
+        **generate_kwargs,
+    )
+    warnings.extend(response_warnings)
+
+    output_values: dict[str, Any] = {}
+    for binding in node.writes:
+        if binding.state in response_payload:
+            output_values[binding.state] = response_payload[binding.state]
+        else:
+            output_values[binding.state] = None
+
+    finalize_kwargs: dict[str, Any] = {
+        "state": state,
+        "node_name": node_name,
+        "output_values": output_values,
+    }
+    if callable_accepts_keyword_func(finalize_agent_stream_delta_func, "reasoning"):
+        finalize_kwargs["reasoning"] = response_reasoning
+    finalize_agent_stream_delta_func(**finalize_kwargs)
+
+    requested_tool_calls = response_payload.get(_new_llm_output_state_for_channel(node, state_schema, "tool_calls"), [])
+    record_activity_event_func(
+        state,
+        kind="model_tool_selection",
+        summary=f"New LLM selected {len(requested_tool_calls) if isinstance(requested_tool_calls, list) else 0} tool call(s).",
+        node_id=node_name,
+        status="succeeded",
+        detail={
+            "provided_tool_keys": [tool["function"]["name"] for tool in model_tools],
+            "tool_call_count": len(requested_tool_calls) if isinstance(requested_tool_calls, list) else 0,
+        },
+    )
+
+    return {
+        "outputs": output_values,
+        "response": response_payload,
+        "reasoning": response_reasoning,
+        "action_input_reasoning": "",
+        "subgraph_input_reasoning": "",
+        "selected_actions": [],
+        "selected_tools": [tool["function"]["name"] for tool in model_tools],
+        "selected_capabilities": [],
+        "action_outputs": [],
+        "tool_outputs": [],
+        "capability_outputs": [],
+        "runtime_config": _runtime_config_for_artifacts(runtime_config),
+        "warnings": list(dict.fromkeys(warnings)),
+        "llm_phases": ["new_llm_response"],
+        "context_assembly_report": build_context_assembly_report(
+            node_id=node_name,
+            node_type="new_llm",
+            input_values=input_values,
+            state_schema=state_schema,
+            action_context={},
+            llm_phases=["new_llm_response"],
+        ),
+        "final_result": str(first_truthy_func(output_values.values()) or response_payload.get("summary") or ""),
+    }
+
+
 def _unpack_agent_action_input_generation_result(
     result: Any,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any], str, list[str], dict[str, Any]]:
@@ -1258,7 +1397,62 @@ def _ordered_output_values(output_keys: list[str], values: dict[str, Any]) -> di
     return output_values
 
 
-def _agent_node_with_only_writes(node: NodeSystemAgentNode, output_keys: list[str]) -> NodeSystemAgentNode:
+def _new_llm_output_state_for_channel(
+    node: NodeSystemNewLlmNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    channel: str,
+) -> str:
+    for binding in node.writes:
+        definition = state_schema.get(binding.state)
+        metadata = definition.binding if definition is not None else None
+        if metadata is not None and metadata.kind.value == "llm_output" and metadata.field_key == channel:
+            return binding.state
+        if definition is not None and (definition.name.strip() or binding.state) == channel:
+            return binding.state
+    return channel
+
+
+def _tool_definition_to_model_tool(tool_definition: Any) -> dict[str, Any]:
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for field in getattr(tool_definition, "input_schema", []) or []:
+        field_key = str(getattr(field, "key", "") or "").strip()
+        if not field_key:
+            continue
+        required.append(field_key)
+        properties[field_key] = {
+            **_json_schema_for_tool_value_type(str(getattr(field, "value_type", "") or "text")),
+            "description": str(getattr(field, "description", "") or getattr(field, "name", "") or "").strip(),
+        }
+    return {
+        "type": "function",
+        "function": {
+            "name": str(getattr(tool_definition, "tool_key", "") or "").strip(),
+            "description": str(getattr(tool_definition, "description", "") or getattr(tool_definition, "name", "") or "").strip(),
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+def _json_schema_for_tool_value_type(value_type: str) -> dict[str, Any]:
+    normalized = value_type.strip().lower()
+    if normalized in {"number", "integer", "float"}:
+        return {"type": "number"}
+    if normalized in {"boolean", "bool"}:
+        return {"type": "boolean"}
+    if normalized in {"json", "object", "dict", "map"}:
+        return {"type": "object"}
+    if normalized in {"array", "list"}:
+        return {"type": "array"}
+    return {"type": "string"}
+
+
+def _agent_node_with_only_writes(node: AgentRuntimeNode, output_keys: list[str]) -> AgentRuntimeNode:
     output_key_set = set(output_keys)
     if len(output_key_set) == len(node.writes) and all(binding.state in output_key_set for binding in node.writes):
         return node
@@ -1365,7 +1559,7 @@ def _collect_context_pressure_tool_inputs(
         "context_items": [],
     }
     target_node = _resolve_graph_node(graph_context, target_agent_node_id)
-    if not isinstance(target_node, NodeSystemAgentNode):
+    if not isinstance(target_node, (NodeSystemAgentNode, NodeSystemNewLlmNode)):
         payload["target_error"] = "target_agent_node_missing"
         return payload
 
@@ -1445,7 +1639,7 @@ def _dynamic_state_context_item(
 
 
 def _collect_dynamic_tool_inputs(
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     input_values: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition],
@@ -1527,7 +1721,7 @@ def _next_capability_artifact_invocation_index(
 
 
 def map_dynamic_action_result_package(
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     state_schema: dict[str, NodeSystemStateDefinition],
     *,
     action_key: str,
@@ -1609,7 +1803,7 @@ def build_dynamic_action_result_package(
 
 
 def map_dynamic_tool_result_package(
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     state_schema: dict[str, NodeSystemStateDefinition],
     *,
     tool_key: str,
@@ -1691,7 +1885,7 @@ def build_dynamic_tool_result_package(
 
 
 def map_dynamic_subgraph_result_package(
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     state_schema: dict[str, NodeSystemStateDefinition],
     *,
     subgraph_key: str,
@@ -1811,7 +2005,7 @@ def is_missing_action_input_value(value: Any) -> bool:
 def _build_action_invocation_context(
     *,
     state: dict[str, Any],
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     input_values: dict[str, Any],
     node_name: str,
     action_key: str,
@@ -1847,7 +2041,7 @@ def _build_action_invocation_context(
 
 def _resolve_bound_action_state_inputs(
     *,
-    node: NodeSystemAgentNode,
+    node: AgentRuntimeNode,
     input_values: dict[str, Any],
     action_key: str,
 ) -> tuple[dict[str, Any], dict[str, str]]:

@@ -229,6 +229,16 @@ test("buildBuiltinNodeCreationEntries exposes a first-class Batch node", () => {
   assert.equal(batch?.nodeKind, "batch");
 });
 
+test("buildBuiltinNodeCreationEntries exposes a first-class New LLM node", () => {
+  const entries = buildBuiltinNodeCreationEntries();
+  const newLlm = entries.find((entry) => entry.id === "node-new-llm");
+
+  assert.equal(newLlm?.family, "new_llm");
+  assert.equal(newLlm?.mode, "node");
+  assert.equal(newLlm?.nodeKind, "new_llm");
+  assert.equal(newLlm?.label, "New LLM Node");
+});
+
 test("buildNodeCreationEntries filters creation candidates by query and source type", () => {
   const entries = buildNodeCreationEntries({
     builtins: [...builtins],

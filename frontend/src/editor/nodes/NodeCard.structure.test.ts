@@ -13,6 +13,7 @@ const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNo
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
 const agentNodeBodySource = readFileSync(resolve(currentDirectory, "AgentNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const newLlmNodeBodySource = readFileSync(resolve(currentDirectory, "NewLlmNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const batchNodeBodySource = readFileSync(resolve(currentDirectory, "BatchNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const inputNodeBodySource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const outputNodeBodySource = readFileSync(resolve(currentDirectory, "OutputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
@@ -581,7 +582,10 @@ test("NodeCard keeps action actions below the agent while creating ports from pl
   assert.match(agentActionPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
   assert.match(componentSource, /from "\.\/actionPickerModel";/);
   assert.match(componentSource, /resolveSelectAgentActionPatch/);
-  assert.match(componentSource, /const selectedActionKey = computed\(\(\) => props\.node\.kind === "agent" \? props\.node\.config\.actionKey\.trim\(\) : ""\);/);
+  assert.match(
+    componentSource,
+    /const selectedActionKey = computed\(\(\) =>\s*props\.node\.kind === "agent" \? props\.node\.config\.actionKey\.trim\(\) : "",\s*\);/,
+  );
   assert.match(componentSource, /const patch = resolveSelectAgentActionPatch\(\s*props\.node\.config\.actionKey,\s*actionKey,\s*props\.actionDefinitions,\s*props\.node\.config\.actionInstructionBlocks \?\? \{\},\s*\);/);
   assert.match(componentSource, /function selectAgentAction\(actionKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
   assert.doesNotMatch(componentSource, /resolveAttachAgentActionPatch/);
@@ -624,6 +628,33 @@ test("NodeCard keeps action actions below the agent while creating ports from pl
   assert.doesNotMatch(agentSection, /<div v-if="activePortPickerSide" class="node-card__port-picker"/);
   assert.doesNotMatch(agentSection, /<div v-if="isActionPickerOpen" class="node-card__action-picker"/);
   assert.doesNotMatch(agentSection, /v-for="definition in availableActionDefinitions"/);
+});
+
+test("NodeCard renders New LLM with tool selection and fixed output channels", () => {
+  const newLlmSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'new_llm'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(newLlmSectionMatch, "expected to find the New LLM node section");
+  const newLlmSection = newLlmSectionMatch[0];
+
+  assert.match(componentSource, /import NewLlmNodeBody from "\.\/NewLlmNodeBody\.vue";/);
+  assert.match(newLlmSection, /<NewLlmNodeBody/);
+  assert.match(newLlmSection, /:selected-tool-keys="newLlmSelectedToolKeys"/);
+  assert.match(newLlmSection, /:tool-definitions="toolDefinitions"/);
+  assert.match(newLlmSection, /@update-tool-keys="updateNewLlmToolKeys"/);
+  assert.match(newLlmNodeBodySource, /<AgentRuntimeControls/);
+  assert.match(newLlmNodeBodySource, /class="new-llm-node-body__tool-panel"/);
+  assert.match(newLlmNodeBodySource, /function toggleTool\(toolKey: string\)/);
+  assert.doesNotMatch(newLlmNodeBodySource, /AgentActionPicker/);
+  assert.doesNotMatch(newLlmSection, /@select-action="selectAgentAction"/);
+  assert.match(componentSource, /const newLlmSelectedToolKeys = computed\(\(\) => \(props\.node\.kind === "new_llm" \? \[\.\.\.\(props\.node\.config\.toolKeys \?\? \[\]\)\] : \[\]\)\);/);
+  assert.match(componentSource, /function updateNewLlmToolKeys\(toolKeys: string\[\]\)/);
+  assert.match(topActionsSource, /bodyKind === 'new_llm'/);
+  assert.match(topActionsSource, /reasoning_content/);
+  assert.match(topActionsSource, /finish_reason/);
+  assert.match(componentSource, /@new-llm-reasoning-output="updateNewLlmReasoningOutput"/);
+  assert.match(componentSource, /@new-llm-finish-reason-output="updateNewLlmFinishReasonOutput"/);
+  assert.match(componentSource, /if \(props\.node\.kind !== "agent" && props\.node\.kind !== "new_llm"\) \{/);
 });
 
 test("NodeCard keeps new state drafts while the create popover switches to existing states", () => {
@@ -937,7 +968,7 @@ test("NodeCard blocks every in-canvas control while graph editing is locked", ()
   assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*closeLockedFloatingPanels\(\);/);
   assert.match(componentSource, /function emitOutputConfigPatch\(patch: Partial<OutputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitInputConfigPatch\(patch: Partial<InputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function emitAgentConfigPatch\(patch: Partial<AgentNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function emitAgentConfigPatch\(patch: Partial<AgentNode\["config"\] \| NewLlmNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitConditionConfigPatch\(patch: Partial<ConditionNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleAdvancedPanel\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
@@ -1378,7 +1409,7 @@ test("NodeCard delegates output preview presentation while keeping Advanced in t
   assert.match(outputNodeBodySource, /node-card__preview--empty/);
   assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
   assert.doesNotMatch(outputSection, /<pre v-else class="node-card__preview-text">/);
-  assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : view\.body\.kind === 'batch' \? 320 : 280/);
+  assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : view\.body\.kind === 'batch' \? 320 : view\.body\.kind === 'new_llm' \? 320 : 280/);
 });
 
 test("NodeCard uses a shared capsule switch card for output persistence like the agent controls", () => {

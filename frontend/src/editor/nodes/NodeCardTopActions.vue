@@ -57,6 +57,63 @@
             />
           </label>
         </div>
+        <div v-else-if="bodyKind === 'new_llm'" class="node-card__advanced-popover-content">
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">{{ t("nodeCard.temperature") }}</span>
+            <ElInput
+              :model-value="agentTemperatureInput"
+              type="number"
+              inputmode="decimal"
+              @update:model-value="emit('update:agent-temperature', $event)"
+            />
+          </label>
+          <div class="node-card__control-row">
+            <span class="node-card__control-label">reasoning_content</span>
+            <div class="node-card__control-list node-card__control-list--equal">
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': !newLlmShowReasoningOutput }"
+                @pointerdown.stop
+                @click.stop="emit('new-llm-reasoning-output', false)"
+              >
+                Hide
+              </button>
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': newLlmShowReasoningOutput }"
+                @pointerdown.stop
+                @click.stop="emit('new-llm-reasoning-output', true)"
+              >
+                Show
+              </button>
+            </div>
+          </div>
+          <div class="node-card__control-row">
+            <span class="node-card__control-label">finish_reason</span>
+            <div class="node-card__control-list node-card__control-list--equal">
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': !newLlmShowFinishReasonOutput }"
+                @pointerdown.stop
+                @click.stop="emit('new-llm-finish-reason-output', false)"
+              >
+                Hide
+              </button>
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': newLlmShowFinishReasonOutput }"
+                @pointerdown.stop
+                @click.stop="emit('new-llm-finish-reason-output', true)"
+              >
+                Show
+              </button>
+            </div>
+          </div>
+        </div>
         <div v-else-if="bodyKind === 'batch'" class="node-card__advanced-popover-content">
           <label class="node-card__control-row">
             <span class="node-card__control-label">{{ t("nodeCard.batchMaxConcurrency") }}</span>
@@ -241,7 +298,7 @@ import { useI18n } from "vue-i18n";
 import type { NodeTopAction } from "./useNodeFloatingPanels";
 import type { OutputNode } from "@/types/node-system";
 
-type BodyKind = "input" | "agent" | "batch" | "output" | "condition" | "subgraph" | "tool";
+type BodyKind = "input" | "agent" | "new_llm" | "batch" | "output" | "condition" | "subgraph" | "tool";
 type OutputDisplayModeOption = {
   value: OutputNode["config"]["displayMode"];
   label: string;
@@ -271,6 +328,8 @@ const props = defineProps<{
   outputPersistFormatOptions: OutputPersistFormatOption[];
   outputFileNameTemplate: string;
   outputFileNamePlaceholder: string;
+  newLlmShowReasoningOutput: boolean;
+  newLlmShowFinishReasonOutput: boolean;
   isOutputDisplayModeActive: (displayMode: OutputNode["config"]["displayMode"]) => boolean;
   isOutputPersistFormatActive: (persistFormat: OutputNode["config"]["persistFormat"]) => boolean;
 }>();
@@ -288,6 +347,8 @@ const emit = defineEmits<{
   (event: "update:output-display-mode", value: OutputNode["config"]["displayMode"]): void;
   (event: "update:output-persist-format", value: OutputNode["config"]["persistFormat"]): void;
   (event: "update:output-file-name", value: string | number): void;
+  (event: "new-llm-reasoning-output", value: boolean): void;
+  (event: "new-llm-finish-reason-output", value: boolean): void;
 }>();
 
 const { t } = useI18n();

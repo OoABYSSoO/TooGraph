@@ -23,6 +23,7 @@ from app.core.storage.settings_store import load_app_settings, save_app_settings
 
 DEFAULT_MODEL_LOG_RETENTION_ROOT_RUNS = 200
 MAX_MODEL_LOG_RETENTION_ROOT_RUNS = 10_000
+MODEL_LOG_TREE_NODE_TYPES = {"agent", "new_llm", "subgraph"}
 
 
 def append_model_request_log(
@@ -1525,7 +1526,7 @@ def _build_tree_for_run(
     for execution in executions:
         node_id = str(execution.get("node_id") or "").strip()
         node_type = str(execution.get("node_type") or "").strip()
-        if node_type not in {"agent", "subgraph"} or not node_id:
+        if node_type not in MODEL_LOG_TREE_NODE_TYPES or not node_id:
             continue
         node_entries = _entries_for_execution(entries, execution)
         child_runs = children_by_parent_node.get(node_id, [])
@@ -1557,7 +1558,7 @@ def _build_tree_for_run(
             continue
         node_id = str(entry.get("node_id") or "").strip()
         node_type = str(entry.get("node_type") or "agent").strip() or "agent"
-        if node_type not in {"agent", "subgraph"} or not node_id:
+        if node_type not in MODEL_LOG_TREE_NODE_TYPES or not node_id:
             continue
         fallback_entries_by_node.setdefault(node_id, []).append(entry)
 

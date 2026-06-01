@@ -8,7 +8,7 @@ from app.core.model_catalog import (
     resolve_model_context_budget,
     resolve_runtime_model_name,
 )
-from app.core.schemas.node_system import NodeSystemAgentNode
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemNewLlmNode
 from app.core.thinking_levels import normalize_thinking_level, resolve_effective_thinking_level
 from app.tools.local_llm import (
     get_default_agent_temperature,
@@ -18,7 +18,7 @@ from app.tools.local_llm import (
 
 
 def resolve_agent_runtime_config(
-    node: NodeSystemAgentNode,
+    node: NodeSystemAgentNode | NodeSystemNewLlmNode,
     *,
     get_default_text_model_ref_func: Callable[..., str] = get_default_text_model_ref,
     get_default_agent_thinking_enabled_func: Callable[[], bool] = get_default_agent_thinking_enabled,
@@ -84,7 +84,7 @@ def resolve_agent_runtime_config(
     }
 
 
-def _resolved_provider_profile(node: NodeSystemAgentNode) -> dict[str, Any]:
+def _resolved_provider_profile(node: NodeSystemAgentNode | NodeSystemNewLlmNode) -> dict[str, Any]:
     profile = node.config.provider_profile
     return {
         "request_timeout_seconds": profile.request_timeout_seconds,

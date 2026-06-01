@@ -1,6 +1,6 @@
 # Buddy 正统 Tool-Calling Agent Loop 反思
 
-最后整理日期：2026-06-01。
+最后整理日期：2026-06-02。
 
 本文是对 TooGraph Buddy 主循环和能力协议的一次重新校准。它不以迁移成本为约束，也不假设现有官方模板必须保持兼容。所有图模板都可以重建；已有 `Action`、`Tool`、`Subgraph` 等概念也可以重新命名、合并或降级为实现细节。目标是从更正统的 agent/tool-calling 理论出发，重新推导 TooGraph 的理想形态。
 
@@ -233,7 +233,97 @@ Graph/Buddy context
 这个总结节点不允许使用工具。
 ```
 
-## 6. 两个正交维度
+## 6. 工具信息渐进展开
+
+原生 tool calling 不是免费的。模型如果要在一次调用中同时完成“选择工具”和“填写调用参数”，应用就必须把可用工具的调用契约放进模型上下文。至少包括：
+
+```text
+tool name
+tool description
+parameters JSON Schema
+每个参数的 description
+```
+
+这意味着全量暴露 tools 会带来明确成本：
+
+- 工具越多，上下文越膨胀。
+- 工具描述越长，模型越容易在相似工具之间混淆。
+- 参数 schema 越复杂，误填概率越高。
+- 高风险工具如果被宽泛暴露，会增加权限和审批压力。
+- 复杂工具的完整操作手册不适合每轮都塞进 provider tools。
+
+因此，TooGraph 不应把“使用 tool calling”理解成“每个 LLM 节点永远一次性暴露全部工具完整手册”。更合理的是分层暴露工具信息：
+
+```text
+第一层：Tool Index
+  轻量工具目录，只包含 tool name、一句话用途、简短参数摘要、风险/权限标签。
+
+第二层：Tool Manual
+  选中某个工具后再加载详细说明，包括完整参数 schema、示例、边界条件、错误处理和输出语义。
+
+第三层：Tool Execution
+  基于完整 schema 生成或校验 tool_call，由 Tool Executor 执行并记录结果。
+```
+
+这保留了原来多步调用思路中有价值的部分：先确定需要哪个能力，再展开这个能力的详细操作说明。但它不应退回到“用提示词模拟 capability selector”的旧协议，而应成为正式的 tool registry / tool discovery 机制。
+
+推荐区分三种工具暴露模式：
+
+```text
+Direct Tool Calling
+  适合简单、低风险、参数少的工具。
+  直接把完整 schema 放进 provider tools。
+  例如 search_web(query)、get_time(location)。
+
+Progressive Tool Calling
+  适合复杂、高风险、参数多或需要长操作手册的工具。
+  第一轮暴露 Tool Index 或 Tool Group。
+  选中工具后加载 Tool Manual。
+  第二轮再生成严格 tool_call。
+
+Graph Tool Calling
+  适合复杂工作流工具。
+  LLM 只看见高层调用 schema。
+  内部步骤由图模板或子图执行，并产生 child run、artifact 和审计记录。
+```
+
+这不是“tool calling 不如多步调用”，而是：
+
+```text
+简单工具：单步 native tool calling 更直接。
+复杂工具：渐进展开更可靠、更省上下文、更容易做权限控制。
+```
+
+LLM 节点的 Tool 配置应支持这种策略：
+
+```text
+Tool Exposure
+  - direct tools
+  - tool index
+  - selected tool groups
+  - manual lookup allowed
+
+Budgets
+  - max direct tools
+  - max tool schema tokens
+  - max manual tokens per selected tool
+
+Fallback
+  - native direct call
+  - progressive manual lookup
+  - structured-output emulation
+  - fail closed
+```
+
+这让 TooGraph 的优势更清楚：
+
+```text
+Provider tool calling 负责标准化模型调用格式。
+TooGraph tool discovery 负责控制模型看见多少工具信息。
+TooGraph 图运行负责把工具选择、手册展开、执行、观察结果和循环都做成可审计流程。
+```
+
+## 7. 两个正交维度
 
 现在最容易混乱的地方，是把两个维度混在一起：
 
@@ -308,7 +398,7 @@ TooGraph 的理想能力不是只支持其中一种，而是同时支持：
 
 这也是 agent loop 的产品意义：它不是为了替代所有固定模板，而是证明 TooGraph 可以用图搭出通用 agent，而不是只能做固定流程编排。
 
-## 7. Tool Node 与 Tool Executor
+## 8. Tool Node 与 Tool Executor
 
 `Tool Node` 和 `Tool Executor` 应共享同一个 Tool Registry 和 Tool Runtime，但它们的心智不同。
 
@@ -355,7 +445,7 @@ Tool Executor
 
 这能解释为什么 TooGraph 仍需要 Tool Node。不是所有图都是 agent loop；大量高价值模板就是确定使用某个工具的固定工作流。
 
-## 8. 图上的主循环表达
+## 9. 图上的主循环表达
 
 理想图不需要隐藏 while-loop，但也不需要把选择工具做成单独 Action。循环和分支仍然应该通过画布表达，尤其是通过 Condition 节点表达。
 
@@ -397,7 +487,7 @@ LLM 自己通过 tool_calls 输出要调用的工具和参数。
 图负责把 tool_calls 路由到执行器，再把结果回灌。
 ```
 
-## 9. LLM 输出协议
+## 10. LLM 输出协议
 
 LLM 节点应允许两类自然结果：
 
@@ -457,7 +547,7 @@ Tool Executor 执行后产生：
 
 下一轮 LLM 调用应收到 tool result，而不是收到一个 TooGraph 专用的 `result_package` 说明书。`result_package` 可以作为 TooGraph artifact/state 包装存在，但对 agent loop 来说，核心语义应是 tool result / observation。
 
-## 10. Structured Output 的重新定位
+## 11. Structured Output 的重新定位
 
 Tool calling 不会完全替代 structured output，但优先级应重新排列。
 
@@ -484,7 +574,7 @@ Buddy 主循环中，如果 provider/model 支持原生 tool calling，则不应
 
 作为首选路径。它应该是 fallback，而不是专业主路径。
 
-## 11. Tool 与权限边界
+## 12. Tool 与权限边界
 
 Provider tool calling 只是模型输出协议，不是安全边界。
 
@@ -508,7 +598,7 @@ TooGraph Runtime 决定能不能执行。
 
 这正是 TooGraph 的价值所在。
 
-## 12. 工作流作为 Tool
+## 13. 工作流作为 Tool
 
 现有 Subgraph / Graph Template 应考虑统一成一种 Tool 暴露方式：
 
@@ -525,7 +615,7 @@ Workflow Tool
 
 这可以保留 TooGraph 的图优势，同时对齐 tool calling 的公共心智模型。
 
-## 13. Action 的重新定位
+## 14. Action 的重新定位
 
 现有 Action 可以被吸收成 Tool implementation：
 
@@ -562,7 +652,7 @@ LLM-backed Tool
 
 但对外仍统一暴露为 Tool。用户不需要先理解 Action 与 Tool 的区别。
 
-## 14. 固定工作流与通用 Agent 的关系
+## 15. 固定工作流与通用 Agent 的关系
 
 TooGraph 不应该把固定工作流和通用 Agent 对立起来。它们是同一套图系统的两种表达。
 
@@ -604,7 +694,7 @@ Deep Research Workflow
 
 这才是图协议功能完备性的体现：它既能表达稳定流程，也能表达动态 Agent。
 
-## 15. Buddy UI 与运行记录
+## 16. Buddy UI 与运行记录
 
 Buddy 聊天中可以把主循环显示为：
 
@@ -659,7 +749,7 @@ RunDetail 中可以更详细：
 
 两者都进入同一个 run record 和 artifact 系统，但用户能看出一个是图作者确定的步骤，一个是模型动态选择的步骤。
 
-## 16. 失败与恢复
+## 17. 失败与恢复
 
 理想失败处理：
 
@@ -689,7 +779,7 @@ Budget exhausted
 - 写文件、网络、执行脚本等高风险工具，应在节点执行前暂停审批。
 - 成功结果应写入 state、artifact 或 tool result record，供后续节点读取。
 
-## 17. Provider 能力与降级策略
+## 18. Provider 能力与降级策略
 
 理想策略：
 
@@ -717,7 +807,7 @@ Provider supports neither reliably
 
 这能避免“表面能跑，实际不可诊断”的问题。
 
-## 18. 对现有模板的态度
+## 19. 对现有模板的态度
 
 这次反思不要求兼容现有模板。理想状态下，官方 Buddy 模板可以重建为：
 
@@ -742,7 +832,7 @@ Context Builder
 
 旧概念可以保留为内部兼容层，但不应继续主导新设计。
 
-## 19. 推荐理想架构
+## 20. 推荐理想架构
 
 推荐目标架构：
 
@@ -783,7 +873,7 @@ LLM 节点可以使用哪些工具。
 固定流程也可以直接使用 Tool Node 调用工具。
 ```
 
-## 20. 核心结论
+## 21. 核心结论
 
 TooGraph 不应该因为追求图可见性，而重新发明一套复杂的 tool calling 替代协议。
 
@@ -802,7 +892,7 @@ TooGraph 不应该因为追求图可见性，而重新发明一套复杂的 tool
 
 这样既不放弃 TooGraph 的图产品优势，也不拒绝已有成熟 agent 理论。
 
-## 21. 下一步需要设计的问题
+## 22. 下一步需要设计的问题
 
 进入实现设计前，需要回答：
 

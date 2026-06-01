@@ -8,7 +8,7 @@ export type GraphNodeSize = {
   height: number;
 };
 
-export type NodeFamily = "input" | "output" | "agent" | "batch" | "condition" | "subgraph" | "tool";
+export type NodeFamily = "input" | "output" | "agent" | "new_llm" | "batch" | "condition" | "subgraph" | "tool";
 
 export type StateDefinition = {
   name: string;
@@ -32,6 +32,11 @@ export type StateDefinition = {
     kind: "capability_result";
     nodeId: string;
     fieldKey?: "result_package";
+    managed?: boolean;
+  } | {
+    kind: "llm_output";
+    nodeId: string;
+    fieldKey: "content" | "tool_calls" | "reasoning_content" | "finish_reason";
     managed?: boolean;
   } | null;
 };
@@ -122,6 +127,25 @@ export type AgentNode = {
     providerProfile?: AgentProviderProfile;
   };
 };
+
+export type NewLlmNode = Omit<AgentNode, "kind" | "config"> & {
+  kind: "new_llm";
+  config: {
+    toolKeys: string[];
+    outputChannels?: {
+      reasoningContent?: boolean;
+      finishReason?: boolean;
+    };
+    taskInstruction: string;
+    modelSource: "global" | "override";
+    model: string;
+    thinkingMode: AgentThinkingMode;
+    temperature: number;
+    providerProfile?: AgentProviderProfile;
+  };
+};
+
+export type AgentLikeNode = AgentNode | NewLlmNode;
 
 export type BatchInputMode = "shared" | "batch";
 export type BatchWorkerSource = "default_llm" | "subgraph";
@@ -235,7 +259,15 @@ export type ToolNode = {
   };
 };
 
-export type GraphNode = InputNode | AgentNode | BatchNode | ConditionNode | OutputNode | SubgraphNode | ToolNode;
+export type GraphNode = InputNode | AgentNode | NewLlmNode | BatchNode | ConditionNode | OutputNode | SubgraphNode | ToolNode;
+
+export function isAgentLikeNode(node: GraphNode): node is AgentLikeNode {
+  return node.kind === "agent" || node.kind === "new_llm";
+}
+
+export function isAgentLikeNodeKind(kind: GraphNode["kind"]): kind is AgentLikeNode["kind"] {
+  return kind === "agent" || kind === "new_llm";
+}
 
 export type GraphEdge = {
   source: string;
@@ -402,7 +434,7 @@ export type NodeCreationEntry = {
   description: string;
   mode: "node" | "preset" | "subgraph";
   origin?: "builtin" | "persisted";
-  nodeKind?: "input" | "output" | "batch" | "subgraph" | "tool";
+  nodeKind?: "input" | "output" | "new_llm" | "batch" | "subgraph" | "tool";
   presetId?: string;
   graphId?: string;
   templateId?: string;

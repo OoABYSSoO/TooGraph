@@ -66,7 +66,12 @@ export function canConnectStateBinding(
 
   const isVirtualOutputSource =
     isVirtualAnyOutputStateKey(sourceStateKey) &&
-    (sourceNode.kind === "agent" || sourceNode.kind === "batch" || sourceNode.kind === "subgraph" || sourceNode.kind === "tool" || (sourceNode.kind === "input" && sourceNode.writes.length === 0));
+    (sourceNode.kind === "agent" ||
+      sourceNode.kind === "new_llm" ||
+      sourceNode.kind === "batch" ||
+      sourceNode.kind === "subgraph" ||
+      sourceNode.kind === "tool" ||
+      (sourceNode.kind === "input" && sourceNode.writes.length === 0));
 
   if (!isVirtualOutputSource && !sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
     return false;
@@ -77,10 +82,23 @@ export function canConnectStateBinding(
       return false;
     }
     if (isCreateAgentInputStateKey(targetStateKey)) {
-      return targetNode.kind === "agent" || targetNode.kind === "batch" || targetNode.kind === "subgraph" || targetNode.kind === "tool";
+      return (
+        targetNode.kind === "agent" ||
+        targetNode.kind === "new_llm" ||
+        targetNode.kind === "batch" ||
+        targetNode.kind === "subgraph" ||
+        targetNode.kind === "tool"
+      );
     }
     if (isVirtualAnyInputStateKey(targetStateKey)) {
-      return targetNode.kind === "agent" || targetNode.kind === "batch" || targetNode.kind === "subgraph" || targetNode.kind === "tool" || targetNode.reads.length === 0;
+      return (
+        targetNode.kind === "agent" ||
+        targetNode.kind === "new_llm" ||
+        targetNode.kind === "batch" ||
+        targetNode.kind === "subgraph" ||
+        targetNode.kind === "tool" ||
+        targetNode.reads.length === 0
+      );
     }
     return targetNode.reads.some((binding) => binding.state === targetStateKey);
   }
@@ -106,11 +124,21 @@ export function canConnectStateBinding(
   }
 
   if (isCreateAgentInputStateKey(targetStateKey)) {
-    return (targetNode.kind === "agent" || targetNode.kind === "batch" || targetNode.kind === "subgraph" || targetNode.kind === "tool") && !targetNode.reads.some((binding) => binding.state === sourceStateKey);
+    return (
+      targetNode.kind === "agent" ||
+      targetNode.kind === "new_llm" ||
+      targetNode.kind === "batch" ||
+      targetNode.kind === "subgraph" ||
+      targetNode.kind === "tool"
+    ) && !targetNode.reads.some((binding) => binding.state === sourceStateKey);
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
-    return targetNode.kind === "agent" || targetNode.kind === "batch" || targetNode.kind === "subgraph" || targetNode.kind === "tool"
+    return targetNode.kind === "agent" ||
+      targetNode.kind === "new_llm" ||
+      targetNode.kind === "batch" ||
+      targetNode.kind === "subgraph" ||
+      targetNode.kind === "tool"
       ? !targetNode.reads.some((binding) => binding.state === sourceStateKey)
       : targetNode.reads.length === 0;
   }
@@ -295,7 +323,18 @@ export function canConnectFlowNodes(
     return false;
   }
 
-  if ((sourceNode.kind !== "input" && sourceNode.kind !== "agent" && sourceNode.kind !== "batch" && sourceNode.kind !== "subgraph" && sourceNode.kind !== "tool") || !canNodeAcceptFlowTarget(sourceNode, targetNode)) {
+  if (
+    sourceNode.kind !== "input" &&
+    sourceNode.kind !== "agent" &&
+    sourceNode.kind !== "new_llm" &&
+    sourceNode.kind !== "batch" &&
+    sourceNode.kind !== "subgraph" &&
+    sourceNode.kind !== "tool"
+  ) {
+    return false;
+  }
+
+  if (!canNodeAcceptFlowTarget(sourceNode, targetNode)) {
     return false;
   }
 
@@ -322,16 +361,35 @@ export function canConnectStateInputSource(
     if (sourceNode.writes.length > 0) {
       return false;
     }
-  } else if (sourceNode.kind !== "agent" && sourceNode.kind !== "batch" && sourceNode.kind !== "subgraph" && sourceNode.kind !== "tool") {
+  } else if (
+    sourceNode.kind !== "agent" &&
+    sourceNode.kind !== "new_llm" &&
+    sourceNode.kind !== "batch" &&
+    sourceNode.kind !== "subgraph" &&
+    sourceNode.kind !== "tool"
+  ) {
     return false;
   }
 
   if (isCreateAgentInputStateKey(targetStateKey)) {
-    if (targetNode.kind !== "agent" && targetNode.kind !== "batch" && targetNode.kind !== "subgraph" && targetNode.kind !== "tool") {
+    if (
+      targetNode.kind !== "agent" &&
+      targetNode.kind !== "new_llm" &&
+      targetNode.kind !== "batch" &&
+      targetNode.kind !== "subgraph" &&
+      targetNode.kind !== "tool"
+    ) {
       return false;
     }
   } else if (isVirtualAnyInputStateKey(targetStateKey)) {
-    if (targetNode.kind !== "agent" && targetNode.kind !== "batch" && targetNode.kind !== "subgraph" && targetNode.kind !== "tool" && targetNode.reads.length > 0) {
+    if (
+      targetNode.kind !== "agent" &&
+      targetNode.kind !== "new_llm" &&
+      targetNode.kind !== "batch" &&
+      targetNode.kind !== "subgraph" &&
+      targetNode.kind !== "tool" &&
+      targetNode.reads.length > 0
+    ) {
       return false;
     }
   } else if (!targetNode.reads.some((binding) => binding.state === targetStateKey)) {

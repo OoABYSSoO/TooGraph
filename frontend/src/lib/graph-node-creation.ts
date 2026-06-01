@@ -12,6 +12,7 @@ import type {
   GraphPayload,
   GraphPosition,
   InputNode,
+  NewLlmNode,
   NodeCreationContext,
   OutputNode,
   PresetDocument,
@@ -143,6 +144,29 @@ function buildBatchNode(position: GraphPosition): BatchNode {
   };
 }
 
+function buildNewLlmNode(position: GraphPosition): NewLlmNode {
+  return {
+    kind: "new_llm",
+    name: "New LLM Node",
+    description: "Experimental one-turn LLM node for the next tool-calling protocol.",
+    ui: normalizeCreatedNodeUi(position),
+    reads: [],
+    writes: [],
+    config: {
+      toolKeys: [],
+      outputChannels: {
+        reasoningContent: false,
+        finishReason: false,
+      },
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+}
+
 function buildSubgraphNode(position: GraphPosition): SubgraphNode {
   return {
     kind: "subgraph",
@@ -198,6 +222,65 @@ export function buildGenericBatchNode(params: { id: string; position: GraphPosit
     id: params.id,
     node: buildBatchNode(params.position),
     state_schema: {},
+  };
+}
+
+export function buildGenericNewLlmNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
+  const contentStateKey = `${params.id}_content`;
+  const toolCallsStateKey = `${params.id}_tool_calls`;
+  return {
+    id: params.id,
+    node: {
+      ...buildNewLlmNode(params.position),
+      writes: [
+        { state: contentStateKey, mode: "replace" },
+        { state: toolCallsStateKey, mode: "replace" },
+      ],
+    },
+    state_schema: {
+      [contentStateKey]: buildNewLlmOutputStateDefinition({
+        nodeId: params.id,
+        fieldKey: "content",
+        name: "content",
+        description: "Final assistant content.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+      }),
+      [toolCallsStateKey]: buildNewLlmOutputStateDefinition({
+        nodeId: params.id,
+        fieldKey: "tool_calls",
+        name: "tool_calls",
+        description: "Tool calls requested by the model.",
+        type: "json",
+        value: [],
+        color: "#0f766e",
+      }),
+    },
+  };
+}
+
+function buildNewLlmOutputStateDefinition(params: {
+  nodeId: string;
+  fieldKey: "content" | "tool_calls" | "reasoning_content" | "finish_reason";
+  name: string;
+  description: string;
+  type: string;
+  value: unknown;
+  color: string;
+}): StateDefinition {
+  return {
+    name: params.name,
+    description: params.description,
+    type: params.type,
+    value: params.value,
+    color: params.color,
+    binding: {
+      kind: "llm_output",
+      nodeId: params.nodeId,
+      fieldKey: params.fieldKey,
+      managed: true,
+    },
   };
 }
 
@@ -388,7 +471,7 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
     return;
   }
 
-  if (node.kind === "agent" || node.kind === "batch") {
+  if (node.kind === "agent" || node.kind === "new_llm" || node.kind === "batch") {
     if (!node.reads.some((binding) => binding.state === stateKey)) {
       node.reads = [...node.reads, { state: stateKey, required: true }];
     }
@@ -420,7 +503,7 @@ function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: str
     node.writes = [{ state: stateKey, mode: "replace" }];
     return;
   }
-  if (node.kind !== "agent") {
+  if (node.kind !== "agent" && node.kind !== "new_llm") {
     return;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {
@@ -602,13 +685,17 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     sourceStateKey &&
     (input.createdNode.kind === "output" ||
       input.createdNode.kind === "agent" ||
+      input.createdNode.kind === "new_llm" ||
       input.createdNode.kind === "batch" ||
       input.createdNode.kind === "condition" ||
       input.createdNode.kind === "subgraph")
   ) {
     ensureStateDefinitionForCreation(nextDocument, sourceStateKey, sourceValueType || "text");
     bindCreatedStateToNode(nextDocument.nodes[input.createdNodeId], sourceStateKey);
-    if (nextDocument.nodes[input.createdNodeId]?.kind === "agent") {
+    if (
+      nextDocument.nodes[input.createdNodeId]?.kind === "agent" ||
+      nextDocument.nodes[input.createdNodeId]?.kind === "new_llm"
+    ) {
       reconcileAgentCapabilityInputBindingsInPlace(nextDocument, input.createdNodeId);
     }
     applyStateNameToCreatedOutputNode(nextDocument.nodes[input.createdNodeId], sourceStateKey, nextDocument.state_schema);

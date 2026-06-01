@@ -6,7 +6,7 @@
       'node-card--selected': selected,
       'node-card--hovered': hovered,
       'node-card--input': view.body.kind === 'input',
-      'node-card--agent': view.body.kind === 'agent',
+      'node-card--agent': view.body.kind === 'agent' || view.body.kind === 'new_llm',
       'node-card--batch': view.body.kind === 'batch',
       'node-card--condition': view.body.kind === 'condition',
       'node-card--output': view.body.kind === 'output',
@@ -41,7 +41,7 @@
       :human-review-pending="humanReviewPending"
       :has-advanced-settings="hasAdvancedSettings"
       :can-save-preset="canSavePreset"
-      :advanced-popover-width="view.body.kind === 'output' ? 340 : view.body.kind === 'batch' ? 320 : 280"
+      :advanced-popover-width="view.body.kind === 'output' ? 340 : view.body.kind === 'batch' ? 320 : view.body.kind === 'new_llm' ? 320 : 280"
       :action-popover-style="actionPopoverStyle"
       :confirm-popover-style="confirmPopoverStyle"
       :agent-temperature-input="agentTemperatureInput"
@@ -52,6 +52,8 @@
       :output-persist-format-options="outputPersistFormatOptions"
       :output-file-name-template="view.body.kind === 'output' ? view.body.fileNameTemplate : ''"
       :output-file-name-placeholder="view.title || t('nodeCard.outputFallback')"
+      :new-llm-show-reasoning-output="view.body.kind === 'new_llm' ? view.body.showReasoningContentOutput : false"
+      :new-llm-show-finish-reason-output="view.body.kind === 'new_llm' ? view.body.showFinishReasonOutput : false"
       :is-output-display-mode-active="isOutputDisplayModeActive"
       :is-output-persist-format-active="isOutputPersistFormatActive"
       @toggle-advanced="toggleAdvancedPanel"
@@ -66,6 +68,8 @@
       @update:output-display-mode="updateOutputDisplayMode"
       @update:output-persist-format="updateOutputPersistFormat"
       @update:output-file-name="handleOutputFileNameInputValue"
+      @new-llm-reasoning-output="updateNewLlmReasoningOutput"
+      @new-llm-finish-reason-output="updateNewLlmFinishReasonOutput"
     />
     <header class="node-card__header">
       <div class="node-card__eyebrow">{{ view.kindLabel }}</div>
@@ -326,6 +330,73 @@
         @update:breakpoint-enabled="handleAgentBreakpointToggleValue"
         @select-action="selectAgentAction"
         @update-action-instruction="handleActionInstructionInput"
+        @task-input="handleAgentTaskInstructionInput"
+      />
+    </section>
+
+    <section v-else-if="view.body.kind === 'new_llm'" class="node-card__body node-card__body--agent">
+      <NewLlmNodeBody
+        ref="agentNodeBodyRef"
+        :node-id="nodeId"
+        :body="view.body"
+        :selected-tool-keys="newLlmSelectedToolKeys"
+        :tool-definitions="toolDefinitions"
+        :tool-definitions-loading="toolDefinitionsLoading"
+        :tool-definitions-error="toolDefinitionsError"
+        :ordered-input-ports="orderedAgentInputPorts"
+        :ordered-output-ports="orderedAgentOutputPorts"
+        :state-editor-popover-style="stateEditorPopoverStyle"
+        :agent-add-popover-style="agentAddPopoverStyle"
+        :confirm-popover-style="confirmPopoverStyle"
+        :state-editor-draft="stateEditorDraft"
+        :state-editor-error="stateEditorError"
+        :type-options="stateTypeOptions"
+        :color-options="stateColorOptions"
+        :is-state-editor-open="isStateEditorOpen"
+        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+        :is-port-reordering="isPortReordering"
+        :is-port-reorder-placeholder="isPortReorderPlaceholder"
+        :input-create-visible="shouldRevealAgentCreateInputPort"
+        :input-create-open="isPortCreateOpen('input')"
+        :input-create-accent-color="pendingStateInputTarget?.stateColor ?? pendingStateInputSource?.stateColor ?? '#16a34a'"
+        :input-create-label="pendingStateInputTarget?.label ?? pendingStateInputSource?.label ?? '+ input'"
+        :input-create-anchor-state-key="agentCreateInputAnchorStateKey"
+        :create-draft="portStateDraft"
+        :create-title="portPickerTitle"
+        :create-error="portStateError"
+        :create-hint="t('nodeCard.createStateBindHint')"
+        :create-selection-value="portStateSelectionValue"
+        :create-existing-state-options="existingPortStateOptions"
+        :model-value="agentResolvedModelValue || undefined"
+        :model-options="agentModelOptions"
+        :global-model-ref="trimmedGlobalTextModelRef"
+        :thinking-mode-value="agentThinkingModeValue"
+        :thinking-options="agentThinkingOptions"
+        :thinking-enabled="agentThinkingEnabled"
+        @pointer-enter="handleStateEditorPillPointerEnter"
+        @pointer-leave="handleStateEditorPillPointerLeave"
+        @reorder-pointer-down="handlePortReorderPointerDown"
+        @port-click="handlePortStatePillClick"
+        @remove-click="handleRemovePortStateClick"
+        @update:name="handleStateEditorNameInput"
+        @update:type="handleStateEditorTypeValue"
+        @update:color="handleStateEditorColorInput"
+        @update:description="handleStateEditorDescriptionInput"
+        @open-create="openPortStateCreate"
+        @update:create-selection="handlePortStateSelectionValue"
+        @update:create-name="handlePortDraftNameValue"
+        @update:create-type="handlePortDraftTypeSelect"
+        @update:create-color="handlePortDraftColorSelect"
+        @update:create-description="handlePortDraftDescriptionValue"
+        @update:create-value="updatePortDraftValue"
+        @cancel-create="closePortPicker"
+        @commit-create="commitPortStateCreate"
+        @model-visible-change="handleAgentModelSelectVisibleChange"
+        @update:model-value="handleAgentModelValueChange"
+        @update:thinking-mode="handleAgentThinkingModeSelect"
+        @update-tool-keys="updateNewLlmToolKeys"
         @task-input="handleAgentTaskInstructionInput"
       />
     </section>
@@ -616,12 +687,13 @@ import ConditionNodeBody from "./ConditionNodeBody.vue";
 import FloatingStatePortPill from "./FloatingStatePortPill.vue";
 import InputNodeBody from "./InputNodeBody.vue";
 import NodeCardTopActions from "./NodeCardTopActions.vue";
+import NewLlmNodeBody from "./NewLlmNodeBody.vue";
 import OutputNodeBody from "./OutputNodeBody.vue";
 import PrimaryStatePort from "./PrimaryStatePort.vue";
 import SubgraphNodeBody from "./SubgraphNodeBody.vue";
 import ToolNodeBody from "./ToolNodeBody.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
-import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition, TemplateRecord, ToolNode } from "@/types/node-system";
+import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, NewLlmNode, OutputNode, StateDefinition, TemplateRecord, ToolNode } from "@/types/node-system";
 import type { ActionDefinition } from "@/types/actions";
 import type { ToolDefinition } from "@/types/tools";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
@@ -771,7 +843,7 @@ const emit = defineEmits<{
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
-  (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
+  (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"] | NewLlmNode["config"]> }): void;
   (event: "update-tool-config", payload: { nodeId: string; patch: Partial<ToolNode["config"]> }): void;
   (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
   (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
@@ -853,12 +925,12 @@ const view = computed(() =>
   }),
 );
 const agentInputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
+  view.value.body.kind === "agent" || view.value.body.kind === "new_llm" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
     ? view.value.inputs.filter((port) => !port.virtual)
     : [],
 );
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
+  view.value.body.kind === "agent" || view.value.body.kind === "new_llm" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
     ? view.value.outputs.filter((port) => !port.virtual)
     : [],
 );
@@ -892,7 +964,7 @@ const batchWorkerTemplateOptions = computed(() =>
 const toolTargetAgentNodeId = computed(() => (props.node.kind === "tool" ? props.node.config.targetAgentNodeId ?? "" : ""));
 const toolTargetAgentNodeOptions = computed(() =>
   Object.entries(props.graphNodes)
-    .filter(([, node]) => node.kind === "agent")
+    .filter(([, node]) => node.kind === "agent" || node.kind === "new_llm")
     .map(([nodeId, node]) => ({
       value: nodeId,
       label: node.name.trim() || nodeId,
@@ -1097,15 +1169,19 @@ watch(
 );
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
-  return props.node.kind === "agent" ? resolveAgentLikeModelValue(props.node.config) : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
+  return props.node.kind === "agent" || props.node.kind === "new_llm"
+    ? resolveAgentLikeModelValue(props.node.config)
+    : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 });
 const batchDefaultResolvedModelValue = computed(() => {
   return props.node.kind === "batch" ? resolveAgentLikeModelValue(props.node.config.defaultWorker) : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 });
 const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
-  props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
+  props.node.kind === "agent" || props.node.kind === "new_llm" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
 );
-const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? agentThinkingModeValue.value !== "off" : true);
+const agentThinkingEnabled = computed(() =>
+  props.node.kind === "agent" || props.node.kind === "new_llm" ? agentThinkingModeValue.value !== "off" : true,
+);
 const batchDefaultThinkingModeValue = computed<AgentThinkingControlMode>(() =>
   props.node.kind === "batch" ? normalizeAgentThinkingMode(props.node.config.defaultWorker.thinkingMode) : "off",
 );
@@ -1115,7 +1191,10 @@ const batchDefaultThinkingEnabled = computed(() =>
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
-const selectedActionKey = computed(() => props.node.kind === "agent" ? props.node.config.actionKey.trim() : "");
+const selectedActionKey = computed(() =>
+  props.node.kind === "agent" ? props.node.config.actionKey.trim() : "",
+);
+const newLlmSelectedToolKeys = computed(() => (props.node.kind === "new_llm" ? [...(props.node.config.toolKeys ?? [])] : []));
 const selectedToolKey = computed(() => props.node.kind === "tool" ? props.node.config.toolKey.trim() : "");
 const availableActionDefinitions = computed(() =>
   props.node.kind === "agent" ? listSelectableActionDefinitions(props.actionDefinitions) : [],
@@ -1134,12 +1213,14 @@ const conditionLoopLimitValue = computed(() =>
   props.node.kind === "condition" ? normalizeConditionLoopLimit(props.node.config.loopLimit) : 5,
 );
 const agentTemperatureInput = computed(() => {
-  if (props.node.kind !== "agent") {
+  if (props.node.kind !== "agent" && props.node.kind !== "new_llm") {
     return String(DEFAULT_AGENT_TEMPERATURE);
   }
   return String(normalizeAgentTemperature(props.node.config.temperature));
 });
-const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "batch" || props.node.kind === "output");
+const hasAdvancedSettings = computed(() =>
+  props.node.kind === "agent" || props.node.kind === "new_llm" || props.node.kind === "batch" || props.node.kind === "output",
+);
 const canSavePreset = computed(() => props.node.kind === "agent");
 const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || Boolean(props.hovered) || activeTopAction.value !== null);
 const shouldShowNodeRunTiming = computed(() => Boolean(props.runTiming));
@@ -1182,7 +1263,7 @@ function isPortCreateOpen(side: "input" | "output") {
   return activePortPickerSide.value === side && Boolean(portStateDraft.value);
 }
 
-function resolveAgentLikeModelValue(config: AgentNode["config"]) {
+function resolveAgentLikeModelValue(config: AgentNode["config"] | NewLlmNode["config"]) {
   const overrideModel = config.model.trim();
   return config.modelSource === "override" && overrideModel ? overrideModel : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 }
@@ -1419,11 +1500,11 @@ function emitInputValuePatch(value: unknown) {
   emitInputConfigPatch({ value });
 }
 
-function emitAgentConfigPatch(patch: Partial<AgentNode["config"]>) {
+function emitAgentConfigPatch(patch: Partial<AgentNode["config"] | NewLlmNode["config"]>) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (props.node.kind !== "agent") {
+  if (props.node.kind !== "agent" && props.node.kind !== "new_llm") {
     return;
   }
   emit("update-agent-config", { nodeId: props.nodeId, patch });
@@ -1545,6 +1626,37 @@ function selectAgentAction(actionKey: string) {
     return;
   }
   emitAgentConfigPatch(patch);
+}
+
+function updateNewLlmToolKeys(toolKeys: string[]) {
+  if (guardLockedGraphInteraction() || props.node.kind !== "new_llm") {
+    return;
+  }
+  emitAgentConfigPatch({ toolKeys });
+}
+
+function updateNewLlmReasoningOutput(enabled: boolean) {
+  if (guardLockedGraphInteraction() || props.node.kind !== "new_llm") {
+    return;
+  }
+  emitAgentConfigPatch({
+    outputChannels: {
+      ...(props.node.config.outputChannels ?? {}),
+      reasoningContent: enabled,
+    },
+  });
+}
+
+function updateNewLlmFinishReasonOutput(enabled: boolean) {
+  if (guardLockedGraphInteraction() || props.node.kind !== "new_llm") {
+    return;
+  }
+  emitAgentConfigPatch({
+    outputChannels: {
+      ...(props.node.config.outputChannels ?? {}),
+      finishReason: enabled,
+    },
+  });
 }
 
 function selectTool(toolKey: string) {
@@ -1773,7 +1885,7 @@ function handleStateEditorPillPointerLeave(anchorId: string) {
 function isActionManagedOutputState(stateKey: string) {
   const binding = props.stateSchema[stateKey]?.binding;
   return (
-    props.node.kind === "agent" &&
+    (props.node.kind === "agent" || props.node.kind === "new_llm") &&
     binding?.kind === "action_output" &&
     binding.nodeId === props.nodeId &&
     binding.managed !== false
@@ -1782,7 +1894,7 @@ function isActionManagedOutputState(stateKey: string) {
 
 function isActionManagedInputState(stateKey: string) {
   return (
-    props.node.kind === "agent" &&
+    (props.node.kind === "agent" || props.node.kind === "new_llm") &&
     props.node.reads.some(
       (binding) =>
         binding.state === stateKey &&
@@ -2157,7 +2269,7 @@ function handleAgentBreakpointToggleValue(value: string | number | boolean) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (props.node.kind !== "agent" || typeof value !== "boolean") {
+  if ((props.node.kind !== "agent" && props.node.kind !== "new_llm") || typeof value !== "boolean") {
     return;
   }
   emit("toggle-agent-breakpoint", { nodeId: props.nodeId, enabled: value });

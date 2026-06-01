@@ -17,6 +17,7 @@ from app.core.schemas.node_system import (
     NodeSystemGraphDocument,
     NodeSystemGraphEdge,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemOutputNode,
     NodeSystemSubgraphNode,
     NodeSystemToolNode,
@@ -38,6 +39,8 @@ LEGACY_BREAKPOINT_METADATA_KEYS = (
     "interruptAfter",
     "agent_breakpoint_timing",
 )
+
+LLM_NODE_TYPES = (NodeSystemAgentNode, NodeSystemNewLlmNode)
 
 
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
@@ -70,6 +73,8 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
         issues.extend(_validate_node_shape(node_name, node))
         if isinstance(node, NodeSystemAgentNode):
             issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_action_keys, action_catalog))
+        elif isinstance(node, NodeSystemNewLlmNode):
+            issues.extend(_validate_new_llm_node(node_name, node, state_schema, runtime_tool_keys, tool_catalog))
         elif isinstance(node, NodeSystemBatchNode):
             issues.extend(_validate_batch_node(node_name, node))
         elif isinstance(node, NodeSystemConditionNode):
@@ -265,6 +270,19 @@ def _validate_embedded_graph(
                         getattr(graph, "state_schema", {}),
                         runtime_action_keys,
                         action_catalog,
+                    ),
+                    f"{path_prefix}.nodes.{node_name}",
+                )
+            )
+        elif isinstance(node, NodeSystemNewLlmNode):
+            issues.extend(
+                _prefix_issues(
+                    _validate_new_llm_node(
+                        node_name,
+                        node,
+                        getattr(graph, "state_schema", {}),
+                        runtime_tool_keys,
+                        tool_catalog,
                     ),
                     f"{path_prefix}.nodes.{node_name}",
                 )
@@ -691,6 +709,105 @@ def _validate_tool_node(
     return issues
 
 
+def _validate_new_llm_node(
+    node_name: str,
+    node: NodeSystemNewLlmNode,
+    state_schema: dict[str, object],
+    runtime_tool_keys: set[str],
+    tool_catalog: dict[str, ToolDefinition],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    selected_tool_keys = [tool_key for tool_key in node.config.tool_keys if tool_key]
+    for index, tool_key in enumerate(selected_tool_keys):
+        definition = tool_catalog.get(tool_key)
+        path = f"nodes.{node_name}.config.toolKeys.{index}"
+        if definition is None or tool_key not in runtime_tool_keys or not getattr(definition, "runtime_registered", False):
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_tool_not_runtime_registered",
+                    message=f"New LLM node '{node_name}' provides tool '{tool_key}', but the tool is not runtime-registered.",
+                    path=path,
+                )
+            )
+            continue
+        if definition.status != ToolCatalogStatus.ACTIVE:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_tool_disabled",
+                    message=f"New LLM node '{node_name}' provides tool '{tool_key}', but the tool is disabled.",
+                    path=path,
+                )
+            )
+
+    expected_fields = {"content", "tool_calls"}
+    if node.config.output_channels.reasoning_content:
+        expected_fields.add("reasoning_content")
+    if node.config.output_channels.finish_reason:
+        expected_fields.add("finish_reason")
+
+    seen_fields: set[str] = set()
+    for write_index, write in enumerate(node.writes):
+        state_definition = state_schema.get(write.state)
+        binding = getattr(state_definition, "binding", None)
+        if binding is None or binding.kind != NodeSystemStateBindingKind.LLM_OUTPUT:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_output_binding_missing",
+                    message=f"New LLM node '{node_name}' output state '{write.state}' must use a managed llm_output binding.",
+                    path=f"nodes.{node_name}.writes.{write_index}",
+                )
+            )
+            continue
+        if binding.node_id != node_name:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_output_binding_node_mismatch",
+                    message=(
+                        f"New LLM output state '{write.state}' is bound to node '{binding.node_id}', "
+                        f"expected '{node_name}'."
+                    ),
+                    path=f"state_schema.{write.state}.binding.nodeId",
+                )
+            )
+        if binding.field_key not in {"content", "tool_calls", "reasoning_content", "finish_reason"}:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_output_binding_field_unknown",
+                    message=f"New LLM node '{node_name}' output state '{write.state}' is bound to unknown channel '{binding.field_key}'.",
+                    path=f"state_schema.{write.state}.binding.fieldKey",
+                )
+            )
+            continue
+        if binding.field_key not in expected_fields:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_output_channel_unexpected",
+                    message=f"New LLM node '{node_name}' writes disabled output channel '{binding.field_key}'.",
+                    path=f"state_schema.{write.state}.binding.fieldKey",
+                )
+            )
+        if binding.field_key in seen_fields:
+            issues.append(
+                ValidationIssue(
+                    code="new_llm_output_channel_duplicate",
+                    message=f"New LLM node '{node_name}' writes output channel '{binding.field_key}' more than once.",
+                    path=f"nodes.{node_name}.writes.{write_index}",
+                )
+            )
+        seen_fields.add(binding.field_key)
+
+    for field_key in sorted(expected_fields - seen_fields):
+        issues.append(
+            ValidationIssue(
+                code="new_llm_output_channel_missing",
+                message=f"New LLM node '{node_name}' is missing required output channel '{field_key}'.",
+                path=f"nodes.{node_name}.writes",
+            )
+        )
+
+    return issues
+
+
 def _validate_agent_node(
     node_name: str,
     node: NodeSystemAgentNode,
@@ -1001,7 +1118,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
         )
         return issues
 
-    if source_node.kind not in {"input", "agent", "batch", "subgraph", "tool"}:
+    if source_node.kind not in {"input", "agent", "new_llm", "batch", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_source_kind_invalid",
@@ -1010,7 +1127,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
             )
         )
 
-    if target_node.kind not in {"agent", "batch", "condition", "output", "subgraph", "tool"}:
+    if target_node.kind not in {"agent", "new_llm", "batch", "condition", "output", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_target_kind_invalid",

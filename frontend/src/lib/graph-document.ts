@@ -24,6 +24,7 @@ import type {
   GraphNode,
   GraphPayload,
   InputNode,
+  NewLlmNode,
   OutputNode,
   ReadBinding,
   StateDefinition,
@@ -276,7 +277,7 @@ function bindStateToSourceOutput(node: GraphNode | undefined, stateKey: string) 
     }
     return;
   }
-  if (node.kind !== "agent") {
+  if (node.kind !== "agent" && node.kind !== "new_llm") {
     return;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {
@@ -337,7 +338,7 @@ function updateListMembership(list: string[], nodeId: string, included: boolean)
 
 export function isAgentBreakpointEnabledInDocument(document: GraphPayload | GraphDocument, nodeId: string) {
   const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
+  if (!node || (node.kind !== "agent" && node.kind !== "new_llm")) {
     return false;
   }
   return resolveInterruptAfterNodeIds(document.metadata).includes(nodeId);
@@ -349,7 +350,7 @@ export function updateAgentBreakpointInDocument<T extends GraphPayload | GraphDo
   enabled: boolean,
 ): T {
   const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
+  if (!node || (node.kind !== "agent" && node.kind !== "new_llm")) {
     return document;
   }
 
@@ -601,11 +602,11 @@ export function updateNodeMetadataInDocument<T extends GraphPayload | GraphDocum
 export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
-  updater: (current: AgentNode["config"]) => AgentNode["config"],
+  updater: (current: AgentNode["config"] | NewLlmNode["config"]) => AgentNode["config"] | NewLlmNode["config"],
   options: { actionDefinitions?: ActionDefinition[] } = {},
 ): T {
   const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
+  if (!node || (node.kind !== "agent" && node.kind !== "new_llm")) {
     return document;
   }
 
@@ -616,14 +617,18 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
 
   const nextDocument = cloneGraphDocument(document);
   const nextNode = nextDocument.nodes[nodeId];
-  if (nextNode.kind !== "agent") {
+  if (nextNode.kind !== "agent" && nextNode.kind !== "new_llm") {
     return document;
   }
 
   nextNode.config = nextConfig;
-  reconcileAgentActionStateInputBindings(nextDocument, nodeId, options.actionDefinitions ?? []);
-  reconcileAgentActionOutputBindings(nextDocument, nodeId, options.actionDefinitions ?? []);
-  reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+  if (nextNode.kind === "agent") {
+    reconcileAgentActionStateInputBindings(nextDocument, nodeId, options.actionDefinitions ?? []);
+    reconcileAgentActionOutputBindings(nextDocument, nodeId, options.actionDefinitions ?? []);
+    reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+  } else {
+    reconcileNewLlmOutputBindings(nextDocument, nodeId);
+  }
   return nextDocument;
 }
 
@@ -866,7 +871,10 @@ export function reconcileAgentActionOutputBindingsInDocument<T extends GraphPayl
 
 export function reconcileAgentCapabilityInputBindingsInDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string): T {
   const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
+  if (!node || (node.kind !== "agent" && node.kind !== "new_llm")) {
+    return document;
+  }
+  if (node.kind === "new_llm") {
     return document;
   }
 
@@ -889,7 +897,10 @@ export function reconcileAgentCapabilityInputBindingsInDocument<T extends GraphP
 
 export function reconcileAgentCapabilityInputBindingsInPlace<T extends GraphPayload | GraphDocument>(document: T, nodeId: string) {
   const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
+  if (!node || (node.kind !== "agent" && node.kind !== "new_llm")) {
+    return;
+  }
+  if (node.kind === "new_llm") {
     return;
   }
 
@@ -1091,6 +1102,76 @@ function reconcileAgentActionOutputBindings<T extends GraphPayload | GraphDocume
   }
 
   node.config.actionBindings = nextActionBindings;
+}
+
+const NEW_LLM_BASE_OUTPUT_FIELDS = [
+  {
+    fieldKey: "content",
+    name: "content",
+    description: "Final assistant content.",
+    type: "markdown",
+    value: "",
+    color: "#2563eb",
+  },
+  {
+    fieldKey: "tool_calls",
+    name: "tool_calls",
+    description: "Tool calls requested by the model.",
+    type: "json",
+    value: [],
+    color: "#0f766e",
+  },
+] as const;
+
+const NEW_LLM_OPTIONAL_OUTPUT_FIELDS = [
+  {
+    fieldKey: "reasoning_content",
+    name: "reasoning_content",
+    description: "Provider reasoning content.",
+    type: "markdown",
+    value: "",
+    color: "#7c3aed",
+    enabled: (node: NewLlmNode) => Boolean(node.config.outputChannels?.reasoningContent),
+  },
+  {
+    fieldKey: "finish_reason",
+    name: "finish_reason",
+    description: "Provider finish reason.",
+    type: "text",
+    value: "",
+    color: "#f97316",
+    enabled: (node: NewLlmNode) => Boolean(node.config.outputChannels?.finishReason),
+  },
+] as const;
+
+type NewLlmOutputField = (typeof NEW_LLM_BASE_OUTPUT_FIELDS)[number] | (typeof NEW_LLM_OPTIONAL_OUTPUT_FIELDS)[number];
+
+function reconcileNewLlmOutputBindings<T extends GraphPayload | GraphDocument>(document: T, nodeId: string) {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "new_llm") {
+    return;
+  }
+
+  const desiredFields: NewLlmOutputField[] = [
+    ...NEW_LLM_BASE_OUTPUT_FIELDS,
+    ...NEW_LLM_OPTIONAL_OUTPUT_FIELDS.filter((field) => field.enabled(node)),
+  ];
+  const desiredFieldKeys = new Set<string>(desiredFields.map((field) => field.fieldKey));
+  const staleStateKeys = collectManagedNewLlmOutputStateKeys(document, nodeId, (fieldKey) => !desiredFieldKeys.has(fieldKey));
+  if (staleStateKeys.size > 0) {
+    removeManagedStateKeysFromDocument(document, staleStateKeys);
+  }
+
+  const nextWrites: WriteBinding[] = [];
+  for (const field of desiredFields) {
+    const existingStateKey = findExistingNewLlmOutputState(document, nodeId, field.fieldKey);
+    if (existingStateKey) {
+      syncManagedNewLlmOutputStateDefinition(document, existingStateKey, nodeId, field);
+    }
+    const stateKey = existingStateKey ?? createManagedNewLlmOutputState(document, nodeId, field);
+    nextWrites.push({ state: stateKey, mode: "replace" });
+  }
+  node.writes = nextWrites;
 }
 
 function reconcileToolStateInputBindings<T extends GraphPayload | GraphDocument>(
@@ -1377,6 +1458,21 @@ function isManagedToolOutputStateForNode(
   );
 }
 
+function isManagedNewLlmOutputStateForNode(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  stateKey: string,
+  fieldKey?: string,
+) {
+  const stateBinding = document.state_schema[stateKey]?.binding;
+  return (
+    stateBinding?.kind === "llm_output" &&
+    stateBinding.nodeId === nodeId &&
+    stateBinding.managed !== false &&
+    (fieldKey === undefined || stateBinding.fieldKey === fieldKey)
+  );
+}
+
 function isManagedActionInputReadBinding(binding: ReadBinding) {
   return binding.binding?.kind === "action_input" && binding.binding.managed !== false;
 }
@@ -1422,7 +1518,8 @@ function isManagedAgentPortState(
   return (
     isManagedActionOutputStateForNode(document, nodeId, stateKey) ||
     isManagedToolOutputStateForNode(document, nodeId, stateKey) ||
-    isManagedCapabilityResultStateForNode(document, nodeId, stateKey)
+    isManagedCapabilityResultStateForNode(document, nodeId, stateKey) ||
+    isManagedNewLlmOutputStateForNode(document, nodeId, stateKey)
   );
 }
 
@@ -1506,6 +1603,41 @@ function findExistingToolOutputState(
       binding.fieldKey === fieldKey
     );
   })?.[0] ?? null;
+}
+
+function findExistingNewLlmOutputState(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  fieldKey: string,
+) {
+  return Object.entries(document.state_schema).find(([, definition]) => {
+    const binding = definition.binding;
+    return (
+      binding?.kind === "llm_output" &&
+      binding.nodeId === nodeId &&
+      binding.fieldKey === fieldKey
+    );
+  })?.[0] ?? null;
+}
+
+function collectManagedNewLlmOutputStateKeys(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  predicate: (fieldKey: string) => boolean,
+) {
+  const stateKeys = new Set<string>();
+  for (const [stateKey, definition] of Object.entries(document.state_schema)) {
+    const binding = definition.binding;
+    if (
+      binding?.kind === "llm_output" &&
+      binding.nodeId === nodeId &&
+      binding.managed !== false &&
+      predicate(binding.fieldKey)
+    ) {
+      stateKeys.add(stateKey);
+    }
+  }
+  return stateKeys;
 }
 
 function collectStaleManagedToolOutputStateKeys(
@@ -1651,6 +1783,30 @@ function createManagedToolOutputState(
   return stateField.key;
 }
 
+function createManagedNewLlmOutputState(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  field: NewLlmOutputField,
+) {
+  const stateField = buildNextMaterializedVirtualStateField(document, field.type);
+  document.state_schema[stateField.key] = {
+    ...stateField.definition,
+    name: field.name,
+    description: field.description,
+    type: field.type,
+    value: clonePlainValue(field.value),
+    color: field.color,
+    binding: {
+      kind: "llm_output",
+      nodeId,
+      fieldKey: field.fieldKey,
+      managed: true,
+    },
+  };
+  rememberMaterializedStateKeyIndex(document, stateField.key);
+  return stateField.key;
+}
+
 function syncManagedActionOutputStateDefinition(
   document: GraphPayload | GraphDocument,
   stateKey: string,
@@ -1692,6 +1848,35 @@ function syncManagedToolOutputStateDefinition(
     description: field.description.trim() || `${tool.name.trim() || tool.toolKey} output: ${field.key}`,
     type: nextType,
     value: nextValue,
+  };
+}
+
+function syncManagedNewLlmOutputStateDefinition(
+  document: GraphPayload | GraphDocument,
+  stateKey: string,
+  nodeId: string,
+  field: NewLlmOutputField,
+) {
+  const definition = document.state_schema[stateKey];
+  if (!definition) {
+    return;
+  }
+  const nextType = field.type;
+  const currentType = definition.type?.trim() || nextType;
+  const nextValue = currentType === nextType ? definition.value : clonePlainValue(field.value);
+  document.state_schema[stateKey] = {
+    ...definition,
+    name: field.name,
+    description: field.description,
+    type: nextType,
+    value: nextValue,
+    color: definition.color?.trim() || field.color,
+    binding: {
+      kind: "llm_output",
+      nodeId,
+      fieldKey: field.fieldKey,
+      managed: true,
+    },
   };
 }
 
@@ -1786,6 +1971,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   if (isVirtualAnyOutputStateKey(sourceStateKey)) {
     if (
       nextSourceNode.kind === "agent" ||
+      nextSourceNode.kind === "new_llm" ||
       nextSourceNode.kind === "batch" ||
       nextSourceNode.kind === "subgraph" ||
       isCreateAgentInputStateKey(targetStateKey) ||
@@ -1808,7 +1994,12 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   if (isCreateAgentInputStateKey(targetStateKey)) {
-    if (nextTargetNode.kind !== "agent" && nextTargetNode.kind !== "batch" && nextTargetNode.kind !== "subgraph") {
+    if (
+      nextTargetNode.kind !== "agent" &&
+      nextTargetNode.kind !== "new_llm" &&
+      nextTargetNode.kind !== "batch" &&
+      nextTargetNode.kind !== "subgraph"
+    ) {
       return document;
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
@@ -1819,7 +2010,11 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
     nextTargetNode.reads =
-      (nextTargetNode.kind === "agent" || nextTargetNode.kind === "batch" || nextTargetNode.kind === "subgraph") && nextTargetNode.reads.length > 0
+      (nextTargetNode.kind === "agent" ||
+        nextTargetNode.kind === "new_llm" ||
+        nextTargetNode.kind === "batch" ||
+        nextTargetNode.kind === "subgraph") &&
+      nextTargetNode.reads.length > 0
         ? [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }]
         : [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {
@@ -1906,7 +2101,7 @@ export function disconnectManagedActionInputStateInDocument<T extends GraphPaylo
 ): T {
   const sourceNode = document.nodes[sourceNodeId];
   const targetNode = document.nodes[targetNodeId];
-  if (!sourceNode || !targetNode || targetNode.kind !== "agent") {
+  if (!sourceNode || !targetNode || (targetNode.kind !== "agent" && targetNode.kind !== "new_llm")) {
     return document;
   }
   if (!sourceNode.writes.some((binding) => binding.state === stateKey)) {
@@ -1930,7 +2125,7 @@ export function disconnectManagedActionInputStateInDocument<T extends GraphPaylo
 
   const nextDocument = cloneGraphDocument(document);
   const nextTargetNode = nextDocument.nodes[targetNodeId];
-  if (nextTargetNode.kind !== "agent") {
+  if (nextTargetNode.kind !== "agent" && nextTargetNode.kind !== "new_llm") {
     return document;
   }
 

@@ -1103,6 +1103,7 @@ class ModelRequestLogTests(unittest.TestCase):
                     root["node_executions"] = [
                         {"execution_id": "plan:1", "node_id": "plan", "node_type": "agent", "status": "success", "duration_ms": 10},
                         {"execution_id": "nested:2", "node_id": "nested", "node_type": "subgraph", "status": "success", "duration_ms": 20},
+                        {"execution_id": "draft:3", "node_id": "draft", "node_type": "new_llm", "status": "success", "duration_ms": 15},
                     ]
                     child = create_child_run_state(
                         root,
@@ -1149,17 +1150,36 @@ class ModelRequestLogTests(unittest.TestCase):
                             duration_ms=20,
                             status_code=200,
                         )
+                    with use_model_call_context(
+                        run_id="run_root",
+                        root_run_id="run_root",
+                        execution_id="draft:3",
+                        node_id="draft",
+                        node_type="new_llm",
+                        phase="agent_response",
+                    ):
+                        append_model_request_log(
+                            provider_id="local",
+                            transport="openai-compatible",
+                            model="new-llm-model",
+                            path="/chat/completions",
+                            request_raw={"model": "new-llm-model", "messages": [{"role": "user", "content": "draft"}]},
+                            response_raw={"choices": [{"message": {"content": "draft reply"}}]},
+                            duration_ms=15,
+                            status_code=200,
+                        )
 
                     payload = list_model_request_logs(page=1, size=10)
 
-        self.assertEqual(payload["total"], 2)
+        self.assertEqual(payload["total"], 3)
         self.assertEqual([root["run_id"] for root in payload["run_trees"]], ["run_root"])
         tree = payload["run_trees"][0]
         self.assertEqual(tree["kind"], "run")
         self.assertEqual(tree["label"], "Root Graph")
-        self.assertEqual([child["id"] for child in tree["children"]], ["node:run_root:plan", "node:run_root:nested"])
+        self.assertEqual([child["id"] for child in tree["children"]], ["node:run_root:plan", "node:run_root:nested", "node:run_root:draft"])
         root_entry = next(entry for entry in payload["entries"] if entry["model"] == "root-model")
         child_entry = next(entry for entry in payload["entries"] if entry["model"] == "child-model")
+        new_llm_entry = next(entry for entry in payload["entries"] if entry["model"] == "new-llm-model")
         plan_node = tree["children"][0]
         self.assertEqual(plan_node["kind"], "graph_node")
         self.assertEqual(plan_node["model_log_ids"], [root_entry["id"]])
@@ -1168,6 +1188,9 @@ class ModelRequestLogTests(unittest.TestCase):
         self.assertEqual(nested_node["children"][0]["kind"], "run")
         self.assertEqual(nested_node["children"][0]["run_id"], "run_child")
         self.assertEqual(nested_node["children"][0]["children"][0]["model_log_ids"], [child_entry["id"]])
+        new_llm_node = tree["children"][2]
+        self.assertEqual(new_llm_node["node_type"], "new_llm")
+        self.assertEqual(new_llm_node["model_log_ids"], [new_llm_entry["id"]])
 
     def test_prunes_model_request_logs_by_latest_root_runs(self) -> None:
         from app.core.runtime.model_call_context import use_model_call_context

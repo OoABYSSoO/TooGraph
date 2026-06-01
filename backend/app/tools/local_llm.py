@@ -34,6 +34,8 @@ from app.tools.model_provider_http import build_auth_headers, normalize_request_
 from app.tools.model_provider_openai import (
     coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
     extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
+    extract_openai_chat_finish_reason as _extract_openai_chat_finish_reason,
+    extract_openai_chat_tool_calls as _extract_openai_chat_tool_calls,
 )
 from app.tools.model_provider_media import inline_provider_image_attachments
 from app.tools.model_provider_multimodal import build_openai_user_content
@@ -566,6 +568,7 @@ def _chat_with_local_model_with_meta(
     structured_output_schema: dict[str, Any] | None = None,
     structured_output_mode: str | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     resolved_structured_output_mode = normalize_structured_output_mode(
         structured_output_mode or _get_saved_local_provider_config().get("structured_output_mode")
@@ -594,6 +597,9 @@ def _chat_with_local_model_with_meta(
         request_payload["max_tokens"] = max_tokens
     if first_call_structured_output_schema:
         request_payload["response_format"] = build_openai_json_schema_response_format(first_call_structured_output_schema)
+    if tools:
+        request_payload["tools"] = tools
+        request_payload["tool_choice"] = "auto"
 
     warnings: list[str] = []
     resolved_thinking_level = normalize_thinking_level(
@@ -722,7 +728,8 @@ def _chat_with_local_model_with_meta(
                 "Thinking mode was requested and the provider accepted the request, but this response did not include any reasoning text."
             )
 
-        if not content:
+        tool_calls = _extract_openai_chat_tool_calls(response_payload)
+        if not content and not tool_calls:
             raise RuntimeError("Local LLM returned an empty response.")
     except Exception as exc:
         if should_fallback_video_to_frames(exc, request_attachments):
@@ -757,6 +764,7 @@ def _chat_with_local_model_with_meta(
                         structured_output_schema=structured_output_schema,
                         structured_output_mode=resolved_structured_output_mode,
                         request_timeout_seconds=request_timeout_seconds,
+                        tools=tools,
                     )
                 except Exception as fallback_exc:
                     raise RuntimeError(
@@ -800,6 +808,8 @@ def _chat_with_local_model_with_meta(
         "thinking_level": resolved_thinking_level,
         "reasoning_format": reasoning_format if thinking_request_payload and provider_id == "local" else None,
         "reasoning": reasoning,
+        "tool_calls": _extract_openai_chat_tool_calls(response_payload),
+        "finish_reason": _extract_openai_chat_finish_reason(response_payload),
         "usage": response_payload.get("usage"),
         "timings": response_payload.get("timings"),
         "response_id": response_payload.get("id"),

@@ -917,7 +917,7 @@ test("EditorWorkspaceShell centralizes simple graph mutation commits", () => {
     graphMutationActionsSource.match(/function connectFlowNodesForTab\(tabId: string, sourceNodeId: string, targetNodeId: string\) \{[\s\S]*?\n  \}\n\n  function connectStateBindingForTab/)?.[0] ??
     "";
   const updateAgentSource =
-    graphMutationActionsSource.match(/function updateAgentConfigForTab\(tabId: string, nodeId: string, patch: Partial<AgentNode\["config"\]>\) \{[\s\S]*?\n  \}\n\n  function toggleAgentBreakpointForTab/)?.[0] ??
+    graphMutationActionsSource.match(/function updateAgentConfigForTab\(tabId: string, nodeId: string, patch: Partial<AgentNode\["config"\] \| NewLlmNode\["config"\]>\) \{[\s\S]*?\n  \}\n\n  function updateToolConfigForTab/)?.[0] ??
     "";
   const updateStateFieldSource =
     graphMutationActionsSource.match(/function updateStateField\(tabId: string, stateKey: string, patch: Partial<StateDefinition>\) \{[\s\S]*?\n  \}\n\n  function formatStateDefinitionLabel/)?.[0] ??

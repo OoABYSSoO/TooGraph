@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from typing import Any, Callable
 
@@ -32,6 +33,59 @@ def extract_openai_chat_text(response_payload: dict[str, Any]) -> tuple[str, str
     )
 
 
+def extract_openai_chat_finish_reason(response_payload: dict[str, Any]) -> str:
+    choices = response_payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first_choice = choices[0] if isinstance(choices[0], dict) else {}
+        finish_reason = first_choice.get("finish_reason") if isinstance(first_choice, dict) else None
+        return str(finish_reason or "").strip()
+    return str(response_payload.get("finish_reason") or "").strip()
+
+
+def extract_openai_chat_tool_calls(response_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    choices = response_payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first_choice = choices[0] if isinstance(choices[0], dict) else {}
+        message = first_choice.get("message") if isinstance(first_choice, dict) else {}
+        if isinstance(message, dict):
+            return normalize_openai_tool_calls(message.get("tool_calls"))
+    return normalize_openai_tool_calls(response_payload.get("tool_calls"))
+
+
+def normalize_openai_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw_tool_calls, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for index, raw_call in enumerate(raw_tool_calls):
+        if not isinstance(raw_call, dict):
+            continue
+        function = raw_call.get("function") if isinstance(raw_call.get("function"), dict) else {}
+        raw_arguments = function.get("arguments")
+        arguments = _parse_tool_call_arguments(raw_arguments)
+        normalized.append(
+            {
+                "id": str(raw_call.get("id") or f"tool_call_{index}"),
+                "type": str(raw_call.get("type") or "function"),
+                "name": str(function.get("name") or raw_call.get("name") or "").strip(),
+                "arguments": arguments,
+                "rawArguments": raw_arguments if isinstance(raw_arguments, str) else "",
+            }
+        )
+    return normalized
+
+
+def _parse_tool_call_arguments(raw_arguments: Any) -> Any:
+    if isinstance(raw_arguments, str):
+        try:
+            parsed = json.loads(raw_arguments)
+            return parsed if isinstance(parsed, (dict, list)) else raw_arguments
+        except ValueError:
+            return raw_arguments
+    if isinstance(raw_arguments, (dict, list)):
+        return raw_arguments
+    return {}
+
+
 def extract_openai_chat_stream_delta(event: dict[str, Any]) -> str:
     choices = event.get("choices")
     if not isinstance(choices, list) or not choices:
@@ -54,6 +108,7 @@ def coalesce_openai_chat_stream_response(stream_text: str) -> dict[str, Any]:
     finish_reason: str | None = None
     text_parts: list[str] = []
     reasoning_parts: list[str] = []
+    tool_call_parts: dict[int, dict[str, Any]] = {}
     for event in events:
         response_id = str(event.get("id") or response_id)
         response_model = str(event.get("model") or response_model)
@@ -73,13 +128,36 @@ def coalesce_openai_chat_stream_response(stream_text: str) -> dict[str, Any]:
             text_parts.append(content)
         if reasoning:
             reasoning_parts.append(reasoning)
+        raw_tool_calls = source.get("tool_calls")
+        if isinstance(raw_tool_calls, list):
+            for fallback_index, raw_tool_call in enumerate(raw_tool_calls):
+                if not isinstance(raw_tool_call, dict):
+                    continue
+                index = int(raw_tool_call.get("index") if isinstance(raw_tool_call.get("index"), int) else fallback_index)
+                current = tool_call_parts.setdefault(index, {"function": {"arguments": ""}})
+                if raw_tool_call.get("id"):
+                    current["id"] = raw_tool_call.get("id")
+                if raw_tool_call.get("type"):
+                    current["type"] = raw_tool_call.get("type")
+                raw_function = raw_tool_call.get("function")
+                if isinstance(raw_function, dict):
+                    function = current.setdefault("function", {"arguments": ""})
+                    if raw_function.get("name"):
+                        function["name"] = raw_function.get("name")
+                    if raw_function.get("arguments"):
+                        function["arguments"] = str(function.get("arguments") or "") + str(raw_function.get("arguments"))
 
-    if not text_parts and not reasoning_parts:
+    if not text_parts and not reasoning_parts and not tool_call_parts:
         raise ValueError("OpenAI-compatible stream response did not include text deltas.")
 
     message: dict[str, Any] = {"content": "".join(text_parts)}
     if reasoning_parts:
         message["reasoning_content"] = "".join(reasoning_parts)
+    if tool_call_parts:
+        message["tool_calls"] = [
+            tool_call_parts[index]
+            for index in sorted(tool_call_parts)
+        ]
     choice: dict[str, Any] = {"message": message}
     if finish_reason is not None:
         choice["finish_reason"] = finish_reason
@@ -95,6 +173,7 @@ def coalesce_openai_chat_stream_response(stream_text: str) -> dict[str, Any]:
         "events": events,
         "output_chunks": text_parts,
         "reasoning_chunks": reasoning_parts,
+        "tool_call_chunks": list(tool_call_parts.values()),
         "raw_text": stream_text,
     }
     return payload
@@ -120,6 +199,7 @@ def chat_openai_compatible(
     structured_output_schema: dict[str, Any] | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     request_payload: dict[str, Any] = {
@@ -135,6 +215,9 @@ def chat_openai_compatible(
         request_payload["max_tokens"] = max_tokens
     if structured_output_schema:
         request_payload["response_format"] = build_openai_json_schema_response_format(structured_output_schema)
+    if tools:
+        request_payload["tools"] = tools
+        request_payload["tool_choice"] = "auto"
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
         transport=TRANSPORT_OPENAI_COMPATIBLE,
@@ -211,6 +294,8 @@ def chat_openai_compatible(
         status_code=200,
     )
     content, reasoning = extract_openai_chat_text(response_payload)
+    tool_calls = extract_openai_chat_tool_calls(response_payload)
+    finish_reason = extract_openai_chat_finish_reason(response_payload)
     if provider_prompt_cache_result:
         provider_prompt_cache_result = _with_openai_prompt_cache_usage(
             provider_prompt_cache_result,
@@ -221,6 +306,8 @@ def chat_openai_compatible(
         "provider_id": provider_id,
         "temperature": temperature,
         "reasoning": reasoning,
+        "tool_calls": tool_calls,
+        "finish_reason": finish_reason,
         "usage": response_payload.get("usage"),
         "timings": response_payload.get("timings"),
         "response_id": response_payload.get("id"),

@@ -21,7 +21,7 @@ from app.core.runtime.structured_output import (
     build_json_repair_user_prompt,
     validate_structured_output,
 )
-from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemNewLlmNode, NodeSystemStateDefinition
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.tools.local_llm import _chat_with_local_model_with_meta
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
@@ -82,8 +82,55 @@ def model_call_profile_context(
     return context
 
 
+def _resolve_new_llm_output_channels(
+    node: NodeSystemAgentNode | NodeSystemNewLlmNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+) -> dict[str, str] | None:
+    if not isinstance(node, NodeSystemNewLlmNode):
+        return None
+    channels: dict[str, str] = {}
+    for binding in node.writes:
+        definition = state_schema.get(binding.state)
+        metadata = definition.binding if definition is not None else None
+        field_key = ""
+        if metadata is not None and metadata.kind.value == "llm_output" and metadata.node_id:
+            field_key = metadata.field_key
+        if not field_key and definition is not None:
+            field_key = definition.name.strip() or binding.state
+        if field_key in {"content", "tool_calls", "reasoning_content", "finish_reason"}:
+            channels[field_key] = binding.state
+    return channels
+
+
+def _build_new_llm_response_payload(
+    *,
+    content: str,
+    parsed_fields: dict[str, Any],
+    output_channels: dict[str, str],
+    llm_meta: dict[str, Any],
+) -> dict[str, Any]:
+    content_state_key = output_channels.get("content")
+    raw_tool_calls = llm_meta.get("tool_calls")
+    tool_calls = raw_tool_calls if isinstance(raw_tool_calls, list) else []
+    reasoning = str(llm_meta.get("reasoning") or "").strip()
+    finish_reason = str(llm_meta.get("finish_reason") or "").strip()
+    payload: dict[str, Any] = {"summary": content}
+    if content_state_key:
+        payload[content_state_key] = parsed_fields.get(content_state_key, content)
+    tool_calls_state_key = output_channels.get("tool_calls")
+    if tool_calls_state_key:
+        payload[tool_calls_state_key] = tool_calls
+    reasoning_state_key = output_channels.get("reasoning_content")
+    if reasoning_state_key:
+        payload[reasoning_state_key] = reasoning
+    finish_reason_state_key = output_channels.get("finish_reason")
+    if finish_reason_state_key:
+        payload[finish_reason_state_key] = finish_reason
+    return payload
+
+
 def generate_agent_response(
-    node: NodeSystemAgentNode,
+    node: NodeSystemAgentNode | NodeSystemNewLlmNode,
     input_values: dict[str, Any],
     action_context: dict[str, Any],
     runtime_config: dict[str, Any],
@@ -98,8 +145,14 @@ def generate_agent_response(
     get_default_video_model_ref_func: Callable[..., str] = get_default_video_model_ref,
     resolve_runtime_model_name_func: Callable[[str], str] = resolve_runtime_model_name,
     resolve_effective_thinking_level_func: Callable[..., str] = resolve_effective_thinking_level,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
-    output_keys = [binding.state for binding in node.writes]
+    new_llm_output_channels = _resolve_new_llm_output_channels(node, state_schema or {})
+    output_keys = (
+        [new_llm_output_channels["content"]]
+        if new_llm_output_channels and new_llm_output_channels.get("content")
+        else [binding.state for binding in node.writes]
+    )
     if not output_keys:
         return {"summary": ""}, "", [], runtime_config
 
@@ -151,6 +204,7 @@ def generate_agent_response(
                     on_delta=on_delta,
                     input_attachments=input_attachments,
                     structured_output_schema=structured_output_schema,
+                    tools=tools,
                     **model_request_profile_kwargs(runtime_config),
                 )
         finally:
@@ -169,6 +223,7 @@ def generate_agent_response(
                     input_attachments=input_attachments,
                     structured_output_schema=structured_output_schema,
                     model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
+                    tools=tools,
                     **model_provider_request_profile_kwargs(runtime_config, prompt_snapshot),
                 )
         finally:
@@ -216,7 +271,15 @@ def generate_agent_response(
                 repair_succeeded = True
         except Exception as exc:
             repair_error = str(exc)
-    response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
+    if new_llm_output_channels:
+        response_payload = _build_new_llm_response_payload(
+            content=content,
+            parsed_fields=parsed_fields,
+            output_channels=new_llm_output_channels,
+            llm_meta=llm_meta,
+        )
+    else:
+        response_payload = {"summary": content, **parsed_fields}
     reasoning = str(llm_meta.get("reasoning") or "").strip()
     structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
     prompt_snapshot = apply_provider_prompt_cache_result(prompt_snapshot, llm_meta.get("provider_prompt_cache_result"))

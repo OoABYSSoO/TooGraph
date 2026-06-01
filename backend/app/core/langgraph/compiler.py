@@ -18,6 +18,7 @@ from app.core.schemas.node_system import (
     NodeSystemConditionNode,
     NodeSystemGraphPayload,
     NodeSystemInputNode,
+    NodeSystemNewLlmNode,
     NodeSystemOutputNode,
     NodeSystemStateType,
     NodeSystemSubgraphNode,
@@ -26,7 +27,8 @@ from app.core.schemas.node_system import (
 
 RUNTIME_START = "__start__"
 RUNTIME_END = "__end__"
-RUNTIME_NODE_TYPES = (NodeSystemAgentNode, NodeSystemBatchNode, NodeSystemSubgraphNode, NodeSystemToolNode)
+LLM_NODE_TYPES = (NodeSystemAgentNode, NodeSystemNewLlmNode)
+RUNTIME_NODE_TYPES = (*LLM_NODE_TYPES, NodeSystemBatchNode, NodeSystemSubgraphNode, NodeSystemToolNode)
 
 
 def get_langgraph_runtime_unsupported_reasons(
@@ -63,11 +65,18 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     tool_keys: set[str] = set()
     for node_name, node in graph.nodes.items():
         attached_actions = [node.config.action_key] if isinstance(node, NodeSystemAgentNode) and node.config.action_key else []
-        attached_tools = [node.config.tool_key] if isinstance(node, NodeSystemToolNode) and node.config.tool_key else []
+        if isinstance(node, NodeSystemNewLlmNode):
+            attached_tools = list(node.config.tool_keys)
+        elif isinstance(node, NodeSystemToolNode) and node.config.tool_key:
+            attached_tools = [node.config.tool_key]
+        else:
+            attached_tools = []
         if isinstance(node, NodeSystemSubgraphNode):
             for inner_node in node.config.graph.nodes.values():
                 if isinstance(inner_node, NodeSystemAgentNode) and inner_node.config.action_key:
                     action_keys.add(inner_node.config.action_key)
+                if isinstance(inner_node, NodeSystemNewLlmNode):
+                    tool_keys.update(inner_node.config.tool_keys)
                 if isinstance(inner_node, NodeSystemToolNode) and inner_node.config.tool_key:
                     tool_keys.add(inner_node.config.tool_key)
         action_keys.update(attached_actions)

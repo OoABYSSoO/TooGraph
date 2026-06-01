@@ -631,7 +631,7 @@ import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { ActionDefinition } from "@/types/actions";
 import type { ToolDefinition } from "@/types/tools";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
-import type { AgentNode, BatchNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition, TemplateRecord, ToolNode } from "@/types/node-system";
+import type { AgentNode, BatchNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, NewLlmNode, OutputNode, StateDefinition, TemplateRecord, ToolNode } from "@/types/node-system";
 
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
@@ -697,7 +697,7 @@ const emit = defineEmits<{
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
-  (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
+  (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"] | NewLlmNode["config"]> }): void;
   (event: "update-tool-config", payload: { nodeId: string; patch: Partial<ToolNode["config"]> }): void;
   (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
   (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;

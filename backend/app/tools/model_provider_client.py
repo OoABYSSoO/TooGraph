@@ -186,6 +186,7 @@ def _chat_openai_compatible(
     structured_output_schema: dict[str, Any] | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_openai.chat_openai_compatible(
         provider_id=provider_id,
@@ -206,6 +207,7 @@ def _chat_openai_compatible(
         structured_output_schema=structured_output_schema,
         prompt_cache_policy=prompt_cache_policy,
         request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
+        tools=tools,
     )
 
 
@@ -225,6 +227,7 @@ def _chat_anthropic(
     structured_output_schema: dict[str, Any] | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_anthropic.chat_anthropic(
         provider_id=provider_id,
@@ -560,6 +563,7 @@ def chat_with_model_provider(
     structured_output_mode: str | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -598,6 +602,7 @@ def chat_with_model_provider(
                 structured_output_schema=schema,
                 prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
+                tools=tools,
             )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
         def invoke(
@@ -704,7 +709,9 @@ def chat_with_model_provider(
     if video_fallback_warning:
         warnings.append(video_fallback_warning)
     if not content:
-        raise RuntimeError(f"{provider_id} returned an empty response.")
+        tool_calls = meta.get("tool_calls")
+        if not tools or not isinstance(tool_calls, list) or not tool_calls:
+            raise RuntimeError(f"{provider_id} returned an empty response.")
     if resolved_thinking_level != THINKING_LEVEL_OFF and not bool(meta.get("thinking_enabled")):
         warnings.append(
             f"Thinking level '{resolved_thinking_level}' was requested for provider '{provider_id}', but TooGraph did not find a native thinking field for this provider/model."
@@ -1030,6 +1037,7 @@ def _chat_with_model_ref_once(
     provider_cost_budget_degradation: dict[str, Any] | None = None,
     provider_rate_profile: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
     persist_credential_state: bool = True,
 ) -> tuple[str, dict[str, Any]]:
     provider_id, model_name = _split_model_ref(model_ref)
@@ -1067,6 +1075,7 @@ def _chat_with_model_ref_once(
             structured_output_schema=structured_output_schema,
             structured_output_mode=effective_structured_output_mode,
             request_timeout_seconds=request_timeout_seconds,
+            tools=tools,
         )
 
     transport = str(provider_config.get("transport") or template["transport"])
@@ -1145,6 +1154,7 @@ def _chat_with_model_ref_once(
                     structured_output_schema=structured_output_schema,
                     structured_output_mode=effective_structured_output_mode,
                     prompt_cache_policy=effective_prompt_cache_policy,
+                    tools=tools,
                 )
                 _annotate_last_model_request_log_with_provider_cache(meta)
     except ProviderRateProfileExceeded:
@@ -1881,6 +1891,7 @@ def chat_with_model_ref_with_meta(
     provider_cost_budget_approval: dict[str, Any] | None = None,
     provider_rate_profile: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     fixture = model_runtime_fixture if isinstance(model_runtime_fixture, dict) else {}
     fixture_providers = fixture.get("model_providers")
@@ -1916,6 +1927,7 @@ def chat_with_model_ref_with_meta(
             provider_cost_budget_approval=provider_cost_budget_approval,
             provider_rate_profile=provider_rate_profile,
             request_timeout_seconds=request_timeout_seconds,
+            tools=tools,
             persist_credential_state=persist_credential_state,
         )
     except ProviderCostBudgetExceeded as budget_exc:
@@ -1940,6 +1952,7 @@ def chat_with_model_ref_with_meta(
             provider_cost_budget_approval=provider_cost_budget_approval,
             provider_rate_profile=provider_rate_profile,
             request_timeout_seconds=request_timeout_seconds,
+            tools=tools,
             persist_credential_state=persist_credential_state,
             primary_exc=budget_exc,
         )
@@ -1965,6 +1978,7 @@ def _chat_with_model_ref_cost_budget_degradation(
     provider_cost_budget_approval: dict[str, Any] | None,
     provider_rate_profile: dict[str, Any] | None,
     request_timeout_seconds: float | None,
+    tools: list[dict[str, Any]] | None,
     persist_credential_state: bool,
     primary_exc: ProviderCostBudgetExceeded,
 ) -> tuple[str, dict[str, Any]]:
@@ -2025,6 +2039,7 @@ def _chat_with_model_ref_cost_budget_degradation(
                 provider_cost_budget_degradation=degradation,
                 provider_rate_profile=provider_rate_profile,
                 request_timeout_seconds=request_timeout_seconds,
+                tools=tools,
                 persist_credential_state=persist_credential_state,
             )
         except ProviderCostBudgetExceeded:

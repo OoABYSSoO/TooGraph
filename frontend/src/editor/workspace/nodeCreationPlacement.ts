@@ -196,7 +196,10 @@ function bindStateOutputForPlacement(node: GraphNode, stateKey: string) {
     return;
   }
 
-  if ((node.kind === "agent" || node.kind === "batch") && !node.writes.some((binding) => binding.state === stateKey)) {
+  if (
+    (node.kind === "agent" || node.kind === "new_llm" || node.kind === "batch") &&
+    !node.writes.some((binding) => binding.state === stateKey)
+  ) {
     node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
   }
 }

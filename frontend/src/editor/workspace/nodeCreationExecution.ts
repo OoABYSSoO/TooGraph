@@ -4,6 +4,7 @@ import {
   applyNodeCreationResult,
   buildGenericInputNode,
   buildGenericBatchNode,
+  buildGenericNewLlmNode,
   buildGenericOutputNode,
   buildGenericSubgraphNode,
   buildGenericToolNode,
@@ -141,6 +142,23 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
   if (input.entry.mode === "node" && input.entry.nodeKind === "batch") {
     const created = applyCreatedNodePlacement(
       buildGenericBatchNode({
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+      }),
+      createdNodeId,
+      input.context,
+    );
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
+  if (input.entry.mode === "node" && input.entry.nodeKind === "new_llm") {
+    const created = applyCreatedNodePlacement(
+      buildGenericNewLlmNode({
         id: createdNodeId,
         position: input.context?.position ?? { x: 0, y: 0 },
       }),
