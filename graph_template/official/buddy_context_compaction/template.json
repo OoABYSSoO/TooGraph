@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_context_compaction",
   "label": "上下文压缩",
-  "description": "Compress only Buddy conversation history into session_summary; user messages, Buddy Home, capability results, and public replies stay outside this subgraph.",
+  "description": "只把 Buddy 会话历史压缩进 session_summary；用户消息、Buddy Home、能力结果和公开回复都保留在本子图之外。",
   "default_graph_name": "上下文压缩",
   "state_schema": {
     "conversation_history": {
@@ -29,7 +29,7 @@
     },
     "protected_recent_history": {
       "name": "protected_recent_history",
-      "description": "需要在后续 prompt 中继续保留原文的最近会话片段。",
+      "description": "需要在后续提示词中继续保留原文的最近会话片段。",
       "type": "markdown",
       "value": "",
       "color": "#0f766e",
@@ -86,7 +86,7 @@
     },
     "applied_session_summary_commands": {
       "name": "applied_session_summary_commands",
-      "description": "已应用的 session summary 写回命令和 revision 信息。",
+      "description": "已应用的会话摘要写回命令和 revision 信息。",
       "type": "json",
       "value": [],
       "color": "#059669",
@@ -101,7 +101,7 @@
     },
     "skipped_session_summary_commands": {
       "name": "skipped_session_summary_commands",
-      "description": "被跳过的 session summary 写回命令。",
+      "description": "被跳过的会话摘要写回命令。",
       "type": "json",
       "value": [],
       "color": "#dc2626",
@@ -158,7 +158,7 @@
     "plan_compaction": {
       "kind": "agent",
       "name": "规划压缩范围",
-      "description": "Plans which parts of conversation_history should remain raw and which parts should be summarized.",
+      "description": "规划 conversation_history 中哪些部分应保留原文，哪些部分应摘要。",
       "ui": {
         "position": {
           "x": 680,
@@ -188,7 +188,7 @@
         "actionBindings": [],
         "suspendedFreeWrites": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "Use only conversation_history to create compaction_plan JSON. conversation_history is the current history context package; without an existing summary it renders full prior history, and with a summary it renders summary plus messages after the summary. Identifiers are available in conversation_history metadata. Include protect_first, protect_last, summary_scope, estimated_omitted_messages, should_summarize, risk_notes, and anti_thrashing_notes. By default preserve a small opening task setup and the most recent 12 to 20 raw messages, and summarize the middle history. This node only writes the plan; the later write node prepares the session_summary.update command.",
+        "taskInstruction": "只使用 conversation_history 创建 compaction_plan JSON。conversation_history 是当前历史上下文包；没有现有摘要时会渲染为完整既往历史，有摘要时会渲染为摘要加摘要之后的消息。标识符可从 conversation_history metadata 读取。必须包含 protect_first、protect_last、summary_scope、estimated_omitted_messages、should_summarize、risk_notes 和 anti_thrashing_notes。默认保留少量开头任务设定以及最近 12 到 20 条原始消息，并摘要中间历史。本节点只写入计划；后续写入节点会准备 session_summary.update 命令。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -198,7 +198,7 @@
     "summarize_context": {
       "kind": "agent",
       "name": "生成会话摘要",
-      "description": "Updates the session summary candidate and prepares an auditable writeback command.",
+      "description": "更新会话摘要候选，并准备可审计的写回命令。",
       "ui": {
         "position": {
           "x": 1260,
@@ -249,7 +249,7 @@
         "actionBindings": [],
         "suspendedFreeWrites": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "Compress session history only. Use the rendered conversation_history value as the source, preserving any existing summary that is still valid. Read source_run_id and current_session_id from conversation_history metadata. Do not summarize current user_message, Buddy Home, capability_result, or public_response because they are not inputs to this subgraph. Preserve recent raw messages in protected_recent_history Markdown. Summarize middle history, explicit user decisions, task progress, open items, and capability conclusions that already exist in conversation_history into session_summary_candidate Markdown.\n\nWrite all of these outputs: compaction_report JSON with source_run_id, current_session_id, omitted_count, protected_count, summary_changed, summary_source_refs, omitted_refs, protected_recent_history_refs, risk_notes, and anti_thrashing_notes; should_write_summary boolean; writer_input JSON. summary_source_refs, omitted_refs, and protected_recent_history_refs must come from conversation_history.source_refs or conversation_history.context_ref.source_refs. writer_input.commands may contain only one session_summary.update command. payload.content must equal session_summary_candidate. payload.source_refs must equal summary_source_refs. payload.source_run_id must equal conversation_history metadata.source_run_id. payload.session_id must equal conversation_history metadata.current_session_id. change_reason should state that session history reached context pressure and was compacted. If the summary did not materially change or risk is too high, set should_write_summary=false and commands=[].",
+        "taskInstruction": "只压缩会话历史。使用渲染后的 conversation_history 值作为来源，并保留仍然有效的现有摘要。从 conversation_history metadata 读取 source_run_id 和 current_session_id。不要摘要当前 user_message、Buddy Home、capability_result 或 public_response，因为它们不是本子图输入。将最近原始消息保存在 protected_recent_history Markdown。把 conversation_history 中已有的中间历史、明确用户决策、任务进度、开放事项和能力结论摘要到 session_summary_candidate Markdown。\n\n写入全部这些输出：compaction_report JSON，包含 source_run_id、current_session_id、omitted_count、protected_count、summary_changed、summary_source_refs、omitted_refs、protected_recent_history_refs、risk_notes 和 anti_thrashing_notes；should_write_summary boolean；writer_input JSON。summary_source_refs、omitted_refs 和 protected_recent_history_refs 必须来自 conversation_history.source_refs 或 conversation_history.context_ref.source_refs。writer_input.commands 最多只能包含一个 session_summary.update 命令。payload.content 必须等于 session_summary_candidate。payload.source_refs 必须等于 summary_source_refs。payload.source_run_id 必须等于 conversation_history metadata.source_run_id。payload.session_id 必须等于 conversation_history metadata.current_session_id。change_reason 应说明会话历史达到上下文压力并已被压缩。如果摘要没有实质变化，或风险过高，则设置 should_write_summary=false 且 commands=[]。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -360,8 +360,8 @@
         "actionInstructionBlocks": {
           "buddy_home_writer": {
             "actionKey": "buddy_home_writer",
-            "title": "session_summary writeback instruction",
-            "content": "Use Buddy Home Writer with commands from writer_input.commands. Each command is session_summary.update with payload.content as the complete updated session summary. Use writer_input.run_id as run_id.",
+            "title": "会话摘要写回说明",
+            "content": "使用 Buddy Home Writer 执行 writer_input.commands。每条命令都是 session_summary.update，其中 payload.content 是完整更新后的会话摘要。使用 writer_input.run_id 作为 run_id。",
             "source": "node.override"
           }
         },

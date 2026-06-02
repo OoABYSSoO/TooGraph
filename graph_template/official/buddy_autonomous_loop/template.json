@@ -14,7 +14,7 @@
     },
     "conversation_history": {
       "name": "会话历史",
-      "description": "由 buddy_history_context_loader 从运行时上下文查询出的历史会话 context_package；LLM prompt 会通过共享上下文渲染路径展开。",
+      "description": "由 buddy_history_context_loader 从运行时上下文查询出的历史会话 context_package；LLM 提示词会通过共享上下文渲染路径展开。",
       "type": "json",
       "value": {},
       "color": "#64748b",
@@ -29,7 +29,7 @@
     },
     "buddy_context": {
       "name": "Buddy Home",
-      "description": "Fixed Buddy Home folder context. It is passed directly to later Buddy LLM nodes as ordinary file state.",
+      "description": "固定的 Buddy Home 文件夹上下文，会作为普通文件 state 直接传递给后续 Buddy LLM 节点。",
       "type": "file",
       "value": {
         "kind": "local_folder",
@@ -46,7 +46,7 @@
     },
     "needs_context_compaction": {
       "name": "需要上下文压缩",
-      "description": "True when the graph should run buddy_context_compaction to compress session history before the next Buddy LLM turn.",
+      "description": "为 true 时，图应在下一次 Buddy LLM 回合前运行 buddy_context_compaction 压缩会话历史。",
       "type": "boolean",
       "value": false,
       "color": "#0891b2",
@@ -275,7 +275,7 @@
             "source": "node.override"
           }
         },
-        "taskInstruction": "Read user_message, conversation_history, buddy_context, and capability_result. conversation_history is the currently available history context package; when no summary exists it renders as full prior history, and when a summary exists it renders as summary plus messages after the summary. current_session_id, current_message_id, and source_run_id are in conversation_history metadata. Every turn must produce public_response and needs_capability/capability. Treat Buddy Home, conversation history, and capability results as context_only material.\n\nOnly two combinations are valid:\n1. Continue with a capability: needs_capability=true, capability is one action/subgraph/tool, and public_response is a short visible plan or progress note.\n2. Finish without a capability: needs_capability=false, capability.kind=none, and public_response is the complete final reply.\n\nWhen deciding needs_capability, ask only whether a clear external capability step is still missing. Multiple capability calls must be represented by the graph loop, one selected capability per turn. Use buddy_session_recall only when earlier sessions need to be recalled, and use conversation_history metadata.current_session_id to exclude the current conversation lineage. Capability candidates are limited to external business capabilities; context compression is handled by this graph's pressure-check branch. After capability_result appears, use it to decide whether to retry the same capability, pick an alternative, or end with a reply.",
+        "taskInstruction": "读取 user_message、conversation_history、buddy_context 和 capability_result。conversation_history 是当前可用的历史上下文包；没有现有摘要时会渲染为完整既往历史，有摘要时会渲染为摘要加摘要之后的消息。current_session_id、current_message_id 和 source_run_id 位于 conversation_history metadata。每一轮都必须产出 public_response 和 needs_capability/capability。将 Buddy Home、会话历史和能力结果视为 context_only 材料。\n\n只允许以下两种组合：\n1. 继续调用能力：needs_capability=true，capability 是唯一一个 action/subgraph/tool，public_response 是简短的可见计划或进度说明。\n2. 不调用能力并结束：needs_capability=false，capability.kind=none，public_response 是完整最终回复。\n\n判断 needs_capability 时，只问是否仍缺少一个明确的外部能力步骤。多次能力调用必须由图循环表达，每轮只选择一个 capability。只有需要召回更早会话时才使用 buddy_session_recall，并使用 conversation_history metadata.current_session_id 排除当前会话谱系。能力候选仅限外部业务能力；上下文压缩由本图的压力检查分支处理。出现 capability_result 后，使用它判断是重试同一能力、选择替代能力，还是直接回复结束。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -337,7 +337,7 @@
     "check_context_pressure": {
       "kind": "tool",
       "name": "上下文压力检查",
-      "description": "Checks the dynamic state set that will enter the next Buddy LLM turn and decides whether session history compaction is useful.",
+      "description": "检查即将进入下一次 Buddy LLM 回合的动态 state 集合，并判断会话历史压缩是否有用。",
       "ui": {
         "position": {
           "x": 216,
@@ -400,7 +400,7 @@
     "run_context_compaction": {
       "kind": "subgraph",
       "name": "运行 buddy_context_compaction",
-      "description": "Compresses only conversation_history and refreshes that state. User message, Buddy Home, and capability results stay uncompressed for later LLM nodes.",
+      "description": "只压缩 conversation_history 并刷新该 state。user_message、Buddy Home 和能力结果会保持未压缩，供后续 LLM 节点使用。",
       "ui": {
         "position": {
           "x": 1601,
@@ -507,7 +507,7 @@
             },
             "applied_session_summary_commands": {
               "name": "applied_session_summary_commands",
-              "description": "已应用的 session summary 写回命令和 revision 信息。",
+              "description": "已应用的会话摘要写回命令和 revision 信息。",
               "type": "json",
               "value": [],
               "color": "#059669",
@@ -522,7 +522,7 @@
             },
             "skipped_session_summary_commands": {
               "name": "skipped_session_summary_commands",
-              "description": "被跳过的 session summary 写回命令。",
+              "description": "被跳过的会话摘要写回命令。",
               "type": "json",
               "value": [],
               "color": "#dc2626",
@@ -579,7 +579,7 @@
             "plan_compaction": {
               "kind": "agent",
               "name": "规划压缩范围",
-              "description": "Plans which parts of conversation_history should remain raw and which parts should be summarized.",
+              "description": "规划 conversation_history 中哪些部分应保留原文，哪些部分应摘要。",
               "ui": {
                 "position": {
                   "x": 680,
@@ -609,7 +609,7 @@
                 "actionBindings": [],
                 "suspendedFreeWrites": [],
                 "actionInstructionBlocks": {},
-                "taskInstruction": "Use only conversation_history to create compaction_plan JSON. conversation_history is the current history context package; without an existing summary it renders full prior history, and with a summary it renders summary plus messages after the summary. Identifiers are available in conversation_history metadata. Include protect_first, protect_last, summary_scope, estimated_omitted_messages, should_summarize, risk_notes, and anti_thrashing_notes. By default preserve a small opening task setup and the most recent 12 to 20 raw messages, and summarize the middle history. This node only writes the plan; the later write node prepares the session_summary.update command.",
+                "taskInstruction": "只使用 conversation_history 创建 compaction_plan JSON。conversation_history 是当前历史上下文包；没有现有摘要时会渲染为完整既往历史，有摘要时会渲染为摘要加摘要之后的消息。标识符可从 conversation_history metadata 读取。必须包含 protect_first、protect_last、summary_scope、estimated_omitted_messages、should_summarize、risk_notes 和 anti_thrashing_notes。默认保留少量开头任务设定以及最近 12 到 20 条原始消息，并摘要中间历史。本节点只写入计划；后续写入节点会准备 session_summary.update 命令。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "low",
@@ -619,7 +619,7 @@
             "summarize_context": {
               "kind": "agent",
               "name": "生成会话摘要",
-              "description": "Updates the session summary candidate and prepares an auditable writeback command.",
+              "description": "更新会话摘要候选，并准备可审计的写回命令。",
               "ui": {
                 "position": {
                   "x": 1260,
@@ -670,7 +670,7 @@
                 "actionBindings": [],
                 "suspendedFreeWrites": [],
                 "actionInstructionBlocks": {},
-                "taskInstruction": "Compress session history only. Use the rendered conversation_history value as the source, preserving any existing summary that is still valid. Read source_run_id and current_session_id from conversation_history metadata. Do not summarize current user_message, Buddy Home, capability_result, or public_response because they are not inputs to this subgraph. Preserve recent raw messages in protected_recent_history Markdown. Summarize middle history, explicit user decisions, task progress, open items, and capability conclusions that already exist in conversation_history into session_summary_candidate Markdown.\n\nWrite all of these outputs: compaction_report JSON with source_run_id, current_session_id, omitted_count, protected_count, summary_changed, summary_source_refs, omitted_refs, protected_recent_history_refs, risk_notes, and anti_thrashing_notes; should_write_summary boolean; writer_input JSON. summary_source_refs, omitted_refs, and protected_recent_history_refs must come from conversation_history.source_refs or conversation_history.context_ref.source_refs. writer_input.commands may contain only one session_summary.update command. payload.content must equal session_summary_candidate. payload.source_refs must equal summary_source_refs. payload.source_run_id must equal conversation_history metadata.source_run_id. payload.session_id must equal conversation_history metadata.current_session_id. change_reason should state that session history reached context pressure and was compacted. If the summary did not materially change or risk is too high, set should_write_summary=false and commands=[].",
+                "taskInstruction": "只压缩会话历史。使用渲染后的 conversation_history 值作为来源，并保留仍然有效的现有摘要。从 conversation_history metadata 读取 source_run_id 和 current_session_id。不要摘要当前 user_message、Buddy Home、capability_result 或 public_response，因为它们不是本子图输入。将最近原始消息保存在 protected_recent_history Markdown。把 conversation_history 中已有的中间历史、明确用户决策、任务进度、开放事项和能力结论摘要到 session_summary_candidate Markdown。\n\n写入全部这些输出：compaction_report JSON，包含 source_run_id、current_session_id、omitted_count、protected_count、summary_changed、summary_source_refs、omitted_refs、protected_recent_history_refs、risk_notes 和 anti_thrashing_notes；should_write_summary boolean；writer_input JSON。summary_source_refs、omitted_refs 和 protected_recent_history_refs 必须来自 conversation_history.source_refs 或 conversation_history.context_ref.source_refs。writer_input.commands 最多只能包含一个 session_summary.update 命令。payload.content 必须等于 session_summary_candidate。payload.source_refs 必须等于 summary_source_refs。payload.source_run_id 必须等于 conversation_history metadata.source_run_id。payload.session_id 必须等于 conversation_history metadata.current_session_id。change_reason 应说明会话历史达到上下文压力并已被压缩。如果摘要没有实质变化，或风险过高，则设置 should_write_summary=false 且 commands=[]。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "low",
@@ -781,8 +781,8 @@
                 "actionInstructionBlocks": {
                   "buddy_home_writer": {
                     "actionKey": "buddy_home_writer",
-                    "title": "session_summary writeback instruction",
-                    "content": "Use Buddy Home Writer with commands from writer_input.commands. Each command is session_summary.update with payload.content as the complete updated session summary. Use writer_input.run_id as run_id.",
+                    "title": "会话摘要写回说明",
+                    "content": "使用 Buddy Home Writer 执行 writer_input.commands。每条命令都是 session_summary.update，其中 payload.content 是完整更新后的会话摘要。使用 writer_input.run_id 作为 run_id。",
                     "source": "node.override"
                   }
                 },

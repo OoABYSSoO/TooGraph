@@ -2127,7 +2127,7 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertNotIn("context_compaction_report", selector_node["config"]["taskInstruction"])
         self.assertIn("capability.kind=none", selector_node["config"]["taskInstruction"])
-        self.assertIn("public_response and needs_capability/capability", selector_node["config"]["taskInstruction"])
+        self.assertIn("public_response 和 needs_capability/capability", selector_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", selector_node["config"]["taskInstruction"])
         self.assertIn("conversation_history metadata", selector_node["config"]["taskInstruction"])
         self.assertIn(
