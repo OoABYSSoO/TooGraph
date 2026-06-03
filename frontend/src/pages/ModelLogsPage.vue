@@ -333,7 +333,19 @@
             <h4>{{ t("modelLogs.messages") }}</h4>
             <div v-if="selectedLog.messages.length > 0" class="model-logs-page__messages">
               <article v-for="message in selectedLog.messages" :key="`${message.role}-${message.body.slice(0, 24)}`" class="model-logs-page__message">
-                <span>{{ message.role }}</span>
+                <header class="model-logs-page__message-header">
+                  <span>{{ message.role }}</span>
+                  <button
+                    v-if="messageCanOpenDialog(message)"
+                    type="button"
+                    class="model-logs-page__message-open"
+                    :title="t('modelLogs.openMessage', { role: message.role })"
+                    :aria-label="t('modelLogs.openMessage', { role: message.role })"
+                    @click="openMessageDialog(message)"
+                  >
+                    <ElIcon aria-hidden="true"><View /></ElIcon>
+                  </button>
+                </header>
                 <p>{{ message.body || t("common.noSummary") }}</p>
               </article>
             </div>
@@ -477,6 +489,27 @@
           <pre v-else class="model-logs-page__raw-dialog-code model-logs-page__json-block" v-html="highlightJson(rawDialogContent)"></pre>
         </div>
       </ElDialog>
+
+      <ElDialog
+        v-model="messageDialogVisible"
+        class="model-logs-page__raw-dialog model-logs-page__message-dialog"
+        :modal-class="'model-logs-page__raw-dialog-overlay'"
+        width="min(1080px, calc(100vw - 40px))"
+        append-to-body
+        align-center
+      >
+        <template #header>
+          <div class="model-logs-page__raw-dialog-header">
+            <span class="model-logs-page__detail-eyebrow">{{ t("modelLogs.messages") }}</span>
+            <h3>{{ messageDialogTitle }}</h3>
+            <p>{{ t("modelLogs.messageDialogHint") }}</p>
+          </div>
+        </template>
+
+        <div class="model-logs-page__raw-dialog-body">
+          <pre class="model-logs-page__raw-dialog-code model-logs-page__message-dialog-code">{{ messageDialogContent || t("common.noSummary") }}</pre>
+        </div>
+      </ElDialog>
     </section>
   </AppShell>
 </template>
@@ -534,6 +567,9 @@ const outputDisplayMode = ref<"normal" | "chunks">("normal");
 const rawResponseDisplayMode = ref<"normal" | "chunks">("normal");
 const rawDialogVisible = ref(false);
 const rawDialogKind = ref<"request" | "response">("request");
+const messageDialogVisible = ref(false);
+const messageDialogRole = ref("");
+const messageDialogBody = ref("");
 let searchTimer: number | null = null;
 
 const selectedLog = computed(() => {
@@ -592,6 +628,10 @@ const rawDialogContent = computed(() => {
   }
   return rawDialogKind.value === "request" ? formatRequestRaw(selectedLog.value) : formatResponseRaw(selectedLog.value);
 });
+const messageDialogTitle = computed(() =>
+  t("modelLogs.messageDialogTitle", { role: messageDialogRole.value || t("modelLogs.messages") }),
+);
+const messageDialogContent = computed(() => messageDialogBody.value);
 
 type StreamSummary = {
   eventCount: number;
@@ -611,6 +651,16 @@ function getStringArray(value: unknown) {
 
 function getRecordArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => isRecord(item)) : [];
+}
+
+function messageCanOpenDialog(message: ModelLogEntry["messages"][number]) {
+  return message.role === "system" || message.role === "user";
+}
+
+function openMessageDialog(message: ModelLogEntry["messages"][number]) {
+  messageDialogRole.value = message.role;
+  messageDialogBody.value = message.body || "";
+  messageDialogVisible.value = true;
 }
 
 function selectTreeItem(item: ModelLogTreeItem) {
@@ -1600,19 +1650,51 @@ onBeforeUnmount(() => {
 
 .model-logs-page__message {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 14px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.48);
 }
 
-.model-logs-page__message span {
+.model-logs-page__message-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.model-logs-page__message-header span {
   color: rgb(37, 99, 235);
   font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.model-logs-page__message-open {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.78);
+  color: rgb(37, 99, 235);
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.model-logs-page__message-open:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(219, 234, 254, 0.92);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.1);
+}
+
+.model-logs-page__message-open:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .model-logs-page__message p {
@@ -1727,6 +1809,7 @@ onBeforeUnmount(() => {
 }
 
 :global(.model-logs-page__raw-dialog-overlay.el-overlay) {
+  z-index: 4600 !important;
   background: rgba(42, 24, 14, 0.28);
   backdrop-filter: blur(9px) saturate(0.96);
 }
@@ -1827,6 +1910,11 @@ onBeforeUnmount(() => {
   max-height: 70vh;
   overflow: auto;
   padding: 16px;
+}
+
+.model-logs-page__message-dialog-code {
+  min-height: min(560px, 64vh);
+  max-height: 72vh;
 }
 
 .model-logs-page__raw-text {

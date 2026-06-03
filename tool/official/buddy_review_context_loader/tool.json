@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_review_context_loader",
   "name": "Buddy Review Context Loader",
-  "description": "A deterministic Buddy runtime tool that reconstructs memory-review inputs from a source Buddy graph run stored in the database.",
+  "description": "从数据库中已完成的 Buddy 图运行重建后台记忆复盘所需输入。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
@@ -18,7 +18,7 @@
       "key": "source_run_id",
       "name": "Source Run ID",
       "valueType": "text",
-      "description": "Completed visible Buddy run id that triggered this background review."
+      "description": "触发本次后台复盘的已完成可见 Buddy run id。"
     }
   ],
   "outputSchema": [
@@ -26,67 +26,77 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "succeeded or failed."
+      "description": "加载状态，通常为 succeeded 或 failed。"
     },
     {
       "key": "source_run_id",
       "name": "Source Run ID",
       "valueType": "text",
-      "description": "Normalized source run id."
+      "description": "规范化后的源 run id。"
     },
     {
       "key": "current_session_id",
       "name": "Current Session ID",
       "valueType": "text",
-      "description": "Buddy session id resolved from the source run metadata or source run state."
+      "description": "从源 run 元数据或状态中解析出的 Buddy 会话 id。"
     },
     {
       "key": "user_message",
       "name": "User Message",
       "valueType": "text",
-      "description": "User message reconstructed from the source run state."
+      "description": "从源 run 状态中重建的用户消息。"
     },
     {
       "key": "conversation_history",
       "name": "Conversation History",
       "valueType": "json",
-      "description": "Conversation history state from the source run, normally a context_package with a nested context_assembly_ref."
+      "description": "源 run 中的对话历史状态，通常是包含 context_assembly_ref 的上下文包。"
     },
     {
       "key": "request_understanding",
       "name": "Request Understanding",
       "valueType": "json",
-      "description": "Structured request understanding state from the source run."
+      "description": "源 run 中结构化的请求理解状态。"
     },
     {
       "key": "capability_result",
       "name": "Capability Result",
       "valueType": "json",
-      "description": "Capability result package from the source run."
+      "description": "源 run 中的能力执行结果包。"
     },
     {
       "key": "capability_review",
       "name": "Capability Review",
       "valueType": "json",
-      "description": "Capability review state from the source run."
+      "description": "源 run 中的能力结果复核状态。"
     },
     {
       "key": "public_response",
       "name": "Public Response",
       "valueType": "markdown",
-      "description": "Final visible Buddy response reconstructed from source run state, outputs, or final_result."
+      "description": "从源 run 状态、输出或 final_result 中重建的最终可见 Buddy 回复。"
     },
     {
       "key": "review_context_report",
       "name": "Review Context Report",
       "valueType": "json",
-      "description": "Audit report describing how review inputs were reconstructed."
+      "description": "说明复盘输入如何被重建的审计报告。"
     },
     {
       "key": "result",
       "name": "Result",
       "valueType": "markdown",
-      "description": "Short loader summary."
+      "description": "加载器的简短结果摘要。"
     }
-  ]
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Buddy 复盘上下文加载器",
+      "description": "从数据库中已完成的 Buddy 图运行重建后台记忆复盘所需输入。"
+    },
+    "en-US": {
+      "name": "Buddy Review Context Loader",
+      "description": "Reconstructs memory-review inputs from a source Buddy graph run stored in the database."
+    }
+  }
 }

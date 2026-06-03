@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "embedding_job_processor",
   "name": "Embedding Job Processor",
-  "description": "A deterministic maintenance tool that processes pending embedding jobs for hashing models and OpenAI-compatible embedding providers.",
+  "description": "处理待执行的 embedding jobs，支持哈希模型和 OpenAI-compatible embedding provider。",
   "version": "0.1.0",
   "timeoutSeconds": 60,
   "permissions": [],
@@ -16,13 +16,13 @@
       "key": "model_ref",
       "name": "Model Ref",
       "valueType": "text",
-      "description": "Optional embedding model id or provider:model filter."
+      "description": "可选的 embedding model id 或 provider:model 过滤条件。"
     },
     {
       "key": "limit",
       "name": "Limit",
       "valueType": "number",
-      "description": "Maximum pending jobs to process."
+      "description": "本次最多处理的 pending jobs 数量。"
     }
   ],
   "outputSchema": [
@@ -30,31 +30,41 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Processing status."
+      "description": "处理状态。"
     },
     {
       "key": "processed_count",
       "name": "Processed Count",
       "valueType": "number",
-      "description": "Number of pending jobs inspected."
+      "description": "本次检查的 pending jobs 数量。"
     },
     {
       "key": "completed_count",
       "name": "Completed Count",
       "valueType": "number",
-      "description": "Number of jobs completed."
+      "description": "本次完成的 jobs 数量。"
     },
     {
       "key": "failed_count",
       "name": "Failed Count",
       "valueType": "number",
-      "description": "Number of jobs marked failed."
+      "description": "本次标记为失败的 jobs 数量。"
     },
     {
       "key": "processed_jobs",
       "name": "Processed Jobs",
       "valueType": "json",
-      "description": "Per-job processing audit records."
+      "description": "逐 job 的处理审计记录。"
     }
-  ]
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Embedding 任务处理器",
+      "description": "处理待执行的 embedding jobs，支持哈希模型和 OpenAI-compatible embedding provider。"
+    },
+    "en-US": {
+      "name": "Embedding Job Processor",
+      "description": "Processes pending embedding jobs for hashing models and OpenAI-compatible embedding providers."
+    }
+  }
 }

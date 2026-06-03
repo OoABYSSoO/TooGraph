@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_context_pressure_check",
   "name": "Buddy Context Pressure Check",
-  "description": "A deterministic Buddy runtime tool that checks the selected next-LLM node context and decides whether session history compaction should run.",
+  "description": "检查下一次 Buddy LLM 节点可用上下文，并判断是否需要先运行会话历史压缩。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -18,7 +18,17 @@
       "key": "needs_context_compaction",
       "name": "Needs Context Compaction",
       "valueType": "boolean",
-      "description": "True when the Buddy loop should run buddy_context_compaction before the next LLM turn."
+      "description": "为 true 时，Buddy loop 应在下一次 LLM 回合前先运行 buddy_context_compaction。"
     }
-  ]
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Buddy 上下文压力检查器",
+      "description": "检查下一次 Buddy LLM 节点可用上下文，并判断是否需要先运行会话历史压缩。"
+    },
+    "en-US": {
+      "name": "Buddy Context Pressure Check",
+      "description": "Checks the selected next-LLM node context and decides whether session history compaction should run."
+    }
+  }
 }

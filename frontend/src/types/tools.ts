@@ -7,6 +7,37 @@ export type ToolIoField = {
   description: string;
 };
 
+export type ToolInputPresentationOption = {
+  label: string;
+  value: string | number | boolean;
+  updates?: Record<string, unknown>;
+};
+
+export type ToolInputPresentationVisibleWhen = {
+  field: string;
+  equals?: unknown;
+};
+
+export type ToolInputPresentationProperty = {
+  key: string;
+  name: string;
+  valueType?: string;
+  default?: unknown;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+  options?: ToolInputPresentationOption[];
+  visibleWhen?: ToolInputPresentationVisibleWhen | null;
+};
+
+export type ToolInputPresentation = {
+  mode?: "state" | "static";
+  control?: "text" | "textarea" | "json" | "object" | "number" | "boolean" | "select" | null;
+  default?: unknown;
+  options?: ToolInputPresentationOption[];
+  properties?: ToolInputPresentationProperty[];
+};
+
 export type ToolLocalizedText = {
   name: string;
   description: string;
@@ -30,6 +61,7 @@ export type ToolDefinition = {
   runtime: ToolRuntimeSpec;
   verificationCommands?: VerificationCommand[];
   dynamicStateInputs?: boolean;
+  inputPresentation?: Record<string, ToolInputPresentation>;
   inputSchema: ToolIoField[];
   outputSchema: ToolIoField[];
   sourceScope: string;

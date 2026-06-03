@@ -29,6 +29,8 @@ type BuildMessagePlatformRowsInput = {
   formatStatusLabel?: (supportLevel: string, status: MessagePlatformStatus) => string;
 };
 
+const PRIMARY_MESSAGE_PLATFORM_IDS = new Set(["feishu"]);
+
 export function buildMessagePlatformRows(input: BuildMessagePlatformRowsInput): MessagePlatformRow[] {
   const bindingByPlatform = new Map(input.bindings.map((binding) => [binding.platform_id, binding]));
   const statusByBinding = new Map(input.statuses.map((status) => [status.binding_id, status]));
@@ -53,6 +55,14 @@ export function buildMessagePlatformRows(input: BuildMessagePlatformRowsInput): 
       lastErrorMessage: status?.last_error_message ?? "",
     };
   });
+}
+
+export function buildPrimaryMessagePlatformRows(rows: MessagePlatformRow[]): MessagePlatformRow[] {
+  return rows.filter((row) => PRIMARY_MESSAGE_PLATFORM_IDS.has(row.platformId));
+}
+
+export function buildFutureMessagePlatformRows(rows: MessagePlatformRow[]): MessagePlatformRow[] {
+  return rows.filter((row) => !PRIMARY_MESSAGE_PLATFORM_IDS.has(row.platformId));
 }
 
 function resolvePlatformStatus(

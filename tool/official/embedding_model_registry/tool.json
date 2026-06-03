@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "embedding_model_registry",
   "name": "Embedding Model Registry",
-  "description": "A deterministic registry tool to register embedding models and list configured embedding models for retrieval maintenance.",
+  "description": "注册 embedding 模型，或列出当前配置的 embedding 模型，供检索维护流程使用。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -16,49 +16,49 @@
       "key": "operation",
       "name": "Operation",
       "valueType": "text",
-      "description": "register or list."
+      "description": "要执行的操作：register 或 list。"
     },
     {
       "key": "provider_key",
       "name": "Provider Key",
       "valueType": "text",
-      "description": "Model provider key, for example local-hash, local, openai, or openrouter."
+      "description": "模型供应商 key，例如 local-hash、local、openai 或 openrouter。"
     },
     {
       "key": "model",
       "name": "Model",
       "valueType": "text",
-      "description": "Embedding model name."
+      "description": "Embedding 模型名称。"
     },
     {
       "key": "dimensions",
       "name": "Dimensions",
       "valueType": "number",
-      "description": "Embedding vector dimension count."
+      "description": "Embedding 向量维度数量。"
     },
     {
       "key": "distance_metric",
       "name": "Distance Metric",
       "valueType": "text",
-      "description": "Embedding distance metric. The current supported value is cosine."
+      "description": "Embedding 距离度量；当前支持 cosine。"
     },
     {
       "key": "enabled",
       "name": "Enabled",
       "valueType": "boolean",
-      "description": "Whether memory writes should queue jobs for this embedding model."
+      "description": "是否让记忆写入为该 embedding 模型排队创建 job。"
     },
     {
       "key": "enabled_only",
       "name": "Enabled Only",
       "valueType": "boolean",
-      "description": "When listing models, include only enabled models."
+      "description": "列出模型时，是否只包含已启用模型。"
     },
     {
       "key": "metadata",
       "name": "Metadata",
       "valueType": "json",
-      "description": "Optional model metadata."
+      "description": "可选模型元数据。"
     }
   ],
   "outputSchema": [
@@ -66,41 +66,41 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Registry operation status."
+      "description": "注册表操作状态。"
     },
     {
       "key": "operation",
       "name": "Operation",
       "valueType": "text",
-      "description": "The operation that was executed."
+      "description": "实际执行的操作。"
     },
     {
       "key": "model",
       "name": "Model",
       "valueType": "json",
-      "description": "The registered embedding model record."
+      "description": "已注册的 embedding 模型记录。"
     },
     {
       "key": "models",
       "name": "Models",
       "valueType": "json",
-      "description": "Listed embedding model records."
+      "description": "列出的 embedding 模型记录。"
     },
     {
       "key": "error",
       "name": "Error",
       "valueType": "text",
-      "description": "Error detail when the operation fails."
+      "description": "操作失败时的错误详情。"
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "嵌入模型注册器",
-      "description": "注册或列出检索维护使用的嵌入模型，用于让图明确选择 provider、模型、向量维度、距离度量和启用状态。"
+      "description": "注册 embedding 模型，或列出当前配置的 embedding 模型，供检索维护流程使用。"
     },
     "en-US": {
       "name": "Embedding Model Registry",
-      "description": "Registers and lists embedding models used by retrieval maintenance, including provider, model, dimensions, distance metric, and enabled state."
+      "description": "Registers embedding models and lists configured embedding models for retrieval maintenance."
     }
   }
 }

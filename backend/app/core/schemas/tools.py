@@ -29,6 +29,45 @@ class ToolIoField(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
 
+class ToolInputPresentationOption(BaseModel):
+    label: str = Field(..., min_length=1)
+    value: Any
+    updates: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
+class ToolInputPresentationVisibleWhen(BaseModel):
+    field: str = Field(..., min_length=1)
+    equals: Any = None
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
+class ToolInputPresentationProperty(BaseModel):
+    key: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
+    value_type: str = Field(default="text", alias="valueType", min_length=1)
+    default: Any = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    options: list[ToolInputPresentationOption] = Field(default_factory=list)
+    visible_when: ToolInputPresentationVisibleWhen | None = Field(default=None, alias="visibleWhen")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
+class ToolInputPresentation(BaseModel):
+    mode: Literal["state", "static"] = "state"
+    control: Literal["text", "textarea", "json", "object", "number", "boolean", "select"] | None = None
+    default: Any = None
+    options: list[ToolInputPresentationOption] = Field(default_factory=list)
+    properties: list[ToolInputPresentationProperty] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
 class ToolLocalizedText(BaseModel):
     name: str = ""
     description: str = ""
@@ -59,6 +98,7 @@ class ToolDefinition(BaseModel):
         alias="verificationCommands",
     )
     dynamic_state_inputs: bool = Field(default=False, alias="dynamicStateInputs")
+    input_presentation: dict[str, ToolInputPresentation] = Field(default_factory=dict, alias="inputPresentation")
     input_schema: list[ToolIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[ToolIoField] = Field(default_factory=list, alias="outputSchema")
     source_scope: ToolSourceScope = Field(default=ToolSourceScope.INSTALLED, alias="sourceScope")

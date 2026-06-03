@@ -17,6 +17,7 @@ const {
   isAgentBreakpointEnabledInDocument,
   pruneUnreferencedStateSchemaInDocument,
   reconcileAgentActionOutputBindingsInDocument,
+  reconcileToolBindingsInDocument,
   reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   updateAgentNodeConfigInDocument,
@@ -4414,6 +4415,215 @@ test("updateToolNodeConfigInDocument keeps static tool inputs inside the card co
     assert.deepEqual(node.config.staticInputs, { value: { fixed: true } });
     assert.deepEqual(node.reads, []);
     assert.equal(node.writes.length, 1);
+  }
+});
+
+test("updateToolNodeConfigInDocument materializes manifest card inputs and keeps only state inputs as ports", () => {
+  const sourceChunkerTool: ToolDefinition = {
+    ...jsonPassthroughTool,
+    toolKey: "source_chunker",
+    name: "Source Chunker",
+    inputPresentation: {
+      source_kind: {
+        mode: "static",
+        control: "select",
+        default: "buddy_messages",
+        options: [
+          {
+            label: "Chat history",
+            value: "buddy_messages",
+            updates: {
+              strategy: "conversation_turn_window",
+              limits: { max_chars: 2400, max_turns_per_chunk: 3, overlap_messages: 0 },
+            },
+          },
+          {
+            label: "Knowledge documents",
+            value: "normalized_documents",
+            updates: {
+              strategy: "document_section_window",
+              limits: { max_chars: 1800, overlap_chars: 200 },
+            },
+          },
+        ],
+      },
+      strategy: {
+        mode: "static",
+        control: "select",
+        default: "conversation_turn_window",
+        options: [
+          { label: "Conversation turns", value: "conversation_turn_window" },
+          { label: "Document sections", value: "document_section_window" },
+        ],
+      },
+      source: { mode: "state" },
+      limits: {
+        mode: "static",
+        control: "object",
+        default: {
+          max_chars: 2400,
+          max_turns_per_chunk: 3,
+          overlap_messages: 0,
+        },
+        properties: [
+          { key: "max_chars", name: "Max chars", valueType: "number", default: 2400, min: 200, step: 100 },
+          {
+            key: "max_turns_per_chunk",
+            name: "Max turns",
+            valueType: "number",
+            default: 3,
+            min: 1,
+            step: 1,
+            visibleWhen: { field: "source_kind", equals: "buddy_messages" },
+          },
+          {
+            key: "overlap_messages",
+            name: "Message overlap",
+            valueType: "number",
+            default: 0,
+            min: 0,
+            step: 1,
+            visibleWhen: { field: "source_kind", equals: "buddy_messages" },
+          },
+          {
+            key: "overlap_chars",
+            name: "Char overlap",
+            valueType: "number",
+            default: 200,
+            min: 0,
+            step: 20,
+            visibleWhen: { field: "source_kind", equals: "normalized_documents" },
+          },
+        ],
+      },
+    },
+    inputSchema: [
+      { key: "source_kind", name: "Source Kind", valueType: "text", description: "" },
+      { key: "strategy", name: "Strategy", valueType: "text", description: "" },
+      { key: "source", name: "Source", valueType: "json", description: "" },
+      { key: "limits", name: "Limits", valueType: "json", description: "" },
+    ],
+    outputSchema: [{ key: "chunks", name: "Chunks", valueType: "json", description: "" }],
+  };
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Source Chunker Tool Graph",
+    state_schema: {},
+    nodes: {
+      tool_node: {
+        kind: "tool",
+        name: "Tool",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { toolKey: "" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateToolNodeConfigInDocument(
+    document,
+    "tool_node",
+    (current) => ({ ...current, toolKey: "source_chunker" }),
+    { toolDefinitions: [sourceChunkerTool] },
+  );
+  const node = nextDocument.nodes.tool_node;
+
+  assert.equal(node.kind, "tool");
+  if (node.kind === "tool") {
+    assert.deepEqual(node.config.staticInputs, {
+      source_kind: "buddy_messages",
+      strategy: "conversation_turn_window",
+      limits: {
+        max_chars: 2400,
+        max_turns_per_chunk: 3,
+        overlap_messages: 0,
+      },
+    });
+    assert.deepEqual(
+      node.reads.map((binding) => binding.binding),
+      [
+        {
+          kind: "tool_input",
+          toolKey: "source_chunker",
+          fieldKey: "source",
+          managed: true,
+        },
+      ],
+    );
+    assert.equal(node.reads.length, 1);
+    assert.equal(nextDocument.state_schema[node.reads[0]!.state]?.name, "Source");
+    assert.deepEqual(node.writes.map((binding) => nextDocument.state_schema[binding.state]?.binding?.fieldKey), ["chunks"]);
+  }
+
+  const legacyDocument: GraphPayload = {
+    graph_id: null,
+    name: "Legacy Source Chunker Tool Graph",
+    state_schema: {
+      legacy_source_kind: { name: "Source Kind", description: "", type: "text", value: "", color: "#d97706" },
+      legacy_strategy: { name: "Strategy", description: "", type: "text", value: "", color: "#2563eb" },
+      legacy_source: { name: "Source", description: "", type: "json", value: {}, color: "#7c3aed" },
+      legacy_limits: { name: "Limits", description: "", type: "json", value: {}, color: "#10b981" },
+    },
+    nodes: {
+      tool_node: {
+        kind: "tool",
+        name: "Tool",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          {
+            state: "legacy_source_kind",
+            required: true,
+            binding: { kind: "tool_input", toolKey: "source_chunker", fieldKey: "source_kind", managed: true },
+          },
+          {
+            state: "legacy_strategy",
+            required: true,
+            binding: { kind: "tool_input", toolKey: "source_chunker", fieldKey: "strategy", managed: true },
+          },
+          {
+            state: "legacy_source",
+            required: true,
+            binding: { kind: "tool_input", toolKey: "source_chunker", fieldKey: "source", managed: true },
+          },
+          {
+            state: "legacy_limits",
+            required: true,
+            binding: { kind: "tool_input", toolKey: "source_chunker", fieldKey: "limits", managed: true },
+          },
+        ],
+        writes: [],
+        config: { toolKey: "source_chunker" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const reconciledDocument = reconcileToolBindingsInDocument(legacyDocument, [sourceChunkerTool]);
+  const reconciledNode = reconciledDocument.nodes.tool_node;
+
+  assert.equal(reconciledNode.kind, "tool");
+  if (reconciledNode.kind === "tool") {
+    assert.deepEqual(
+      reconciledNode.reads.map((binding) => binding.binding?.kind === "tool_input" ? binding.binding.fieldKey : ""),
+      ["source"],
+    );
+    assert.deepEqual(reconciledNode.config.staticInputs, {
+      source_kind: "buddy_messages",
+      strategy: "conversation_turn_window",
+      limits: {
+        max_chars: 2400,
+        max_turns_per_chunk: 3,
+        overlap_messages: 0,
+      },
+    });
   }
 });
 

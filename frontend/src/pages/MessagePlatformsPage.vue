@@ -41,22 +41,46 @@
       </section>
 
       <section v-else class="message-platforms-page__platform-grid">
-        <article v-for="row in rows" :key="row.platformId" class="message-platforms-page__platform-card">
+        <article v-for="row in primaryRows" :key="row.platformId" class="message-platforms-page__platform-card">
           <div class="message-platforms-page__platform-main">
             <div class="message-platforms-page__platform-title">
-              <ElIcon class="message-platforms-page__platform-icon" aria-hidden="true"><ChatLineRound /></ElIcon>
+              <span
+                v-if="platformLogoUrl(row)"
+                class="message-platforms-page__platform-icon message-platforms-page__platform-icon--brand"
+                aria-hidden="true"
+              >
+                <img class="message-platforms-page__platform-logo" :src="platformLogoUrl(row)" alt="" />
+              </span>
+              <ElIcon v-else class="message-platforms-page__platform-icon" aria-hidden="true"><ChatLineRound /></ElIcon>
               <div>
                 <h2>{{ row.displayName }}</h2>
                 <p>{{ row.platformId }}</p>
               </div>
             </div>
-            <span class="message-platforms-page__status" :data-tone="row.statusTone">{{ row.statusLabel }}</span>
+            <ElButton
+              class="message-platforms-page__configure-button"
+              type="primary"
+              :disabled="!row.canConfigure"
+              @click="selectPlatform(row)"
+            >
+              <ElIcon aria-hidden="true"><Setting /></ElIcon>
+              {{ row.canConfigure ? t("messagePlatforms.configure") : t("messagePlatforms.planned") }}
+            </ElButton>
           </div>
 
           <dl class="message-platforms-page__platform-meta">
             <div>
               <dt>{{ t("messagePlatforms.enabled") }}</dt>
-              <dd>{{ row.enabled ? t("common.on") : t("common.off") }}</dd>
+              <dd>
+                <ElSwitch
+                  class="message-platforms-page__enabled-switch"
+                  :model-value="row.enabled"
+                  :disabled="!row.configured || busyBindingId === row.bindingId"
+                  :loading="busyBindingId === row.bindingId"
+                  :aria-label="enabledToggleLabel(row)"
+                  @change="setPlatformEnabled(row, Boolean($event))"
+                />
+              </dd>
             </div>
             <div>
               <dt>{{ t("messagePlatforms.configured") }}</dt>
@@ -69,30 +93,75 @@
           </dl>
 
           <p v-if="row.lastErrorMessage" class="message-platforms-page__error">{{ row.lastErrorMessage }}</p>
-
-          <div class="message-platforms-page__actions">
-            <ElButton :disabled="!row.canConfigure" @click="selectPlatform(row)">
-              <ElIcon aria-hidden="true"><Setting /></ElIcon>
-              {{ row.canConfigure ? t("messagePlatforms.configure") : t("messagePlatforms.planned") }}
-            </ElButton>
-          </div>
         </article>
+      </section>
+
+      <section
+        v-if="futureRows.length"
+        class="message-platforms-page__future-support"
+        :aria-label="t('messagePlatforms.futureSupportLabel')"
+      >
+        <div>
+          <h2>{{ t("messagePlatforms.futureSupportTitle") }}</h2>
+          <p>{{ t("messagePlatforms.futureSupportBody") }}</p>
+        </div>
+        <div class="message-platforms-page__future-list">
+          <span v-for="row in futureRows" :key="row.platformId">{{ row.displayName }}</span>
+        </div>
       </section>
 
       <ElDialog
         v-model="isBindingDialogOpen"
         class="message-platforms-page__dialog"
-        :title="selectedRow ? t('messagePlatforms.configureTitle', { platform: selectedRow.displayName }) : t('messagePlatforms.configure')"
+        :title="dialogTitle"
         width="520px"
         :append-to-body="true"
       >
+        <template #header>
+          <div class="message-platforms-page__dialog-title">
+            <img
+              v-if="selectedPlatformLogoUrl"
+              class="message-platforms-page__dialog-title-logo"
+              :src="selectedPlatformLogoUrl"
+              alt=""
+              aria-hidden="true"
+            />
+            <span>{{ dialogTitle }}</span>
+          </div>
+        </template>
         <form class="message-platforms-page__form" @submit.prevent="saveBinding">
           <label>
             <span>{{ t("messagePlatforms.displayName") }}</span>
             <ElInput v-model="bindingDraft.displayName" />
           </label>
 
-          <section v-if="isFeishuSelected" class="message-platforms-page__auto-bind">
+          <section v-if="isFeishuSelected" class="message-platforms-page__binding-mode">
+            <div
+              class="message-platforms-page__binding-tabs"
+              role="tablist"
+              :aria-label="t('messagePlatforms.bindingModeLabel')"
+            >
+              <button
+                v-for="tabItem in bindingModeTabs"
+                :key="tabItem.value"
+                type="button"
+                class="message-platforms-page__binding-tab"
+                :class="{ 'message-platforms-page__binding-tab--active': activeBindingMode === tabItem.value }"
+                role="tab"
+                :aria-selected="activeBindingMode === tabItem.value"
+                :tabindex="activeBindingMode === tabItem.value ? 0 : -1"
+                @click="activeBindingMode = tabItem.value"
+              >
+                {{ tabItem.label }}
+              </button>
+            </div>
+          </section>
+
+          <section
+            v-if="isFeishuSelected && activeBindingMode === 'qr'"
+            class="message-platforms-page__auto-bind"
+            role="tabpanel"
+          >
             <div>
               <h3>{{ t("messagePlatforms.feishuAutoBindTitle") }}</h3>
               <p>{{ t("messagePlatforms.feishuAutoBindBody") }}</p>
@@ -150,36 +219,40 @@
             </div>
           </section>
 
-          <ElDivider v-if="isFeishuSelected">{{ t("messagePlatforms.manualBinding") }}</ElDivider>
-
-          <label v-if="isFeishuSelected">
-            <span>{{ t("messagePlatforms.appId") }}</span>
-            <ElInput v-model="bindingDraft.appId" autocomplete="off" />
-          </label>
-          <label>
-            <span>{{ t("messagePlatforms.connectionMode") }}</span>
-            <ElSelect
-              v-model="bindingDraft.connectionMode"
-              class="toograph-select"
-              popper-class="toograph-select-popper"
-            >
-              <ElOption
-                v-for="option in connectionModeOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </ElSelect>
-          </label>
-          <label>
-            <span>{{ secretLabel }}</span>
-            <ElInput v-model="bindingDraft.secretValue" show-password autocomplete="off" />
-          </label>
-          <div class="message-platforms-page__switch-row">
-            <span>{{ t("messagePlatforms.enableBinding") }}</span>
-            <ElSwitch v-model="bindingDraft.enabled" />
-          </div>
-          <p class="message-platforms-page__form-hint">{{ t("messagePlatforms.secretHint") }}</p>
+          <section
+            v-if="activeBindingMode === 'manual'"
+            class="message-platforms-page__manual-bind"
+            role="tabpanel"
+          >
+            <label v-if="isFeishuSelected">
+              <span>{{ t("messagePlatforms.appId") }}</span>
+              <ElInput v-model="bindingDraft.appId" autocomplete="off" />
+            </label>
+            <label>
+              <span>{{ t("messagePlatforms.connectionMode") }}</span>
+              <ElSelect
+                v-model="bindingDraft.connectionMode"
+                class="toograph-select"
+                popper-class="toograph-select-popper"
+              >
+                <ElOption
+                  v-for="option in connectionModeOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </ElSelect>
+            </label>
+            <label>
+              <span>{{ secretLabel }}</span>
+              <ElInput v-model="bindingDraft.secretValue" show-password autocomplete="off" />
+            </label>
+            <div class="message-platforms-page__switch-row">
+              <span>{{ t("messagePlatforms.enableBinding") }}</span>
+              <ElSwitch v-model="bindingDraft.enabled" />
+            </div>
+            <p class="message-platforms-page__form-hint">{{ t("messagePlatforms.secretHint") }}</p>
+          </section>
         </form>
         <template #footer>
           <ElButton @click="isBindingDialogOpen = false">{{ t("common.cancel") }}</ElButton>
@@ -196,9 +269,10 @@
 import * as QRCode from "qrcode";
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ElAlert, ElButton, ElDialog, ElDivider, ElIcon, ElInput, ElLink, ElMessage, ElOption, ElSelect, ElSwitch } from "element-plus";
+import { ElAlert, ElButton, ElDialog, ElIcon, ElInput, ElLink, ElMessage, ElOption, ElSelect, ElSwitch } from "element-plus";
 import { ChatLineRound, Connection, Refresh, Setting } from "@element-plus/icons-vue";
 
+import feishuLogoUrl from "@/brand/feishu-logo.svg";
 import AppShell from "@/layouts/AppShell.vue";
 import {
   fetchMessagePlatformBindings,
@@ -213,7 +287,12 @@ import type {
   MessagePlatformCatalogEntry,
   MessagePlatformConnectionStatus,
 } from "@/types/message-platforms";
-import { buildMessagePlatformRows, type MessagePlatformRow } from "./messagePlatformsPageModel.ts";
+import {
+  buildFutureMessagePlatformRows,
+  buildMessagePlatformRows,
+  buildPrimaryMessagePlatformRows,
+  type MessagePlatformRow,
+} from "./messagePlatformsPageModel.ts";
 
 const { t } = useI18n();
 
@@ -227,9 +306,11 @@ const selectedRow = ref<MessagePlatformRow | null>(null);
 const isBindingDialogOpen = ref(false);
 const autoBindJob = ref<FeishuAutoBindingJob | null>(null);
 const isAutoBindingStarting = ref(false);
+const busyBindingId = ref("");
 const feishuQrCodeDataUrl = ref("");
 let autoBindPollTimer: ReturnType<typeof setInterval> | null = null;
 let feishuQrGenerationToken = 0;
+type BindingMode = "qr" | "manual";
 
 const bindingDraft = reactive({
   displayName: "",
@@ -238,6 +319,7 @@ const bindingDraft = reactive({
   secretValue: "",
   enabled: true,
 });
+const activeBindingMode = ref<BindingMode>("qr");
 
 const rows = computed(() =>
   buildMessagePlatformRows({
@@ -247,12 +329,22 @@ const rows = computed(() =>
     formatStatusLabel,
   }),
 );
-const connectedCount = computed(() => rows.value.filter((row) => row.status === "connected").length);
-const supportedCount = computed(() => rows.value.filter((row) => row.canConfigure).length);
+const primaryRows = computed(() => buildPrimaryMessagePlatformRows(rows.value));
+const futureRows = computed(() => buildFutureMessagePlatformRows(rows.value));
+const connectedCount = computed(() => primaryRows.value.filter((row) => row.status === "connected").length);
+const supportedCount = computed(() => primaryRows.value.filter((row) => row.canConfigure).length);
+const dialogTitle = computed(() =>
+  selectedRow.value ? t("messagePlatforms.configureTitle", { platform: selectedRow.value.displayName }) : t("messagePlatforms.configure"),
+);
+const selectedPlatformLogoUrl = computed(() => (selectedRow.value ? platformLogoUrl(selectedRow.value) : ""));
 const secretLabel = computed(() =>
   selectedRow.value?.platformId === "feishu" ? t("messagePlatforms.appSecret") : t("messagePlatforms.botToken"),
 );
 const isFeishuSelected = computed(() => selectedRow.value?.platformId === "feishu");
+const bindingModeTabs = computed<{ label: string; value: BindingMode }[]>(() => [
+  { label: t("messagePlatforms.qrBindingTab"), value: "qr" },
+  { label: t("messagePlatforms.manualBindingTab"), value: "manual" },
+]);
 const connectionModeOptions = computed(() =>
   isFeishuSelected.value
     ? [
@@ -301,6 +393,14 @@ function formatStatusLabel(supportLevel: string, status: string) {
   return labels[status] ?? status;
 }
 
+function platformLogoUrl(row: MessagePlatformRow) {
+  return row.platformId === "feishu" ? feishuLogoUrl : "";
+}
+
+function enabledToggleLabel(row: MessagePlatformRow) {
+  return row.enabled ? t("messagePlatforms.disableBinding") : t("messagePlatforms.enableBinding");
+}
+
 async function loadPage() {
   isLoading.value = true;
   error.value = "";
@@ -327,12 +427,43 @@ function selectPlatform(row: MessagePlatformRow) {
   selectedRow.value = row;
   clearAutoBindPolling();
   autoBindJob.value = null;
+  activeBindingMode.value = "qr";
   bindingDraft.displayName = binding?.display_name || row.displayName;
   bindingDraft.connectionMode = String(binding?.config.connection_mode || defaultConnectionMode(row.platformId));
   bindingDraft.appId = String(binding?.config.app_id || "");
   bindingDraft.secretValue = "";
   bindingDraft.enabled = binding?.enabled ?? true;
   isBindingDialogOpen.value = true;
+}
+
+async function setPlatformEnabled(row: MessagePlatformRow, enabled: boolean) {
+  if (!row.configured || busyBindingId.value === row.bindingId || row.enabled === enabled) {
+    return;
+  }
+  const binding = findBinding(row.platformId);
+  if (!binding) {
+    return;
+  }
+
+  busyBindingId.value = row.bindingId;
+  try {
+    const payload = await updateMessagePlatformBinding(binding.binding_id, {
+      platform_id: row.platformId,
+      display_name: binding.display_name || row.displayName,
+      enabled,
+      config: binding.config,
+    });
+    bindings.value = bindings.value.map((item) =>
+      item.binding_id === payload.binding.binding_id ? payload.binding : item,
+    );
+    const nextStatuses = statuses.value.filter((item) => item.binding_id !== payload.status.binding_id);
+    statuses.value = [payload.status, ...nextStatuses];
+    ElMessage.success(t("messagePlatforms.saved"));
+  } catch (err) {
+    ElMessage.error(t("common.failedToSave", { error: err instanceof Error ? err.message : String(err) }));
+  } finally {
+    busyBindingId.value = "";
+  }
 }
 
 function defaultConnectionMode(platformId: string) {
@@ -626,6 +757,17 @@ async function refreshFeishuQrCode(qrUrl: string) {
   background: rgba(255, 248, 240, 0.9);
 }
 
+.message-platforms-page__platform-icon--brand {
+  border: 1px solid rgba(51, 112, 255, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.message-platforms-page__platform-logo {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .message-platforms-page__platform-title h2 {
   margin: 0;
   color: var(--toograph-text-strong);
@@ -639,35 +781,6 @@ async function refreshFeishuQrCode(qrUrl: string) {
   color: var(--toograph-text-muted);
   font-size: 0.8rem;
   word-break: break-word;
-}
-
-.message-platforms-page__status {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.message-platforms-page__status[data-tone="success"] {
-  color: rgb(21, 128, 61);
-  background: rgba(220, 252, 231, 0.9);
-}
-
-.message-platforms-page__status[data-tone="warning"] {
-  color: rgb(180, 83, 9);
-  background: rgba(254, 243, 199, 0.9);
-}
-
-.message-platforms-page__status[data-tone="danger"] {
-  color: rgb(185, 28, 28);
-  background: rgba(254, 226, 226, 0.9);
-}
-
-.message-platforms-page__status[data-tone="muted"] {
-  color: var(--toograph-text-muted);
-  background: rgba(241, 245, 249, 0.85);
 }
 
 .message-platforms-page__platform-meta {
@@ -699,6 +812,16 @@ async function refreshFeishuQrCode(qrUrl: string) {
   white-space: nowrap;
 }
 
+.message-platforms-page__enabled-switch {
+  display: inline-flex;
+  vertical-align: top;
+}
+
+.message-platforms-page__enabled-switch :deep(.el-switch__core) {
+  min-width: 40px;
+  height: 22px;
+}
+
 .message-platforms-page__error {
   margin: 0;
   border-radius: 12px;
@@ -709,14 +832,91 @@ async function refreshFeishuQrCode(qrUrl: string) {
   line-height: 1.45;
 }
 
-.message-platforms-page__actions {
+.message-platforms-page__configure-button {
+  --el-button-bg-color: #3370ff;
+  --el-button-border-color: #3370ff;
+  --el-button-hover-bg-color: #245bdb;
+  --el-button-hover-border-color: #245bdb;
+  --el-button-active-bg-color: #133c9a;
+  --el-button-active-border-color: #133c9a;
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  flex: 0 0 auto;
+  min-height: 34px;
+  border-radius: 999px;
+  padding-inline: 12px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.message-platforms-page__future-support {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.58);
+}
+
+.message-platforms-page__future-support h2 {
+  margin: 0;
+  color: var(--toograph-text-strong);
+  font-size: 1rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.message-platforms-page__future-support p {
+  margin: 7px 0 0;
+  color: var(--toograph-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.message-platforms-page__future-list {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.message-platforms-page__future-list span {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--toograph-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .message-platforms-page__form {
   display: grid;
   gap: 14px;
+}
+
+.message-platforms-page__dialog-title {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  color: var(--toograph-text-strong);
+  font-weight: 800;
+}
+
+.message-platforms-page__dialog-title-logo {
+  width: 24px;
+  height: 24px;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 8px;
 }
 
 .message-platforms-page__form label {
@@ -725,6 +925,56 @@ async function refreshFeishuQrCode(qrUrl: string) {
   color: var(--toograph-text-strong);
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.message-platforms-page__binding-mode {
+  display: grid;
+  gap: 8px;
+}
+
+.message-platforms-page__binding-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 248, 240, 0.72);
+  padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
+}
+
+.message-platforms-page__binding-tab {
+  flex: 1 0 0;
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0 12px;
+  color: rgba(90, 58, 28, 0.74);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.message-platforms-page__binding-tab:not(.message-platforms-page__binding-tab--active):hover {
+  background: rgba(255, 255, 255, 0.56);
+  color: rgba(124, 45, 18, 0.92);
+}
+
+.message-platforms-page__binding-tab--active {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--toograph-accent-strong);
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(120, 53, 15, 0.1);
+}
+
+.message-platforms-page__binding-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
 .message-platforms-page__auto-bind {
@@ -805,6 +1055,11 @@ async function refreshFeishuQrCode(qrUrl: string) {
   margin: 0;
 }
 
+.message-platforms-page__manual-bind {
+  display: grid;
+  gap: 14px;
+}
+
 .message-platforms-page__switch-row {
   display: flex;
   align-items: center;
@@ -835,6 +1090,7 @@ async function refreshFeishuQrCode(qrUrl: string) {
   }
 
   .message-platforms-page__summary,
+  .message-platforms-page__future-support,
   .message-platforms-page__platform-meta {
     grid-template-columns: 1fr;
   }

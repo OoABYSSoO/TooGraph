@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "hybrid_recall_context_loader",
   "name": "Hybrid Recall Context Loader",
-  "description": "A deterministic Buddy hybrid recall tool that searches buddy_messages and memory_entries, then returns one auditable context_package with source refs, retrieval metadata, budget metadata, and warnings.",
+  "description": "同时搜索 Buddy 历史消息和长期记忆，返回包含来源引用、检索元数据、预算信息和警告的可审计上下文包。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -16,97 +16,97 @@
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "description": "Search query used to find Buddy history messages and structured memories."
+      "description": "用于查找 Buddy 历史消息和结构化记忆的搜索查询。"
     },
     {
       "key": "current_session_id",
       "name": "Current Session ID",
       "valueType": "text",
-      "description": "Optional current Buddy session id; matching lineage is excluded from session discover results."
+      "description": "可选的当前 Buddy 会话 id；匹配同一会话谱系的结果会从会话发现结果中排除。"
     },
     {
       "key": "embedding_model_ref",
       "name": "Embedding Model Ref",
       "valueType": "text",
-      "description": "Optional embedding model id/provider:model to enable hybrid memory and session recall."
+      "description": "可选的 embedding model id 或 provider:model，用于启用混合记忆和会话召回。"
     },
     {
       "key": "reranker_model_ref",
       "name": "Reranker Model Ref",
       "valueType": "text",
-      "description": "Optional reranker provider/model ref used to rerank hybrid recall candidates."
+      "description": "可选的 reranker provider:model，用于对混合召回候选重新排序。"
     },
     {
       "key": "session_limit",
       "name": "Session Limit",
       "valueType": "number",
-      "description": "Maximum session hits to include."
+      "description": "最多纳入的会话命中数量。"
     },
     {
       "key": "memory_limit",
       "name": "Memory Limit",
       "valueType": "number",
-      "description": "Maximum memory hits to include."
+      "description": "最多纳入的记忆命中数量。"
     },
     {
       "key": "window",
       "name": "Window",
       "valueType": "number",
-      "description": "Message window around each session hit."
+      "description": "每个会话命中周围包含的消息窗口大小。"
     },
     {
       "key": "bookend",
       "name": "Bookend",
       "valueType": "number",
-      "description": "Number of session bookend messages to include."
+      "description": "要包含的会话首尾消息数量。"
     },
     {
       "key": "sort",
       "name": "Sort",
       "valueType": "text",
-      "description": "rank, newest, or oldest."
+      "description": "排序方式：rank、newest 或 oldest。"
     },
     {
       "key": "role_filter",
       "name": "Role Filter",
       "valueType": "json",
-      "description": "Optional roles to search, usually user and assistant."
+      "description": "可选的消息角色过滤，通常为 user 和 assistant。"
     },
     {
       "key": "scope_kind",
       "name": "Scope Kind",
       "valueType": "text",
-      "description": "Optional memory scope kind filter."
+      "description": "可选的记忆 scope kind 过滤条件。"
     },
     {
       "key": "scope_id",
       "name": "Scope ID",
       "valueType": "text",
-      "description": "Optional memory scope id filter."
+      "description": "可选的记忆 scope id 过滤条件。"
     },
     {
       "key": "layer",
       "name": "Layer",
       "valueType": "text",
-      "description": "Optional memory layer filter."
+      "description": "可选的记忆 layer 过滤条件。"
     },
     {
       "key": "memory_type",
       "name": "Memory Type",
       "valueType": "text",
-      "description": "Optional memory type filter."
+      "description": "可选的记忆类型过滤条件。"
     },
     {
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Memory status filter; defaults to active."
+      "description": "记忆状态过滤条件，默认 active。"
     },
     {
       "key": "max_chars",
       "name": "Max Chars",
       "valueType": "number",
-      "description": "Maximum rendered hybrid recall context characters."
+      "description": "混合召回上下文最多渲染字符数。"
     }
   ],
   "outputSchema": [
@@ -114,29 +114,29 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Loader status."
+      "description": "加载状态。"
     },
     {
       "key": "hybrid_recall_context",
       "name": "Hybrid Recall Context",
       "valueType": "json",
-      "description": "Combined session and memory recall context_package."
+      "description": "组合后的会话与记忆召回上下文包。"
     },
     {
       "key": "hybrid_recall_report",
       "name": "Hybrid Recall Report",
       "valueType": "json",
-      "description": "Search query, memory ids, message ids, source refs, retrieval modes, budget, and warnings."
+      "description": "包含搜索查询、记忆 id、消息 id、来源引用、检索模式、预算和警告的报告。"
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "混合召回上下文加载器",
-      "description": "结合会话消息搜索和长期记忆召回，返回带来源引用、排序元数据、预算信息和警告的可审计上下文包。"
+      "description": "同时搜索 Buddy 历史消息和长期记忆，返回包含来源引用、检索元数据、预算信息和警告的可审计上下文包。"
     },
     "en-US": {
       "name": "Hybrid Recall Context Loader",
-      "description": "Combines session-message search and long-term memory recall into one auditable context package with source refs, ranking metadata, budgets, and warnings."
+      "description": "Searches Buddy messages and memory entries, then returns one auditable context package with source refs, retrieval metadata, budget metadata, and warnings."
     }
   }
 }

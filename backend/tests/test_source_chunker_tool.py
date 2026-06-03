@@ -33,7 +33,32 @@ class SourceChunkerToolTests(unittest.TestCase):
 
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Source Chunker")
-        self.assertIn("chunk candidates", definition.description)
+        self.assertIn("切片候选", definition.description)
+        self.assertEqual(definition.input_presentation["source"].mode, "state")
+        self.assertEqual(definition.input_presentation["source_kind"].mode, "static")
+        self.assertEqual(definition.input_presentation["source_kind"].control, "select")
+        self.assertEqual(definition.input_presentation["source_kind"].default, "buddy_messages")
+        self.assertEqual(
+            [option.label for option in definition.input_presentation["source_kind"].options],
+            ["Chat history", "Knowledge documents"],
+        )
+        self.assertEqual(
+            definition.input_presentation["source_kind"].options[1].updates,
+            {
+                "strategy": "document_section_window",
+                "limits": {"max_chars": 1800, "overlap_chars": 200},
+            },
+        )
+        self.assertEqual(
+            [option.label for option in definition.input_presentation["strategy"].options],
+            ["Conversation turns", "Document sections"],
+        )
+        self.assertEqual(definition.input_presentation["limits"].control, "object")
+        self.assertEqual(
+            [property.key for property in definition.input_presentation["limits"].properties],
+            ["max_chars", "max_turns_per_chunk", "overlap_messages", "overlap_chars"],
+        )
+        self.assertEqual([field.key for field in definition.output_schema], ["chunks"])
         self.assertIn("source_chunker", get_tool_registry(include_disabled=True).keys())
 
     def test_runtime_invocation_preserves_utf8_message_content(self) -> None:

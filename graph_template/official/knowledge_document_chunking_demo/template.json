@@ -22,36 +22,6 @@
       "color": "#0f766e",
       "binding": null
     },
-    "chunker_status": {
-      "name": "Chunker Status",
-      "description": "source_chunker 返回的执行状态。",
-      "type": "text",
-      "value": "",
-      "color": "#475569",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "source_chunker",
-        "nodeId": "chunk_source_material",
-        "fieldKey": "status",
-        "managed": true
-      }
-    },
-    "chunk_count": {
-      "name": "Chunk Count",
-      "description": "生成的 chunk candidates 数量。",
-      "type": "number",
-      "value": 0,
-      "color": "#16a34a",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "source_chunker",
-        "nodeId": "chunk_source_material",
-        "fieldKey": "chunk_count",
-        "managed": true
-      }
-    },
     "chunks": {
       "name": "Chunks",
       "description": "文档切片候选；这里只展示结果，不写入检索库。",
@@ -64,36 +34,6 @@
         "toolKey": "source_chunker",
         "nodeId": "chunk_source_material",
         "fieldKey": "chunks",
-        "managed": true
-      }
-    },
-    "chunk_report": {
-      "name": "Chunk Report",
-      "description": "切片审计报告，包含文档数和限制参数。",
-      "type": "json",
-      "value": {},
-      "color": "#0369a1",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "source_chunker",
-        "nodeId": "chunk_source_material",
-        "fieldKey": "report",
-        "managed": true
-      }
-    },
-    "chunk_error": {
-      "name": "Chunk Error",
-      "description": "切片失败时的错误信息。",
-      "type": "text",
-      "value": "",
-      "color": "#dc2626",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "source_chunker",
-        "nodeId": "chunk_source_material",
-        "fieldKey": "error",
         "managed": true
       }
     }
@@ -148,7 +88,7 @@
         "collapsed": false,
         "size": {
           "width": 500,
-          "height": 560
+          "height": 430
         }
       },
       "reads": [
@@ -166,23 +106,7 @@
       ],
       "writes": [
         {
-          "state": "chunker_status",
-          "mode": "replace"
-        },
-        {
-          "state": "chunk_count",
-          "mode": "replace"
-        },
-        {
           "state": "chunks",
-          "mode": "replace"
-        },
-        {
-          "state": "chunk_report",
-          "mode": "replace"
-        },
-        {
-          "state": "chunk_error",
           "mode": "replace"
         }
       ],
@@ -227,36 +151,6 @@
         "persistFormat": "auto",
         "fileNameTemplate": ""
       }
-    },
-    "output_report": {
-      "kind": "output",
-      "name": "Chunk Report",
-      "description": "查看切片数量、文档数量和切片限制。",
-      "ui": {
-        "position": {
-          "x": 1240,
-          "y": 640
-        },
-        "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 320
-        }
-      },
-      "reads": [
-        {
-          "state": "chunk_report",
-          "required": false,
-          "binding": null
-        }
-      ],
-      "writes": [],
-      "config": {
-        "displayMode": "json",
-        "persistEnabled": false,
-        "persistFormat": "auto",
-        "fileNameTemplate": ""
-      }
     }
   },
   "edges": [
@@ -267,10 +161,6 @@
     {
       "source": "chunk_source_material",
       "target": "output_chunks"
-    },
-    {
-      "source": "chunk_source_material",
-      "target": "output_report"
     }
   ],
   "conditional_edges": [],
@@ -289,11 +179,6 @@
         "state": "chunks",
         "role": "chunk_candidates",
         "label": "Knowledge document chunk candidates"
-      },
-      {
-        "state": "chunk_report",
-        "role": "audit",
-        "label": "Chunking report"
       }
     ]
   }

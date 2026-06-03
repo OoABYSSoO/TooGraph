@@ -51,6 +51,23 @@ export function resolveRunEventText(payload: RunEventPayload, fallback = "") {
   return typeof payload.text === "string" ? payload.text : fallback;
 }
 
+export function resolveRunActivityFailureMessage(payload: RunEventPayload) {
+  const activityStatus = String(payload.status ?? "").trim().toLowerCase();
+  if (!(activityStatus === "failed" || activityStatus === "error")) {
+    return "";
+  }
+  const nodeId = resolveRunEventNodeId(payload);
+  const summary = String(payload.summary ?? "").trim();
+  const error = String(payload.error ?? "").trim();
+  const detail = payload.detail && typeof payload.detail === "object" && !Array.isArray(payload.detail) ? payload.detail as Record<string, unknown> : {};
+  const detailError = String(detail.error ?? detail.error_message ?? "").trim();
+  const message = error || detailError || summary;
+  if (!message) {
+    return "";
+  }
+  return nodeId ? `${nodeId}: ${message}` : message;
+}
+
 export function listRunEventOutputKeys(payload: RunEventPayload, fallback: string[] = []) {
   return Array.isArray(payload.output_keys) ? payload.output_keys.map((key) => String(key)).filter(Boolean) : fallback;
 }

@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "source_chunker",
   "name": "Source Chunker",
-  "description": "A deterministic chunking tool that converts normalized Buddy messages or normalized documents into retrieval-ready chunk candidates without writing storage or queueing embeddings.",
+  "description": "把规范化 Buddy 消息或规范化文档转换为可入库、可召回的确定性切片候选；不会写入存储，也不会排队 embedding。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -11,84 +11,153 @@
     "entrypoint": "run.py",
     "timeoutSeconds": 30
   },
+  "inputPresentation": {
+    "source_kind": {
+      "mode": "static",
+      "control": "select",
+      "default": "buddy_messages",
+      "options": [
+        {
+          "label": "Chat history",
+          "value": "buddy_messages",
+          "updates": {
+            "strategy": "conversation_turn_window",
+            "limits": {
+              "max_chars": 2400,
+              "max_turns_per_chunk": 3,
+              "overlap_messages": 0
+            }
+          }
+        },
+        {
+          "label": "Knowledge documents",
+          "value": "normalized_documents",
+          "updates": {
+            "strategy": "document_section_window",
+            "limits": {
+              "max_chars": 1800,
+              "overlap_chars": 200
+            }
+          }
+        }
+      ]
+    },
+    "strategy": {
+      "mode": "static",
+      "control": "select",
+      "default": "conversation_turn_window",
+      "options": [
+        {
+          "label": "Conversation turns",
+          "value": "conversation_turn_window"
+        },
+        {
+          "label": "Document sections",
+          "value": "document_section_window"
+        }
+      ]
+    },
+    "source": {
+      "mode": "state"
+    },
+    "limits": {
+      "mode": "static",
+      "control": "object",
+      "default": {
+        "max_chars": 2400,
+        "max_turns_per_chunk": 3,
+        "overlap_messages": 0
+      },
+      "properties": [
+        {
+          "key": "max_chars",
+          "name": "Max chars",
+          "valueType": "number",
+          "default": 2400,
+          "min": 200,
+          "step": 100
+        },
+        {
+          "key": "max_turns_per_chunk",
+          "name": "Max turns",
+          "valueType": "number",
+          "default": 3,
+          "min": 1,
+          "step": 1,
+          "visibleWhen": {
+            "field": "source_kind",
+            "equals": "buddy_messages"
+          }
+        },
+        {
+          "key": "overlap_messages",
+          "name": "Message overlap",
+          "valueType": "number",
+          "default": 0,
+          "min": 0,
+          "step": 1,
+          "visibleWhen": {
+            "field": "source_kind",
+            "equals": "buddy_messages"
+          }
+        },
+        {
+          "key": "overlap_chars",
+          "name": "Char overlap",
+          "valueType": "number",
+          "default": 200,
+          "min": 0,
+          "step": 20,
+          "visibleWhen": {
+            "field": "source_kind",
+            "equals": "normalized_documents"
+          }
+        }
+      ]
+    }
+  },
   "inputSchema": [
     {
       "key": "source_kind",
       "name": "Source Kind",
       "valueType": "text",
-      "description": "buddy_messages or normalized_documents."
+      "description": "来源类型：buddy_messages 或 normalized_documents。"
     },
     {
       "key": "strategy",
       "name": "Strategy",
       "valueType": "text",
-      "description": "conversation_turn_window for messages or document_section_window for normalized documents."
+      "description": "切片策略：消息使用 conversation_turn_window，规范化文档使用 document_section_window。"
     },
     {
       "key": "source",
       "name": "Source",
       "valueType": "json",
-      "description": "Normalized source package. For messages, provide session_id and messages. For documents, provide documents."
+      "description": "规范化来源包；消息输入提供 session_id 和 messages，文档输入提供 documents。"
     },
     {
       "key": "limits",
       "name": "Limits",
       "valueType": "json",
-      "description": "Chunking limits such as max_chars, overlap_chars, overlap_messages, and max_turns_per_chunk."
+      "description": "切片限制，例如 max_chars、overlap_chars、overlap_messages 和 max_turns_per_chunk。"
     }
   ],
   "outputSchema": [
     {
-      "key": "status",
-      "name": "Status",
-      "valueType": "text",
-      "description": "succeeded or failed."
-    },
-    {
-      "key": "source_kind",
-      "name": "Source Kind",
-      "valueType": "text",
-      "description": "The normalized input source kind."
-    },
-    {
-      "key": "strategy",
-      "name": "Strategy",
-      "valueType": "text",
-      "description": "The applied chunking strategy."
-    },
-    {
-      "key": "chunk_count",
-      "name": "Chunk Count",
-      "valueType": "number",
-      "description": "Number of chunk candidates produced."
-    },
-    {
       "key": "chunks",
       "name": "Chunks",
       "valueType": "json",
-      "description": "Deterministic retrieval-ready chunk candidates."
-    },
-    {
-      "key": "report",
-      "name": "Report",
-      "valueType": "json",
-      "description": "Chunking audit details."
-    },
-    {
-      "key": "error",
-      "name": "Error",
-      "valueType": "text",
-      "description": "Error detail when chunking fails."
+      "description": "可用于检索入库的确定性切片候选。"
     }
   ],
   "localized": {
     "en-US": {
       "name": "Source Chunker",
-      "description": "Produces deterministic chunk candidates from normalized messages or documents without storage writes."
+      "description": "Converts normalized Buddy messages or normalized documents into deterministic retrieval-ready chunk candidates without writing storage or queueing embeddings."
     },
     "zh-CN": {
-      "name": "Source Chunker",
-      "description": "把规范化消息或文档切成可入库的 chunk candidates，不直接写库或排 embedding job。"
+      "name": "源材料切片器",
+      "description": "把规范化 Buddy 消息或规范化文档转换为可入库、可召回的确定性切片候选；不会写入存储，也不会排队 embedding。"
     }
   }
 }

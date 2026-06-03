@@ -542,6 +542,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 },
                 "source_state": "message_source",
                 "source_input_node": "input_message_source",
+                "output_contract_label": "Buddy message chunk candidates",
             },
             "knowledge_document_chunking_demo": {
                 "static_inputs": {
@@ -551,6 +552,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 },
                 "source_state": "document_source",
                 "source_input_node": "input_document_source",
+                "output_contract_label": "Knowledge document chunk candidates",
             },
         }
         for template_id, expected in expectations.items():
@@ -565,9 +567,14 @@ class TemplateLayoutTests(unittest.TestCase):
                 self.assertNotIn("source_kind", states)
                 self.assertNotIn("strategy", states)
                 self.assertNotIn("limits", states)
+                self.assertNotIn("chunker_status", states)
+                self.assertNotIn("chunk_count", states)
+                self.assertNotIn("chunk_report", states)
+                self.assertNotIn("chunk_error", states)
                 self.assertNotIn("input_source_kind", nodes)
                 self.assertNotIn("input_strategy", nodes)
                 self.assertNotIn("input_limits", nodes)
+                self.assertNotIn("output_report", nodes)
                 self.assertEqual(
                     sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
                     [expected["source_input_node"]],
@@ -593,26 +600,27 @@ class TemplateLayoutTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     tool_node["writes"],
-                    [
-                        {"state": "chunker_status", "mode": "replace"},
-                        {"state": "chunk_count", "mode": "replace"},
-                        {"state": "chunks", "mode": "replace"},
-                        {"state": "chunk_report", "mode": "replace"},
-                        {"state": "chunk_error", "mode": "replace"},
-                    ],
+                    [{"state": "chunks", "mode": "replace"}],
                 )
                 self.assertEqual(states["chunks"]["binding"]["fieldKey"], "chunks")
-                self.assertEqual(states["chunk_report"]["binding"]["fieldKey"], "report")
                 self.assertEqual(
                     template["edges"],
                     [
                         {"source": expected["source_input_node"], "target": "chunk_source_material"},
                         {"source": "chunk_source_material", "target": "output_chunks"},
-                        {"source": "chunk_source_material", "target": "output_report"},
                     ],
                 )
                 self.assertIn({"source": "chunk_source_material", "target": "output_chunks"}, template["edges"])
-                self.assertIn({"source": "chunk_source_material", "target": "output_report"}, template["edges"])
+                self.assertEqual(
+                    template["metadata"]["outputContract"],
+                    [
+                        {
+                            "state": "chunks",
+                            "role": "chunk_candidates",
+                            "label": expected.get("output_contract_label"),
+                        }
+                    ],
+                )
 
                 graph = NodeSystemGraphPayload.model_validate(
                     {

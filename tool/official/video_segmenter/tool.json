@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "video_segmenter",
   "name": "Video Segmenter",
-  "description": "Splits a local video into short batch-ready clips for downstream Batch or LLM analysis nodes.",
+  "description": "把本地视频切成适合批处理或后续 LLM 分析节点使用的短片段。",
   "version": "0.1.0",
   "timeoutSeconds": 600,
   "permissions": [
@@ -20,7 +20,7 @@
       "key": "video",
       "name": "Video",
       "valueType": "video",
-      "description": "Local video file to segment."
+      "description": "需要切分的本地视频文件。"
     }
   ],
   "outputSchema": [
@@ -28,17 +28,17 @@
       "key": "segments",
       "name": "Segments",
       "valueType": "json",
-      "description": "Array of generated video segments, each with index, start_sec, end_sec, local_path, and mime_type."
+      "description": "生成的视频片段数组，每项包含 index、start_sec、end_sec、local_path 和 mime_type。"
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "视频分段器",
-      "description": "把本地视频切分成适合后续 Batch 或 LLM 节点逐段分析的短视频片段，并返回每段的时间范围和本地文件路径。"
+      "description": "把本地视频切成适合批处理或后续 LLM 分析节点使用的短片段。"
     },
     "en-US": {
       "name": "Video Segmenter",
-      "description": "Splits a local video into short clips for downstream Batch or LLM analysis nodes, returning each segment time range and local file path."
+      "description": "Splits a local video into short batch-ready clips for downstream Batch or LLM analysis nodes."
     }
   }
 }

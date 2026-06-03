@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_history_context_loader",
   "name": "Buddy Session History Loader",
-  "description": "A deterministic Buddy runtime tool that loads prior conversation history from the current Buddy session runtime context and returns a context_package.",
+  "description": "从当前 Buddy 会话运行时上下文读取既有对话历史，并返回可用于提示词渲染的上下文包。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -17,7 +17,17 @@
       "key": "conversation_history",
       "name": "Conversation History Package",
       "valueType": "json",
-      "description": "context_package with session history source refs, budget metadata, warnings, and a nested context_assembly_ref for prompt rendering."
+      "description": "包含会话历史来源引用、预算信息、警告，以及用于提示词渲染的 context_assembly_ref。"
     }
-  ]
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Buddy 会话历史加载器",
+      "description": "从当前 Buddy 会话运行时上下文读取既有对话历史，并返回可用于提示词渲染的上下文包。"
+    },
+    "en-US": {
+      "name": "Buddy Session History Loader",
+      "description": "Loads prior conversation history from the current Buddy session runtime context and returns a context package."
+    }
+  }
 }

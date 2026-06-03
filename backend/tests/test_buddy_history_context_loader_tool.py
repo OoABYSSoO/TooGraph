@@ -40,7 +40,7 @@ class BuddyHistoryContextLoaderToolTests(unittest.TestCase):
 
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Session History Loader")
-        self.assertIn("conversation history", definition.description)
+        self.assertIn("对话历史", definition.description)
         self.assertIn("buddy_history_context_loader", get_tool_registry(include_disabled=True).keys())
         manifest = json.loads((TOOL_DIR / "tool.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["inputSchema"], [])

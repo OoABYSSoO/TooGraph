@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "memory_search_context_loader",
   "name": "Memory Search Context Loader",
-  "description": "A deterministic Buddy memory search tool that turns memory_entries recall results into an auditable context_package with memory refs, source refs, retrieval metadata, budget metadata, and warnings.",
+  "description": "搜索结构化长期记忆，并返回包含记忆引用、来源引用、检索元数据、预算信息和警告的可审计上下文包。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -16,61 +16,61 @@
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "description": "Search query used to find structured Buddy memories."
+      "description": "用于查找结构化 Buddy 记忆的搜索查询。"
     },
     {
       "key": "embedding_model_ref",
       "name": "Embedding Model Ref",
       "valueType": "text",
-      "description": "Optional embedding model id/provider:model to enable hybrid memory recall."
+      "description": "可选的 embedding model id 或 provider:model，用于启用混合记忆召回。"
     },
     {
       "key": "reranker_model_ref",
       "name": "Reranker Model Ref",
       "valueType": "text",
-      "description": "Optional reranker provider:model used to reorder hybrid memory recall candidates."
+      "description": "可选的 reranker provider:model，用于重新排序混合记忆召回候选。"
     },
     {
       "key": "scope_kind",
       "name": "Scope Kind",
       "valueType": "text",
-      "description": "Optional memory scope kind filter."
+      "description": "可选的记忆 scope kind 过滤条件。"
     },
     {
       "key": "scope_id",
       "name": "Scope ID",
       "valueType": "text",
-      "description": "Optional memory scope id filter."
+      "description": "可选的记忆 scope id 过滤条件。"
     },
     {
       "key": "layer",
       "name": "Layer",
       "valueType": "text",
-      "description": "Optional memory layer filter."
+      "description": "可选的记忆 layer 过滤条件。"
     },
     {
       "key": "memory_type",
       "name": "Memory Type",
       "valueType": "text",
-      "description": "Optional memory type filter."
+      "description": "可选的记忆类型过滤条件。"
     },
     {
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Memory status filter; defaults to active."
+      "description": "记忆状态过滤条件，默认 active。"
     },
     {
       "key": "limit",
       "name": "Limit",
       "valueType": "number",
-      "description": "Maximum memories to include."
+      "description": "最多纳入的记忆数量。"
     },
     {
       "key": "max_chars",
       "name": "Max Chars",
       "valueType": "number",
-      "description": "Maximum rendered memory context characters."
+      "description": "记忆上下文最多渲染字符数。"
     }
   ],
   "outputSchema": [
@@ -78,19 +78,19 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Loader status."
+      "description": "加载状态。"
     },
     {
       "key": "memory_search_context",
       "name": "Memory Search Context",
       "valueType": "json",
-      "description": "Memory recall context_package."
+      "description": "记忆召回上下文包。"
     },
     {
       "key": "memory_search_report",
       "name": "Memory Search Report",
       "valueType": "json",
-      "description": "Search query, memory ids, source refs, retrieval ranking reports, budget, and warnings."
+      "description": "包含搜索查询、记忆 id、来源引用、检索排序报告、预算和警告的报告。"
     }
   ],
   "localized": {

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildMessagePlatformRows, resolvePlatformStatusTone } from "./messagePlatformsPageModel.ts";
+import {
+  buildFutureMessagePlatformRows,
+  buildMessagePlatformRows,
+  buildPrimaryMessagePlatformRows,
+  resolvePlatformStatusTone,
+} from "./messagePlatformsPageModel.ts";
 
 test("message platform model merges catalog, bindings, and statuses", () => {
   const rows = buildMessagePlatformRows({
@@ -80,4 +85,43 @@ test("message platform model accepts localized status labels", () => {
   });
 
   assert.equal(rows[0].statusLabel, "localized:not_configured");
+});
+
+test("message platform model keeps Feishu as the only primary module and lists others as future support", () => {
+  const rows = buildMessagePlatformRows({
+    platforms: [
+      {
+        platform_id: "telegram",
+        display_name: "Telegram",
+        support_level: "supported",
+        capabilities: { text: true },
+        config_schema: "telegram_bot_v1",
+      },
+      {
+        platform_id: "feishu",
+        display_name: "Feishu/Lark",
+        support_level: "supported",
+        capabilities: { text: true },
+        config_schema: "feishu_v1",
+      },
+      {
+        platform_id: "discord",
+        display_name: "Discord",
+        support_level: "planned",
+        capabilities: { text: true },
+        config_schema: "",
+      },
+    ],
+    bindings: [],
+    statuses: [],
+  });
+
+  assert.deepEqual(
+    buildPrimaryMessagePlatformRows(rows).map((row) => row.platformId),
+    ["feishu"],
+  );
+  assert.deepEqual(
+    buildFutureMessagePlatformRows(rows).map((row) => row.displayName),
+    ["Telegram", "Discord"],
+  );
 });

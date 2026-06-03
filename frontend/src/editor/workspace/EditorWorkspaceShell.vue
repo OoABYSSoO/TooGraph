@@ -419,7 +419,8 @@ import {
 } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
-import { clonePlainValue, reconcileAgentActionOutputBindingsInDocument } from "@/lib/graph-document";
+import { clonePlainValue, reconcileAgentActionOutputBindingsInDocument, reconcileToolBindingsInDocument } from "@/lib/graph-document";
+import { resolveRunActivityFailureMessage } from "@/lib/run-event-stream";
 import { buildGraphRevisionHistoryRows, type GraphRevisionHistoryRow } from "@/lib/graphRevisionHistoryModel";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
@@ -1583,11 +1584,20 @@ function compactPageFactText(value: unknown) {
 }
 
 function handleWorkspaceRunActivityEvent(payload: Record<string, unknown>) {
+  maybeShowRunActivityFailureToast(payload);
   const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent(payload);
   if (!operationPlan) {
     return;
   }
   buddyMascotDebugStore.requestVirtualOperation(operationPlan);
+}
+
+function maybeShowRunActivityFailureToast(payload: Record<string, unknown>) {
+  const message = resolveRunActivityFailureMessage(payload);
+  if (!message) {
+    return;
+  }
+  showRunErrorToast(message);
 }
 
 type GraphEditPlaybackPlanRequestDetail = {
@@ -1991,6 +2001,29 @@ function reconcileOpenDocumentsWithActionDefinitions() {
 watch(
   [() => documentsByTabId.value, () => actionDefinitions.value],
   reconcileOpenDocumentsWithActionDefinitions,
+  { deep: false },
+);
+
+function reconcileOpenDocumentsWithToolDefinitions() {
+  if (!hydrated.value || toolDefinitions.value.length === 0) {
+    return;
+  }
+
+  for (const [tabId, document] of Object.entries(documentsByTabId.value)) {
+    const tab = workspace.value.tabs.find((candidate) => candidate.tabId === tabId) ?? null;
+    if (!tab?.dirty) {
+      continue;
+    }
+    const nextDocument = reconcileToolBindingsInDocument(document, toolDefinitions.value);
+    if (nextDocument !== document) {
+      markDocumentDirty(tabId, nextDocument);
+    }
+  }
+}
+
+watch(
+  [() => documentsByTabId.value, () => toolDefinitions.value],
+  reconcileOpenDocumentsWithToolDefinitions,
   { deep: false },
 );
 

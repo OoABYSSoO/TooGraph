@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "knowledge_context_loader",
   "name": "Knowledge Context Loader",
-  "description": "A deterministic knowledge-base retriever that turns search_knowledge results into an auditable context_package with source refs, retrieval metadata, budget metadata, and warnings.",
+  "description": "把知识库搜索结果转换为包含来源引用、检索元数据、预算信息和警告的可审计上下文包。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -16,31 +16,31 @@
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "description": "Search query for the knowledge base."
+      "description": "面向知识库的搜索查询。"
     },
     {
       "key": "knowledge_base",
       "name": "Knowledge Base",
       "valueType": "text",
-      "description": "Optional knowledge base id. Empty uses the default imported knowledge base."
+      "description": "可选知识库 id；留空时使用默认导入知识库。"
     },
     {
       "key": "limit",
       "name": "Limit",
       "valueType": "number",
-      "description": "Maximum number of knowledge chunks to include."
+      "description": "最多纳入的知识切片数量。"
     },
     {
       "key": "metadata_filter",
       "name": "Metadata Filter",
       "valueType": "json",
-      "description": "Optional search_knowledge metadata filter, such as source_path_prefix, source_kind, or section."
+      "description": "可选的知识库元数据过滤，例如 source_path_prefix、source_kind 或 section。"
     },
     {
       "key": "max_chars",
       "name": "Max Chars",
       "valueType": "number",
-      "description": "Maximum rendered knowledge context characters."
+      "description": "知识库上下文最多渲染字符数。"
     }
   ],
   "outputSchema": [
@@ -48,29 +48,29 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Loader status."
+      "description": "加载状态。"
     },
     {
       "key": "knowledge_context",
       "name": "Knowledge Context",
       "valueType": "json",
-      "description": "Knowledge context_package."
+      "description": "知识库上下文包。"
     },
     {
       "key": "knowledge_context_report",
       "name": "Knowledge Context Report",
       "valueType": "json",
-      "description": "Search query, knowledge base, budget, source refs, retrieval metadata, and warnings."
+      "description": "包含搜索查询、知识库、预算、来源引用、检索元数据和警告的报告。"
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "知识库上下文加载器",
-      "description": "按查询从知识库检索相关片段，并组装为带来源引用、检索元数据、预算信息和警告的可审计上下文包。"
+      "description": "把知识库搜索结果转换为包含来源引用、检索元数据、预算信息和警告的可审计上下文包。"
     },
     "en-US": {
       "name": "Knowledge Context Loader",
-      "description": "Retrieves relevant knowledge-base chunks for a query and packages them with source refs, retrieval metadata, budget data, and warnings."
+      "description": "Turns knowledge-base search results into an auditable context package with source refs, retrieval metadata, budget metadata, and warnings."
     }
   }
 }

@@ -29,6 +29,7 @@ const runLifecycleControllerSource = readWorkspaceSource("useWorkspaceRunLifecyc
 const openControllerSource = readWorkspaceSource("useWorkspaceOpenController.ts");
 const resourceControllerSource = readWorkspaceSource("useWorkspaceResourceController.ts");
 const editGuardControllerSource = readWorkspaceSource("useWorkspaceEditGuardController.ts");
+const runEventStreamSource = readFileSync(resolve(currentDirectory, "../../lib/run-event-stream.ts"), "utf8").replace(/\r\n/g, "\n");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -568,7 +569,15 @@ test("EditorWorkspaceShell subscribes to run events for live output previews", (
   assert.match(runLifecycleControllerSource, /if \(eventType === "activity\.event"\) \{[\s\S]*input\.handleActivityEvent\?\.\(payload\);[\s\S]*\}/);
   assert.match(runLifecycleControllerSource, /function applyStreamingOutputPreviewToTab/);
   assert.match(runLifecycleControllerSource, /buildRunEventOutputPreviewUpdate/);
+  assert.match(componentSource, /import \{ resolveRunActivityFailureMessage \} from "@\/lib\/run-event-stream";/);
   assert.match(componentSource, /function handleWorkspaceRunActivityEvent\(payload: Record<string, unknown>\)/);
+  assert.match(componentSource, /maybeShowRunActivityFailureToast\(payload\);/);
+  assert.match(componentSource, /function maybeShowRunActivityFailureToast\(payload: Record<string, unknown>\)/);
+  assert.match(componentSource, /const message = resolveRunActivityFailureMessage\(payload\);/);
+  assert.match(componentSource, /showRunErrorToast\(message\);/);
+  assert.match(runEventStreamSource, /export function resolveRunActivityFailureMessage\(payload: RunEventPayload\)/);
+  assert.match(runEventStreamSource, /activityStatus === "failed" \|\| activityStatus === "error"/);
+  assert.match(runEventStreamSource, /const nodeId = resolveRunEventNodeId\(payload\);/);
   assert.match(componentSource, /const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent\(payload\);[\s\S]*buddyMascotDebugStore\.requestVirtualOperation\(operationPlan\);/);
   assert.match(componentSource, /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*\}\);/);
   assert.match(runControllerSource, /input\.startRunEventStreamForTab\(tabId, runId\);/);

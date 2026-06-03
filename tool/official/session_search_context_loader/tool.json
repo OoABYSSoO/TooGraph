@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "session_search_context_loader",
   "name": "Session Search Context Loader",
-  "description": "A deterministic Buddy session search tool that turns FTS/trigram/LIKE history hits into an auditable context_package with message refs, snippets, session lineage, budget metadata, and warnings.",
+  "description": "搜索 Buddy 历史消息，并返回包含消息引用、片段、会话谱系、预算信息和警告的可审计上下文包。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -16,49 +16,49 @@
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "description": "Search query used to find Buddy history messages."
+      "description": "用于查找 Buddy 历史消息的搜索查询。"
     },
     {
       "key": "current_session_id",
       "name": "Current Session ID",
       "valueType": "text",
-      "description": "Optional current Buddy session id; matching lineage is excluded from discover results."
+      "description": "可选的当前 Buddy 会话 id；匹配同一会话谱系的结果会从发现结果中排除。"
     },
     {
       "key": "limit",
       "name": "Limit",
       "valueType": "number",
-      "description": "Maximum hit sessions to return."
+      "description": "最多返回的命中会话数量。"
     },
     {
       "key": "window",
       "name": "Window",
       "valueType": "number",
-      "description": "Message window around each hit."
+      "description": "每个命中周围包含的消息窗口大小。"
     },
     {
       "key": "bookend",
       "name": "Bookend",
       "valueType": "number",
-      "description": "Number of session bookend messages to include when available."
+      "description": "可用时要包含的会话首尾消息数量。"
     },
     {
       "key": "sort",
       "name": "Sort",
       "valueType": "text",
-      "description": "rank, newest, or oldest."
+      "description": "排序方式：rank、newest 或 oldest。"
     },
     {
       "key": "role_filter",
       "name": "Role Filter",
       "valueType": "json",
-      "description": "Optional roles to search, usually user and assistant."
+      "description": "可选的消息角色过滤，通常为 user 和 assistant。"
     },
     {
       "key": "max_chars",
       "name": "Max Chars",
       "valueType": "number",
-      "description": "Maximum rendered session search context characters."
+      "description": "会话搜索上下文最多渲染字符数。"
     }
   ],
   "outputSchema": [
@@ -66,29 +66,29 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "Loader status."
+      "description": "加载状态。"
     },
     {
       "key": "session_search_context",
       "name": "Session Search Context",
       "valueType": "json",
-      "description": "Session history search context_package."
+      "description": "会话历史搜索上下文包。"
     },
     {
       "key": "session_search_report",
       "name": "Session Search Report",
       "valueType": "json",
-      "description": "Search query, hit message ids, session lineage, source refs, budget, and warnings."
+      "description": "包含搜索查询、命中消息 id、会话谱系、来源引用、预算和警告的报告。"
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "会话搜索上下文加载器",
-      "description": "在 Buddy 历史消息中搜索相关会话片段，并返回带消息引用、上下文窗口、会话链路、预算信息和警告的可审计上下文包。"
+      "description": "搜索 Buddy 历史消息，并返回包含消息引用、片段、会话谱系、预算信息和警告的可审计上下文包。"
     },
     "en-US": {
       "name": "Session Search Context Loader",
-      "description": "Searches Buddy history messages and returns an auditable context package with message refs, nearby context windows, session lineage, budgets, and warnings."
+      "description": "Searches Buddy history messages and returns an auditable context package with message refs, snippets, session lineage, budget metadata, and warnings."
     }
   }
 }

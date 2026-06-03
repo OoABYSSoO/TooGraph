@@ -9,6 +9,7 @@ import {
   parseRunEventPayload,
   listRunEventOutputKeys,
   parseRunEventPayloadData,
+  resolveRunActivityFailureMessage,
   resolveRunEventNodeId,
   resolveRunEventPreviewNodeIds,
   resolveRunEventText,
@@ -57,6 +58,27 @@ test("resolveRunEventText preserves explicit text and only uses fallback when te
   assert.equal(resolveRunEventText({ text: "ready", delta: " ignored" }, "fallback"), "ready");
   assert.equal(resolveRunEventText({ text: "", delta: " ignored" }, "fallback"), "");
   assert.equal(resolveRunEventText({ delta: " chunk" }, "fallback"), "fallback");
+});
+
+test("resolveRunActivityFailureMessage formats failed activity errors for toast display", () => {
+  assert.equal(
+    resolveRunActivityFailureMessage({
+      node_id: " chunk_source_material ",
+      status: "failed",
+      summary: "Tool failed.",
+      detail: { error_message: "unsupported_source_kind" },
+    }),
+    "chunk_source_material: unsupported_source_kind",
+  );
+  assert.equal(
+    resolveRunActivityFailureMessage({
+      status: "error",
+      error: "Missing source.",
+      summary: "Tool failed.",
+    }),
+    "Missing source.",
+  );
+  assert.equal(resolveRunActivityFailureMessage({ status: "succeeded", error: "ignored" }), "");
 });
 
 test("listRunEventOutputKeys normalizes keys and preserves fallback when keys are absent", () => {
