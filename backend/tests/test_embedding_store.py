@@ -35,16 +35,16 @@ class EmbeddingStoreTests(unittest.TestCase):
         from app.core.storage.embedding_store import register_embedding_model
 
         model = register_embedding_model(
-            provider_key="local",
-            model="hashing-v1",
+            provider_key="openai",
+            model="text-embedding-3-small",
             dimensions=8,
             distance_metric="cosine",
             metadata={"normalized": True},
         )
 
         self.assertTrue(model["embedding_model_id"].startswith("emodel_"))
-        self.assertEqual(model["provider_key"], "local")
-        self.assertEqual(model["model"], "hashing-v1")
+        self.assertEqual(model["provider_key"], "openai")
+        self.assertEqual(model["model"], "text-embedding-3-small")
         self.assertEqual(model["dimensions"], 8)
         self.assertEqual(model["distance_metric"], "cosine")
         self.assertEqual(model["metadata"]["normalized"], True)
@@ -53,7 +53,7 @@ class EmbeddingStoreTests(unittest.TestCase):
         from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=3)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="buddy_message", source_id="msg_1")
         [chunk] = upsert_retrieval_chunks(
             document["document_id"],
@@ -87,7 +87,7 @@ class EmbeddingStoreTests(unittest.TestCase):
         )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=3)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="graph_output", source_id="output_1")
         upsert_retrieval_chunks(
             document["document_id"],
@@ -106,9 +106,8 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertEqual(completed["status"], "completed")
         self.assertTrue(completed["completed_at"])
 
-    def test_process_pending_embedding_jobs_builds_local_vectors_and_completes_jobs(self) -> None:
+    def test_process_pending_embedding_jobs_uses_provider_vectors_and_completes_jobs(self) -> None:
         from app.core.storage.embedding_store import (
-            build_local_text_embedding,
             process_pending_embedding_jobs,
             queue_embedding_job,
             register_embedding_model,
@@ -116,7 +115,7 @@ class EmbeddingStoreTests(unittest.TestCase):
         )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="memory_entry", source_id="mem_job")
         [chunk] = upsert_retrieval_chunks(
             document["document_id"],
@@ -124,9 +123,19 @@ class EmbeddingStoreTests(unittest.TestCase):
         )
         [job] = queue_embedding_job("memory_entry", "mem_job", model["embedding_model_id"])
 
-        report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
+        with patch(
+            "app.core.storage.embedding_store.embed_text_with_model_ref",
+            return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+        ) as embed:
+            report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
+
+        embed.assert_called_once_with(
+            model_ref="openai/text-embedding-3-small",
+            text="Embedding processor should index memory recall content.",
+            dimensions=3,
+        )
         results = search_embedding_vectors(
-            build_local_text_embedding("Embedding processor should index memory recall content.", dimensions=16),
+            [1.0, 0.0, 0.0],
             {"embedding_model_ref": model["embedding_model_id"], "source_kind": "memory_entry"},
             limit=1,
         )
@@ -188,7 +197,7 @@ class EmbeddingStoreTests(unittest.TestCase):
         )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=3)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="memory_entry", source_id="mem_1")
         chunks = upsert_retrieval_chunks(
             document["document_id"],
@@ -206,15 +215,14 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertGreater(results[0]["score"], results[1]["score"])
         self.assertEqual(results[0]["retrieval"]["mode"], "vector")
 
-    def test_hybrid_search_merges_fts_vector_metadata_filter_recency_and_records_audit(self) -> None:
+    def test_hybrid_search_uses_provider_query_vector_and_records_audit(self) -> None:
         from app.core.storage.embedding_store import (
-            build_local_text_embedding,
             register_embedding_model,
             upsert_embedding_vector,
         )
         from app.core.storage.retrieval_store import hybrid_search, upsert_retrieval_chunks, upsert_retrieval_document
 
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="buddy_message", source_id="msg_hybrid")
         chunks = upsert_retrieval_chunks(
             document["document_id"],
@@ -234,21 +242,31 @@ class EmbeddingStoreTests(unittest.TestCase):
         upsert_embedding_vector(
             "chunk_refund",
             model["embedding_model_id"],
-            build_local_text_embedding("refund audit evidence", dimensions=16),
+            [1.0, 0.0, 0.0],
             chunks[0]["content_hash"],
         )
         upsert_embedding_vector(
             "chunk_release",
             model["embedding_model_id"],
-            build_local_text_embedding("release migration", dimensions=16),
+            [0.0, 1.0, 0.0],
             chunks[1]["content_hash"],
         )
 
-        results = hybrid_search(
-            "refund audit",
-            filters={"source_kind": "buddy_message", "metadata_filter": {"topic": "refund"}},
-            embedding_model_ref=model["embedding_model_id"],
-            limit=5,
+        with patch(
+            "app.core.storage.retrieval_store.embed_text_with_model_ref",
+            return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+        ) as embed:
+            results = hybrid_search(
+                "refund audit",
+                filters={"source_kind": "buddy_message", "metadata_filter": {"topic": "refund"}},
+                embedding_model_ref=model["embedding_model_id"],
+                limit=5,
+            )
+
+        embed.assert_called_once_with(
+            model_ref="openai/text-embedding-3-small",
+            text="refund audit",
+            dimensions=3,
         )
 
         self.assertEqual([result["chunk_id"] for result in results], ["chunk_refund"])

@@ -269,6 +269,7 @@ test("NodeCard stretches primary editable surfaces when the canvas resizes the n
   );
   assert.match(inputNodeBodySource, /\.node-card__input-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(inputNodeBodySource, /\.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*resize:\s*none;/);
+  assert.match(agentNodeBodySource, /\.node-card__prompt-surface \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(agentNodeBodySource, /\.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*resize:\s*none;/);
   assert.match(outputNodeBodySource, /\.node-card__output-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(outputNodeBodySource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);

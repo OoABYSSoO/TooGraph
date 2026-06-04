@@ -1,5 +1,5 @@
 import { resolveNodeResize, type NodeResizeHandle } from "./nodeResize.ts";
-import type { GraphNodeSize, GraphPosition } from "@/types/node-system";
+import type { GraphNode, GraphNodeSize, GraphPosition } from "@/types/node-system";
 
 export const NODE_POINTER_ACTIVATION_THRESHOLD = 3;
 
@@ -21,6 +21,7 @@ export type CanvasNodeDragState = {
 
 export type CanvasNodeResizeDragState = {
   nodeId: string;
+  nodeKind?: GraphNode["kind"];
   pointerId: number;
   handle: NodeResizeHandle;
   startClientX: number;
@@ -241,6 +242,7 @@ export function resolveNodeResizeDragMove(input: {
     originSize: drag.originSize,
     deltaX: pointerDeltaX / scale,
     deltaY: pointerDeltaY / scale,
+    nodeKind: drag.nodeKind,
   });
 
   return {

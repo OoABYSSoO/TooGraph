@@ -101,6 +101,8 @@ export type SettingsPayload = {
     text_model_ref: string;
     video_model: string;
     video_model_ref: string;
+    embedding_model?: string;
+    embedding_model_ref?: string;
   };
   agent_runtime_defaults?: {
     model: string;
@@ -109,6 +111,7 @@ export type SettingsPayload = {
     temperature: number;
   };
   model_catalog?: {
+    default_embedding_model_ref?: string;
     providers: SettingsModelProvider[];
     provider_templates?: SettingsModelProvider[];
   };

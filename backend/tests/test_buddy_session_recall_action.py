@@ -277,12 +277,12 @@ class BuddySessionRecallActionTests(unittest.TestCase):
         )
 
     def test_discover_uses_embedding_model_ref_for_hybrid_memory_and_run_output_recall(self) -> None:
-        from app.core.storage.embedding_store import build_local_text_embedding, register_embedding_model, upsert_embedding_vector
+        from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector
         from app.core.storage.memory_store import create_memory_entry
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
         recall = _load_action_module()
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         memory = create_memory_entry(
             scope_kind="buddy_session",
             scope_id="session_embedding",
@@ -295,7 +295,7 @@ class BuddySessionRecallActionTests(unittest.TestCase):
         upsert_embedding_vector(
             str(memory_chunk["chunk_id"]),
             model["embedding_model_id"],
-            build_local_text_embedding(memory["content"], dimensions=16),
+            [1.0, 0.0, 0.0],
             str(memory_chunk["content_hash"]),
         )
         document = upsert_retrieval_document(
@@ -311,16 +311,20 @@ class BuddySessionRecallActionTests(unittest.TestCase):
         upsert_embedding_vector(
             output_chunk["chunk_id"],
             model["embedding_model_id"],
-            build_local_text_embedding(output_chunk["content"], dimensions=16),
+            [1.0, 0.0, 0.0],
             output_chunk["content_hash"],
         )
 
-        result = recall.buddy_session_recall(
-            mode="discover",
-            query="hybrid embedding 召回",
-            limit=5,
-            embedding_model_ref=model["embedding_model_id"],
-        )
+        with patch(
+            "app.core.storage.retrieval_store.embed_text_with_model_ref",
+            return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+        ):
+            result = recall.buddy_session_recall(
+                mode="discover",
+                query="hybrid embedding 召回",
+                limit=5,
+                embedding_model_ref=model["embedding_model_id"],
+            )
 
         self.assertEqual(result["success"], True)
         self.assertEqual(result["memories"][0]["memory_id"], memory["memory_id"])

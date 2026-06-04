@@ -1870,6 +1870,7 @@ function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, e
       const captureElement = applyNodeResizePointerDownSetup(nodeResizePointerDownAction, event);
       startNodeResizeDrag({
         nodeId,
+        nodeKind: node.kind,
         pointerId: event.pointerId,
         handle,
         startClientX: event.clientX,

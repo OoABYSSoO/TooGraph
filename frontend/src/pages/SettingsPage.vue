@@ -136,6 +136,7 @@ import { clampSettingsTemperature } from "./settingsPageModel.ts";
 type SettingsDraft = {
   text_model_ref: string;
   video_model_ref: string;
+  embedding_model_ref: string;
   thinking_enabled: boolean;
   thinking_level: AgentThinkingLevel;
   temperature: number;
@@ -155,6 +156,7 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
     text_model_ref: payload.agent_runtime_defaults?.model ?? payload.model.text_model_ref,
     video_model_ref: payload.model.video_model_ref,
+    embedding_model_ref: payload.model.embedding_model_ref ?? "",
     thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? false,
     thinking_level: normalizeThinkingLevel(payload.agent_runtime_defaults?.thinking_level),
     temperature: payload.agent_runtime_defaults?.temperature ?? 0.2,
@@ -290,6 +292,7 @@ async function handleSave() {
       model: {
         text_model_ref: draft.value.text_model_ref,
         video_model_ref: draft.value.video_model_ref,
+        embedding_model_ref: draft.value.embedding_model_ref,
       },
       agent_runtime_defaults: {
         model: draft.value.text_model_ref,

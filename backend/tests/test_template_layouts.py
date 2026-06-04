@@ -111,7 +111,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_autonomous_loop",
                 "buddy_autonomous_review",
                 "buddy_context_compaction",
+                "buddy_memory_recall",
                 "buddy_message_chunking_demo",
+                "buddy_message_retrieval_ingestion",
                 "ecommerce_review_mining_agent",
                 "embedding_maintenance",
                 "game_creative_factory",
@@ -132,7 +134,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_autonomous_loop",
                 "buddy_autonomous_review",
                 "buddy_context_compaction",
+                "buddy_memory_recall",
                 "buddy_message_chunking_demo",
+                "buddy_message_retrieval_ingestion",
                 "embedding_maintenance",
                 "knowledge_document_chunking_demo",
                 "toograph_page_operation_workflow",
@@ -700,6 +704,313 @@ class TemplateLayoutTests(unittest.TestCase):
                 validation = validate_graph(graph)
                 self.assertEqual([issue.model_dump() for issue in validation.issues], [])
                 self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_buddy_message_retrieval_ingestion_template_loads_messages_before_chunking(self) -> None:
+        template = load_template_record("buddy_message_retrieval_ingestion")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(
+            template["metadata"]["requiredTools"],
+            ["buddy_message_source_loader", "source_chunker", "retrieval_ingestion_writer"],
+        )
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            ["input_session_id"],
+        )
+        self.assertIn("session_id", states)
+        self.assertIn("source_package", states)
+        self.assertNotIn("source_kind", states)
+        self.assertNotIn("strategy", states)
+        self.assertNotIn("limits", states)
+
+        loader_node = nodes["load_buddy_messages"]
+        self.assertEqual(loader_node["kind"], "tool")
+        self.assertEqual(loader_node["config"]["toolKey"], "buddy_message_source_loader")
+        self.assertEqual(loader_node["config"]["staticInputs"], {"limit": 200, "after_client_order": -1})
+        self.assertEqual(
+            _read_contracts(loader_node["reads"]),
+            [
+                {
+                    "state": "session_id",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "buddy_message_source_loader",
+                        "fieldKey": "session_id",
+                        "managed": True,
+                    },
+                }
+            ],
+        )
+        self.assertEqual(loader_node["writes"], [{"state": "source_package", "mode": "replace"}])
+
+        chunker_node = nodes["chunk_source_material"]
+        self.assertEqual(chunker_node["config"]["toolKey"], "source_chunker")
+        self.assertEqual(
+            chunker_node["config"]["staticInputs"],
+            {
+                "source_kind": "buddy_messages",
+                "strategy": "conversation_turn_window",
+                "limits": {"max_chars": 2400, "max_turns_per_chunk": 3, "overlap_messages": 0},
+            },
+        )
+        self.assertEqual(
+            _read_contracts(chunker_node["reads"]),
+            [
+                {
+                    "state": "source_package",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "source_chunker",
+                        "fieldKey": "source",
+                        "managed": True,
+                    },
+                }
+            ],
+        )
+
+        writer_node = nodes["write_retrieval_ingestion"]
+        self.assertEqual(writer_node["config"]["toolKey"], "retrieval_ingestion_writer")
+        self.assertEqual(writer_node["config"]["staticInputs"]["source_kind"], "buddy_message")
+        self.assertEqual(writer_node["config"]["staticInputs"]["embedding_model_refs"], "")
+        self.assertEqual(
+            _read_contracts(writer_node["reads"]),
+            [
+                {
+                    "state": "source_package",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_ingestion_writer",
+                        "fieldKey": "source",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "chunks",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_ingestion_writer",
+                        "fieldKey": "chunks",
+                        "managed": True,
+                    },
+                },
+            ],
+        )
+        self.assertEqual(
+            template["edges"],
+            [
+                {"source": "input_session_id", "target": "load_buddy_messages"},
+                {"source": "load_buddy_messages", "target": "chunk_source_material"},
+                {"source": "chunk_source_material", "target": "write_retrieval_ingestion"},
+                {"source": "write_retrieval_ingestion", "target": "output_ingestion_report"},
+            ],
+        )
+        self.assertEqual(
+            template["metadata"]["outputContract"],
+            [
+                {
+                    "state": "ingestion_report",
+                    "role": "retrieval_ingestion_report",
+                    "label": "Buddy message retrieval ingestion",
+                },
+                {
+                    "state": "indexed_chunks",
+                    "role": "retrieval_chunks",
+                    "label": "Indexed Buddy message chunks",
+                },
+                {
+                    "state": "embedding_jobs",
+                    "role": "embedding_jobs",
+                    "label": "Queued Buddy message embedding jobs",
+                },
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_buddy_message_retrieval_ingestion",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_buddy_memory_recall_template_loops_over_session_recall_and_returns_evidence_package(self) -> None:
+        template = load_template_record("buddy_memory_recall")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
+        self.assertEqual(metadata["permissions"], ["buddy_session_read"])
+        self.assertIs(metadata["capabilityDiscoverableDefault"], True)
+        self.assertEqual(metadata["capability"]["granularity"], "workflow")
+        self.assertIn("buddy_memory_recall", metadata["capability"]["covers"])
+        self.assertIn("evidence_package", metadata["capability"]["produces"])
+        self.assertIn("key_quotes", metadata["capability"]["produces"])
+
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            ["input_recall_goal"],
+        )
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "condition"],
+            ["should_continue_recall"],
+        )
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_evidence_package"],
+        )
+        for state_key in [
+            "recall_goal",
+            "recall_plan",
+            "recall_request",
+            "session_recall_context",
+            "recalled_sessions",
+            "recall_iteration_review",
+            "evidence_package",
+            "key_quotes",
+            "source_refs",
+            "coverage",
+        ]:
+            self.assertIn(state_key, states)
+        self.assertEqual(states["evidence_package"]["type"], "json")
+        self.assertEqual(states["key_quotes"]["type"], "json")
+        self.assertEqual(states["source_refs"]["type"], "json")
+        self.assertEqual(states["coverage"]["type"], "text")
+
+        plan_node = nodes["plan_recall_request"]
+        self.assertEqual(plan_node["kind"], "agent")
+        self.assertIn("buddy_session_recall", plan_node["config"]["taskInstruction"])
+        self.assertIn("current_session_id", plan_node["config"]["taskInstruction"])
+        self.assertEqual(
+            {binding["state"]: binding["mode"] for binding in plan_node["writes"]},
+            {"recall_plan": "replace", "recall_request": "replace"},
+        )
+
+        recall_node = nodes["run_session_recall"]
+        self.assertEqual(recall_node["kind"], "agent")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
+        self.assertEqual(
+            _read_contracts(recall_node["reads"]),
+            [
+                {
+                    "state": "recall_request",
+                    "required": True,
+                    "binding": {
+                        "kind": "action_input",
+                        "actionKey": "buddy_session_recall",
+                        "toolKey": "",
+                        "fieldKey": "recall_request",
+                        "managed": True,
+                    },
+                },
+                {"state": "recall_goal", "required": True},
+                {"state": "recall_iteration_review", "required": False},
+            ],
+        )
+        self.assertEqual(
+            recall_node["config"]["actionBindings"],
+            [
+                {
+                    "actionKey": "buddy_session_recall",
+                    "outputMapping": {
+                        "success": "buddy_session_recall_success",
+                        "session_recall_context": "session_recall_context",
+                        "sessions": "recalled_sessions",
+                        "memories": "recalled_memories",
+                        "run_outputs": "recalled_run_outputs",
+                        "context_package": "recall_context_package",
+                        "result": "buddy_session_recall_result",
+                    },
+                }
+            ],
+        )
+
+        review_node = nodes["review_recall_iteration"]
+        self.assertEqual(review_node["kind"], "agent")
+        self.assertIn("needs_more_recall", review_node["config"]["taskInstruction"])
+        self.assertIn("next_recall_request", review_node["config"]["taskInstruction"])
+        self.assertEqual(
+            {binding["state"]: binding["mode"] for binding in review_node["writes"]},
+            {"recall_iteration_review": "replace", "recall_request": "replace"},
+        )
+
+        condition_node = nodes["should_continue_recall"]
+        self.assertEqual(condition_node["config"]["branches"], ["true", "false", "exhausted"])
+        self.assertEqual(condition_node["config"]["loopLimit"], 3)
+        self.assertEqual(condition_node["config"]["rule"]["source"], "$state.recall_iteration_review.needs_more_recall")
+        self.assertEqual(condition_node["config"]["rule"]["operator"], "==")
+        self.assertIs(condition_node["config"]["rule"]["value"], True)
+        self.assertEqual(condition_node["config"]["branchMapping"], {"true": "true", "false": "false"})
+
+        assemble_node = nodes["assemble_evidence_package"]
+        self.assertEqual(assemble_node["kind"], "agent")
+        self.assertIn("key_quotes", assemble_node["config"]["taskInstruction"])
+        self.assertIn("source_refs", assemble_node["config"]["taskInstruction"])
+        self.assertIn("coverage", assemble_node["config"]["taskInstruction"])
+        self.assertEqual(
+            {binding["state"]: binding["mode"] for binding in assemble_node["writes"]},
+            {
+                "evidence_package": "replace",
+                "key_quotes": "replace",
+                "source_refs": "replace",
+                "coverage": "replace",
+            },
+        )
+        self.assertEqual(
+            template["conditional_edges"],
+            [
+                {
+                    "source": "should_continue_recall",
+                    "branches": {
+                        "true": "run_session_recall",
+                        "false": "assemble_evidence_package",
+                        "exhausted": "assemble_evidence_package",
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            metadata["outputContract"],
+            [
+                {"state": "evidence_package", "role": "memory_recall_evidence", "label": "Buddy memory recall evidence package"},
+                {"state": "key_quotes", "role": "key_quotes", "label": "Key recalled source quotes"},
+                {"state": "source_refs", "role": "source_refs", "label": "Recalled source references"},
+                {"state": "coverage", "role": "coverage", "label": "Recall coverage"},
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_buddy_memory_recall",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
 
     def test_advanced_web_research_loop_contract(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "advanced_web_research_loop")
@@ -2107,7 +2418,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["origin"], "buddy")
         self.assertEqual(template["metadata"]["role"], "buddy_autonomous_loop")
         self.assertEqual(plan.requirements.runtime_entry_nodes, ["load_history_context"])
-        self.assertEqual(template["metadata"]["requiredActions"], ["toograph_capability_selector", "buddy_session_recall"])
+        self.assertEqual(template["metadata"]["requiredActions"], ["toograph_capability_selector"])
+        self.assertEqual(template["metadata"]["requiredTemplates"], ["buddy_memory_recall"])
         self.assertEqual(
             template["metadata"]["requiredTools"],
             ["buddy_history_context_loader", "buddy_context_pressure_check"],
@@ -2328,10 +2640,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("context_compaction_report", selector_node["config"]["taskInstruction"])
         self.assertIn("capability.kind=none", selector_node["config"]["taskInstruction"])
         self.assertIn("public_response、show_result_package 和 needs_capability/capability", selector_node["config"]["taskInstruction"])
-        self.assertIn("buddy_session_recall", selector_node["config"]["taskInstruction"])
+        self.assertIn("buddy_memory_recall", selector_node["config"]["taskInstruction"])
+        self.assertIn("evidence_package", selector_node["config"]["taskInstruction"])
+        self.assertIn("source_refs", selector_node["config"]["taskInstruction"])
+        self.assertNotIn("只有需要召回更早会话时才使用 buddy_session_recall", selector_node["config"]["taskInstruction"])
         self.assertIn("conversation_history metadata", selector_node["config"]["taskInstruction"])
         self.assertIn(
-            "buddy_session_recall",
+            "buddy_memory_recall",
+            selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
+        )
+        self.assertIn(
+            "历史证据",
             selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
         )
 
@@ -2343,7 +2662,8 @@ class TemplateLayoutTests(unittest.TestCase):
             self.assertNotIn(read.get("state"), {"capability_trace", "current_session_id"})
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertIn("selected_capability.kind=action/subgraph/tool", execute_node["config"]["taskInstruction"])
-        self.assertIn("buddy_session_recall", execute_node["config"]["taskInstruction"])
+        self.assertIn("buddy_memory_recall", execute_node["config"]["taskInstruction"])
+        self.assertIn("recall_goal", execute_node["config"]["taskInstruction"])
         self.assertNotIn("capability_trace", execute_node["config"]["taskInstruction"])
         self.assertIn("result_package", execute_node["config"]["taskInstruction"])
 

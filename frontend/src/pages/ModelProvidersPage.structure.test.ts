@@ -86,6 +86,20 @@ test("ModelProvidersPage filters default runtime selectors to chat-capable model
   assert.match(pageSource, /const availableRefs = new Set\(configuredChatModelOptions\.value\.map/);
 });
 
+test("ModelProvidersPage adds a right-side embedding model selector", () => {
+  assert.match(pageSource, /settings\.defaultEmbeddingRuntime/);
+  assert.match(pageSource, /settings\.defaultEmbeddingModel/);
+  assert.match(pageSource, /v-model="draft\.embedding_model_ref"/);
+  assert.match(pageSource, /const configuredEmbeddingModels = computed/);
+  assert.match(pageSource, /const configuredEmbeddingModelOptions = computed/);
+  assert.match(pageSource, /modelHasCapability\(provider, modelName, "embedding"\)/);
+  assert.match(pageSource, /:disabled="configuredEmbeddingModelOptions\.length === 0"/);
+  assert.match(pageSource, /v-for="option in configuredEmbeddingModelOptions"/);
+  assert.match(pageSource, /embedding_model_ref: payload\.model\.embedding_model_ref \?\? ""/);
+  assert.match(pageSource, /embedding_model_ref: draft\.value\.embedding_model_ref/);
+  assert.match(pageSource, /settings\.noConfiguredEmbeddingModels/);
+});
+
 test("ModelProvidersPage discovers model options through add model instead of separate refresh controls", () => {
   assert.doesNotMatch(pageSource, /allow-create/);
   assert.doesNotMatch(pageSource, /model-providers-page__refresh-icon-button/);

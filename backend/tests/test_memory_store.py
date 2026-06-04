@@ -116,7 +116,7 @@ class MemoryStoreTests(unittest.TestCase):
         from app.core.storage.embedding_store import register_embedding_model
         from app.core.storage.memory_store import create_memory_entry, update_memory_entry
 
-        register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         memory = create_memory_entry(
             scope_kind="buddy_session",
             scope_id="session_1",

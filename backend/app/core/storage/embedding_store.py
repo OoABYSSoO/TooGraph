@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import re
 from typing import Any
 
 from app.core.storage.database import get_connection
@@ -270,15 +269,11 @@ def process_pending_embedding_jobs(model_ref: str = "", limit: int = 50) -> dict
             model_name = str(row["model"] or "")
             content = str(row["content"] or "")
             dimensions = int(row["dimensions"] or 0)
-            if _is_local_embedding_model(provider_key, model_name):
-                vector = build_local_text_embedding(content, dimensions=dimensions)
-                embedding_meta = {"mode": "local_hash", "provider_id": provider_key, "model": model_name}
-            else:
-                vector, embedding_meta = embed_text_with_model_ref(
-                    model_ref=f"{provider_key}/{model_name}",
-                    text=content,
-                    dimensions=dimensions,
-                )
+            vector, embedding_meta = embed_text_with_model_ref(
+                model_ref=f"{provider_key}/{model_name}",
+                text=content,
+                dimensions=dimensions,
+            )
             vector_record = upsert_embedding_vector(
                 str(row["chunk_id"] or ""),
                 str(row["embedding_model_id"] or ""),
@@ -430,21 +425,6 @@ def search_embedding_vectors(
     return ranked[:normalized_limit]
 
 
-def build_local_text_embedding(text: str, *, dimensions: int) -> list[float]:
-    normalized_dimensions = _bounded_int(dimensions, default=384, minimum=1, maximum=16_384)
-    vector = [0.0 for _ in range(normalized_dimensions)]
-    for token in _tokenize_for_embedding(text):
-        digest = hashlib.sha256(token.encode("utf-8")).digest()
-        index = int.from_bytes(digest[:4], "big") % normalized_dimensions
-        sign = 1.0 if digest[4] % 2 == 0 else -1.0
-        weight = 1.0 + min(len(token), 16) / 16
-        vector[index] += sign * weight
-    magnitude = math.sqrt(sum(value * value for value in vector))
-    if not magnitude:
-        return vector
-    return [round(value / magnitude, 8) for value in vector]
-
-
 def _vector_search_result_from_row(row: Any, query_vector: list[float]) -> dict[str, Any]:
     stored_vector = _json_loads(row["vector_json"], [])
     vector_score = _cosine_similarity(query_vector, _normalize_query_vector(stored_vector))
@@ -539,12 +519,6 @@ def _normalize_vector(vector: list[float], *, dimensions: int) -> list[float]:
     return normalized
 
 
-def _is_local_embedding_model(provider_key: str, model: str) -> bool:
-    normalized_provider = str(provider_key or "").strip().lower()
-    normalized_model = str(model or "").strip().lower()
-    return normalized_provider == "local-hash" or normalized_model.startswith("hashing")
-
-
 def _normalize_query_vector(vector: Any) -> list[float]:
     return [float(value) for value in vector] if isinstance(vector, list) else []
 
@@ -557,12 +531,6 @@ def _cosine_similarity(left: list[float], right: list[float]) -> float:
     if not left_norm or not right_norm:
         return 0.0
     return sum(a * b for a, b in zip(left, right, strict=False)) / (left_norm * right_norm)
-
-
-def _tokenize_for_embedding(text: str) -> list[str]:
-    normalized = str(text or "").lower()
-    tokens = re.findall(r"[\w.-]+|[\u4e00-\u9fff]", normalized)
-    return [token for token in tokens if token.strip()]
 
 
 def _metadata_matches(metadata: dict[str, Any], filters: dict[str, Any]) -> bool:

@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from app.core.storage.database import get_connection
+from app.tools.model_provider_client import embed_text_with_model_ref
 from app.tools.model_provider_client import rerank_documents_with_model_ref
 
 
@@ -213,7 +214,6 @@ def hybrid_search(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     from app.core.storage.embedding_store import (
-        build_local_text_embedding,
         resolve_embedding_model,
         search_embedding_vectors,
     )
@@ -227,7 +227,11 @@ def hybrid_search(
     vector_results: list[dict[str, Any]] = []
     if str(embedding_model_ref or "").strip():
         model = resolve_embedding_model(embedding_model_ref)
-        query_vector = build_local_text_embedding(normalized_query, dimensions=int(model["dimensions"]))
+        query_vector, _embedding_meta = embed_text_with_model_ref(
+            model_ref=f"{model['provider_key']}/{model['model']}",
+            text=normalized_query,
+            dimensions=int(model["dimensions"]),
+        )
         vector_results = search_embedding_vectors(
             query_vector,
             {**resolved_filters, "embedding_model_ref": model["embedding_model_id"]},

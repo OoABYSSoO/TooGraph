@@ -361,6 +361,7 @@ test("EditorCanvas exposes invisible corner hotzones for real node resizing", ()
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
   assert.match(componentSource, /case "ignore-active-connection":[\s\S]*return;/);
   assert.match(componentSource, /case "start-resize":[\s\S]*startNodeResizeDrag\(\{/);
+  assert.match(componentSource, /case "start-resize":[\s\S]*startNodeResizeDrag\(\{[\s\S]*nodeKind:\s*node\.kind,/);
   assert.match(componentSource, /function isNodeResizeHotzoneEnabled\(\) \{[\s\S]*return !isGraphEditingLocked\(\) && !activeConnection\.value;/);
   assert.match(componentSource, /if \(handleNodeDragResizePointerMove\(event\)\) \{[\s\S]*return;/);
   assert.match(canvasNodeDragResizeSource, /const resizeResult = resolveNodeResizeDragMove\(\{[\s\S]*drag: nodeResizeDrag\.value,[\s\S]*viewportScale: input\.viewportScale\(\),/);

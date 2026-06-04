@@ -353,22 +353,39 @@ TooGraph 的目标翻译：
 - 用 revision、command record、review run、improvement candidate 表达可审计性和回滚。
 - 用 source refs、confidence、risk_flags、skipped_reason 表达证据边界。
 
-## 召回应前置为显式图阶段
+## 召回应作为高优先级动态子图
 
-Buddy 生成回复前，理想上应有显式召回规划，而不是只在能力选择时偶尔调用 `buddy_session_recall`。
+Buddy 主回复链路不固定增加一个“是否召回”前置节点。第一个 Buddy LLM 节点仍然同时负责可见回复和能力选择；当问题依赖历史决策、长期偏好、压缩前上下文、旧会话原文或来源引用时，它应优先选择 `buddy_memory_recall` 子图能力。
 
-理想流程：
+主流程：
 
 ```mermaid
 flowchart TD
-  A["User Message"] --> B["Recall Need Planner"]
-  B -->|无需召回| C["Buddy Reply / Capability Selection"]
-  B -->|需要召回| D["Retrieval Query 图"]
-  D --> E["Hybrid Search"]
-  E --> F["Rerank"]
-  F --> G["Context Package with refs"]
-  G --> C
+  A["User Message"] --> B["Buddy Reply / Capability Selection"]
+  B -->|无需召回| C["Final Reply"]
+  B -->|需要历史证据| D["buddy_memory_recall 子图"]
+  D --> E["Evidence Package with refs"]
+  E --> B
 ```
+
+`buddy_session_recall` Action 仍是只读检索 primitive，负责一次 browse、discover 或 scroll。`buddy_memory_recall` 子图负责把一次或多次检索变成可用证据包：
+
+```mermaid
+flowchart TD
+  A["Recall Goal"] --> B["Plan recall request"]
+  B --> C["buddy_session_recall"]
+  C --> D["Review evidence coverage"]
+  D -->|needs_more_recall| C
+  D -->|enough / partial / exhausted| E["Assemble evidence_package"]
+```
+
+召回子图职责：
+
+- 改写或拆分召回 query。
+- 在命中不足时改用 browse、discover 或 scroll 展开上下文。
+- 去重、排序并提取关键原文。
+- 保留 source refs、coverage、missing_evidence 和 answer_notes。
+- 控制循环预算，默认最多 3 轮。
 
 召回分层：
 
@@ -407,14 +424,14 @@ flowchart TD
 
 - 用一个模型生成 chunk vector，用另一个模型生成 query vector 后直接比较。
 - 混合不同维度的向量。
-- 静默把 local hash embedding 当成真实语义 embedding。
+- 注册或使用 deterministic/hash fallback 作为 embedding 模型。
 - 内容变化后继续复用旧 content_hash 的向量。
 - 删除 source 后留下不可解释的孤儿向量。
 
 允许：
 
 - 同一 chunk 为多个 embedding 模型保存多套向量。
-- 没有真实 embedding 模型时使用 local deterministic embedding 作为开发 fallback。
+- 没有真实 embedding 模型时退化为 lexical retrieval，或让 embedding job 明确失败/等待模型配置。
 - 先落 FTS/trigram，再异步补 vector。
 - query 时在无向量条件下退化为 lexical retrieval，并明确记录 fallback。
 
@@ -485,13 +502,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["User Message"] --> B["Recall Planner"]
-  B --> C["Retrieval Query 图"]
-  C --> D["Hybrid Search"]
-  D --> E["Rerank"]
-  E --> F["Context Package"]
-  F --> G["Buddy Reply / Business Agent"]
-  G --> H["Output with Citations"]
+  A["User Message"] --> B["Buddy Reply / Capability Selection"]
+  B -->|select subgraph| C["buddy_memory_recall"]
+  C --> D["Plan / Recall / Review loop"]
+  D --> E["Evidence Package"]
+  E --> B
+  B --> F["Output with bounded citations"]
 ```
 
 ## 演进路线
@@ -501,7 +517,7 @@ flowchart TD
 - `buddy_message`、`memory_entry` 继续投影到 retrieval。
 - `buddy_session_summary` 升级为 retrieval source。
 - session summary 更新后创建 embedding jobs。
-- Buddy 回复前增加显式 recall planning 和 Retrieval Query 子图。
+- Buddy 能力选择中加入高优先级 `buddy_memory_recall` 动态子图；子图内部包含显式 recall planning、循环检索和 evidence package 整理。
 - 后台复盘从 every completed run 调整为 trigger/cadence driven graph run。
 
 第二阶段：知识库 ingestion 闭环。

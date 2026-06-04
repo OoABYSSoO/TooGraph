@@ -68,8 +68,26 @@ test("resolveNodeResize clamps node size while preserving the fixed corner", () 
   });
 });
 
+test("resolveNodeResize lets agent nodes grow taller than the shared resize maximum", () => {
+  const result = resolveNodeResize({
+    handle: "se",
+    originPosition: { x: 120, y: 80 },
+    originSize: { width: 460, height: 720 },
+    deltaX: 20,
+    deltaY: 420,
+    nodeKind: "agent",
+  });
+
+  assert.deepEqual(result, {
+    position: { x: 120, y: 80 },
+    size: { width: 480, height: 1140 },
+  });
+});
+
 test("normalizeNodeSize accepts finite positive dimensions only", () => {
   assert.deepEqual(normalizeNodeSize({ width: 512.4, height: 333.6 }), { width: 512, height: 334 });
+  assert.deepEqual(normalizeNodeSize({ width: 512.4, height: 1200 }, "agent"), { width: 512, height: 1200 });
+  assert.deepEqual(normalizeNodeSize({ width: 512.4, height: 1200 }, "input"), { width: 512, height: MAX_NODE_RESIZE_HEIGHT });
   assert.equal(normalizeNodeSize({ width: 0, height: 333 }), null);
   assert.equal(normalizeNodeSize({ width: 512, height: Number.NaN }), null);
   assert.equal(normalizeNodeSize(null), null);

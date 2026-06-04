@@ -13,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.buddy import store
 from app.buddy.fake_history import FakeHistoryOptions, build_fake_history_dataset, seed_fake_history
 from app.core.storage import database
-from app.core.storage.embedding_store import register_embedding_model
 
 
 class BuddyFakeHistoryTests(unittest.TestCase):
@@ -23,6 +22,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
         self._patchers = [
             patch("app.core.storage.database.DATA_DIR", data_dir),
             patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            patch("app.core.storage.settings_store.load_app_settings", return_value={}),
         ]
         for patcher in self._patchers:
             patcher.start()
@@ -58,13 +58,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
                 self.assertEqual(message["metadata"]["synthetic_batch_id"], "test_batch")
                 self.assertEqual(message["metadata"]["synthetic"], True)
 
-    def test_seed_fake_history_uses_buddy_store_without_retrieval_projection(self) -> None:
-        register_embedding_model(
-            provider_key="local",
-            model="hashing-v1",
-            dimensions=64,
-            embedding_model_id="emb_test_hashing",
-        )
+    def test_seed_fake_history_uses_buddy_store_and_projects_messages_to_retrieval(self) -> None:
         result = seed_fake_history(
             FakeHistoryOptions(
                 batch_id="write_test",
@@ -77,7 +71,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
 
         self.assertEqual(result["session_count"], 2)
         self.assertEqual(result["message_count"], 4)
-        self.assertEqual(result["retrieval_chunk_count"], 0)
+        self.assertEqual(result["retrieval_chunk_count"], 4)
         self.assertEqual(result["embedding_job_count"], 0)
 
         sessions = store.list_chat_sessions(include_deleted=True)
@@ -94,7 +88,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertEqual(buddy_messages, 4)
-        self.assertEqual(retrieval_chunks, 0)
+        self.assertEqual(retrieval_chunks, 4)
         self.assertEqual(embedding_jobs, 0)
 
 

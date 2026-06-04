@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "buddy_message_source_loader",
+  "name": "Buddy Message Source Loader",
+  "description": "从 Buddy 历史会话读取消息，并整理成 source_chunker 可直接使用的规范化消息来源包；只读取数据，不切片、不写入检索库、不排队 embedding。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "buddy_session_read"
+  ],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputPresentation": {
+    "session_id": {
+      "mode": "state"
+    },
+    "limit": {
+      "mode": "static",
+      "control": "number",
+      "default": 200
+    },
+    "after_client_order": {
+      "mode": "static",
+      "control": "number",
+      "default": -1
+    }
+  },
+  "inputSchema": [
+    {
+      "key": "session_id",
+      "name": "Session ID",
+      "valueType": "text",
+      "description": "要读取的 Buddy 会话 ID。"
+    },
+    {
+      "key": "limit",
+      "name": "Limit",
+      "valueType": "number",
+      "description": "本次最多读取多少条消息。"
+    },
+    {
+      "key": "after_client_order",
+      "name": "After Client Order",
+      "valueType": "number",
+      "description": "只读取 client_order 大于该值的消息；默认 -1 会包含从 0 开始的完整会话。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "source_package",
+      "name": "Source Package",
+      "valueType": "json",
+      "description": "规范化 Buddy 消息来源包，可连接到 source_chunker 的 source 输入。"
+    }
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Buddy 消息来源加载器",
+      "description": "从 Buddy 历史会话读取消息，并整理成 source_chunker 可直接使用的规范化消息来源包；只读取数据，不切片、不写入检索库、不排队 embedding。"
+    },
+    "en-US": {
+      "name": "Buddy Message Source Loader",
+      "description": "Loads Buddy chat messages into a normalized source package for source_chunker without chunking, writing retrieval storage, or queueing embeddings."
+    }
+  }
+}

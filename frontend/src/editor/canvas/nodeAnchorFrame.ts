@@ -15,7 +15,7 @@ export function buildNodeAnchorFrame(
     position?: GraphPosition;
   } = {},
 ): NodeFrame {
-  const size = options.size ?? normalizeNodeSize(node.ui.size) ?? resolveFallbackNodeSize(node);
+  const size = options.size ?? normalizeNodeSize(node.ui.size, node.kind) ?? resolveFallbackNodeSize(node);
   const position = options.position ?? node.ui.position;
   return {
     x: position.x,

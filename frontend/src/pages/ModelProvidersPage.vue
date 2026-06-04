@@ -58,6 +58,29 @@
           </article>
 
           <article class="model-providers-page__panel">
+            <h3>{{ t("settings.defaultEmbeddingRuntime") }}</h3>
+            <label>
+              <span>{{ t("settings.defaultEmbeddingModel") }}</span>
+              <ElSelect
+                v-model="draft.embedding_model_ref"
+                class="model-providers-page__select toograph-select"
+                :teleported="false"
+                popper-class="toograph-select-popper"
+                :disabled="configuredEmbeddingModelOptions.length === 0"
+                @change="handleRuntimeDraftChange"
+              >
+                <ElOption v-for="option in configuredEmbeddingModelOptions" :key="option.value" :label="option.label" :value="option.value" />
+              </ElSelect>
+            </label>
+            <div v-if="configuredEmbeddingModelOptions.length === 0" class="model-providers-page__hint">
+              {{ t("settings.noConfiguredEmbeddingModels") }}
+            </div>
+            <div v-else class="model-providers-page__hint">
+              {{ t("settings.defaultEmbeddingModelHint") }}
+            </div>
+          </article>
+
+          <article class="model-providers-page__panel">
             <h3>{{ t("settings.agentRuntime") }}</h3>
             <label>
               <span>{{ t("settings.defaultThinking") }}</span>
@@ -980,6 +1003,7 @@ import {
 type SettingsDraft = {
   text_model_ref: string;
   video_model_ref: string;
+  embedding_model_ref: string;
   thinking_enabled: boolean;
   thinking_level: AgentThinkingLevel;
   temperature: number;
@@ -1066,6 +1090,7 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
     text_model_ref: payload.agent_runtime_defaults?.model ?? payload.model.text_model_ref,
     video_model_ref: payload.model.video_model_ref,
+    embedding_model_ref: payload.model.embedding_model_ref ?? "",
     thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? false,
     thinking_level: normalizeThinkingLevel(payload.agent_runtime_defaults?.thinking_level),
     temperature: payload.agent_runtime_defaults?.temperature ?? 0.2,
@@ -1253,6 +1278,22 @@ const configuredChatModelOptions = computed(() =>
   Array.from(
     new Map(
       configuredChatModels.value.map((model) => [
+        model.model_ref,
+        {
+          value: model.model_ref,
+          label: modelDisplayLookup.value[model.model_ref] || model.model_ref,
+        },
+      ]),
+    ).values(),
+  ),
+);
+const configuredEmbeddingModels = computed(() =>
+  configuredModels.value.filter(({ provider, model: modelName }) => modelHasCapability(provider, modelName, "embedding")),
+);
+const configuredEmbeddingModelOptions = computed(() =>
+  Array.from(
+    new Map(
+      configuredEmbeddingModels.value.map((model) => [
         model.model_ref,
         {
           value: model.model_ref,
@@ -1554,16 +1595,27 @@ function ensureCodexProviderDraft() {
 }
 
 function alignDefaultModelsToProviderSelection() {
-  if (!draft.value || configuredChatModelOptions.value.length === 0) {
+  if (!draft.value) {
     return;
   }
-  const availableRefs = new Set(configuredChatModelOptions.value.map((option) => option.value));
-  const fallbackRef = configuredChatModelOptions.value[0].value;
-  if (!availableRefs.has(draft.value.text_model_ref)) {
-    draft.value.text_model_ref = fallbackRef;
+  if (configuredChatModelOptions.value.length > 0) {
+    const availableRefs = new Set(configuredChatModelOptions.value.map((option) => option.value));
+    const fallbackRef = configuredChatModelOptions.value[0].value;
+    if (!availableRefs.has(draft.value.text_model_ref)) {
+      draft.value.text_model_ref = fallbackRef;
+    }
+    if (!availableRefs.has(draft.value.video_model_ref)) {
+      draft.value.video_model_ref = fallbackRef;
+    }
   }
-  if (!availableRefs.has(draft.value.video_model_ref)) {
-    draft.value.video_model_ref = fallbackRef;
+  if (configuredEmbeddingModelOptions.value.length === 0) {
+    draft.value.embedding_model_ref = "";
+    return;
+  }
+  const embeddingAvailableRefs = new Set(configuredEmbeddingModelOptions.value.map((option) => option.value));
+  const embeddingFallbackRef = configuredEmbeddingModelOptions.value[0].value;
+  if (!embeddingAvailableRefs.has(draft.value.embedding_model_ref)) {
+    draft.value.embedding_model_ref = embeddingFallbackRef;
   }
 }
 
@@ -1659,6 +1711,7 @@ async function persistSettings() {
       model: {
         text_model_ref: draft.value.text_model_ref,
         video_model_ref: draft.value.video_model_ref,
+        embedding_model_ref: draft.value.embedding_model_ref,
       },
       agent_runtime_defaults: {
         model: draft.value.text_model_ref,

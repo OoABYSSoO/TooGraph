@@ -27,6 +27,7 @@ class BuddyStoreTests(unittest.TestCase):
         self._patchers = [
             patch("app.core.storage.database.DATA_DIR", data_dir),
             patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            patch("app.core.storage.settings_store.load_app_settings", return_value={}),
         ]
         for patcher in self._patchers:
             patcher.start()
@@ -286,24 +287,19 @@ class BuddyStoreTests(unittest.TestCase):
                         "SELECT run_id FROM buddy_message_run_refs WHERE message_id = ?",
                         (assistant_message["message_id"],),
                     ).fetchone()
-                    retrieval_document_count = connection.execute(
+                    retrieval_rows = connection.execute(
                         """
-                        SELECT COUNT(*)
-                        FROM retrieval_documents
-                        WHERE source_kind = 'buddy_message'
-                          AND source_id IN (?, ?)
+                        SELECT d.source_kind, d.source_id, d.source_revision_id, d.title,
+                               d.scope_json, d.metadata_json,
+                               c.chunk_id, c.source_locator_json, c.content, c.metadata_json
+                        FROM retrieval_documents AS d
+                        JOIN retrieval_chunks AS c ON c.document_id = d.document_id
+                        WHERE d.source_kind = 'buddy_message'
+                          AND d.source_id IN (?, ?)
+                        ORDER BY d.source_id ASC
                         """,
                         (user_message["message_id"], assistant_message["message_id"]),
-                    ).fetchone()[0]
-                    retrieval_chunk_count = connection.execute(
-                        """
-                        SELECT COUNT(*)
-                        FROM retrieval_chunks
-                        WHERE source_kind = 'buddy_message'
-                          AND source_id IN (?, ?)
-                        """,
-                        (user_message["message_id"], assistant_message["message_id"]),
-                    ).fetchone()[0]
+                    ).fetchall()
 
         self.assertEqual(user_message["role"], "user")
         self.assertEqual(assistant_message["run_id"], "run_1")
@@ -317,8 +313,116 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(all_after_delete[0]["session_id"], session["session_id"])
         self.assertEqual(revision_count, 2)
         self.assertEqual(run_ref[0], "run_1")
-        self.assertEqual(retrieval_document_count, 0)
-        self.assertEqual(retrieval_chunk_count, 0)
+        self.assertEqual(len(retrieval_rows), 2)
+        retrieval_by_source_id = {str(row[1]): row for row in retrieval_rows}
+        user_retrieval = retrieval_by_source_id[user_message["message_id"]]
+        assistant_retrieval = retrieval_by_source_id[assistant_message["message_id"]]
+        self.assertEqual(user_retrieval[0], "buddy_message")
+        self.assertTrue(str(user_retrieval[2]).startswith("msgrev_"))
+        self.assertIn("user message", user_retrieval[3])
+        self.assertEqual(json.loads(user_retrieval[4])["session_id"], session["session_id"])
+        self.assertEqual(json.loads(user_retrieval[5])["role"], "user")
+        self.assertTrue(str(user_retrieval[6]).startswith(f"buddy_message:{user_message['message_id']}:"))
+        self.assertEqual(json.loads(user_retrieval[7])["message_id"], user_message["message_id"])
+        self.assertIn("当前图的结构", user_retrieval[8])
+        self.assertEqual(json.loads(user_retrieval[9])["role"], "user")
+        self.assertEqual(json.loads(assistant_retrieval[5])["run_id"], "run_1")
+        self.assertEqual(json.loads(assistant_retrieval[9])["include_in_context"], False)
+
+    def test_append_chat_message_queues_embedding_jobs_when_model_refs_are_explicit(self) -> None:
+        from app.core.storage.embedding_store import register_embedding_model
+
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="测试创建会话")
+                message = store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "user",
+                        "content": "这条消息应该排队生成 embedding job。",
+                        "embedding_model_refs": [model["embedding_model_id"]],
+                    },
+                    changed_by="user",
+                    change_reason="测试追加用户消息",
+                )
+
+                with closing(sqlite3.connect(database.DB_PATH)) as connection:
+                    jobs = connection.execute(
+                        """
+                        SELECT source_kind, source_id, chunk_id, embedding_model_id, status
+                        FROM embedding_jobs
+                        WHERE source_kind = 'buddy_message' AND source_id = ?
+                        """,
+                        (message["message_id"],),
+                    ).fetchall()
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0][0], "buddy_message")
+        self.assertEqual(jobs[0][1], message["message_id"])
+        self.assertTrue(str(jobs[0][2]).startswith(f"buddy_message:{message['message_id']}:"))
+        self.assertEqual(jobs[0][3], model["embedding_model_id"])
+        self.assertEqual(jobs[0][4], "pending")
+
+    def test_append_chat_message_queues_default_embedding_model_from_settings(self) -> None:
+        embedding_settings = {
+            "embedding_model_ref": "local/text-embedding-qwen3-embedding-8b",
+            "model_providers": {
+                "local": {
+                    "label": "Local",
+                    "transport": "openai-compatible",
+                    "base_url": "http://127.0.0.1:1234/v1",
+                    "enabled": True,
+                    "models": [
+                        {
+                            "model": "text-embedding-qwen3-embedding-8b",
+                            "label": "text-embedding-qwen3-embedding-8b",
+                            "capabilities": {"chat": False, "embedding": True},
+                            "embedding": {"dimensions": 4096},
+                        }
+                    ],
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                with patch("app.core.storage.settings_store.load_app_settings", return_value=embedding_settings):
+                    session = store.create_chat_session({}, changed_by="user", change_reason="test session")
+                    message = store.append_chat_message(
+                        session["session_id"],
+                        {
+                            "role": "user",
+                            "content": "Default embedding model should queue this message after retrieval projection.",
+                        },
+                        changed_by="user",
+                        change_reason="test append",
+                    )
+
+                with closing(sqlite3.connect(database.DB_PATH)) as connection:
+                    model_row = connection.execute(
+                        """
+                        SELECT embedding_model_id, provider_key, model, dimensions, enabled
+                        FROM embedding_models
+                        WHERE provider_key = 'local' AND model = 'text-embedding-qwen3-embedding-8b'
+                        """
+                    ).fetchone()
+                    jobs = connection.execute(
+                        """
+                        SELECT source_kind, source_id, embedding_model_id, status
+                        FROM embedding_jobs
+                        WHERE source_kind = 'buddy_message' AND source_id = ?
+                        """,
+                        (message["message_id"],),
+                    ).fetchall()
+
+        self.assertIsNotNone(model_row)
+        self.assertEqual(model_row[1:], ("local", "text-embedding-qwen3-embedding-8b", 4096, 1))
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0][0], "buddy_message")
+        self.assertEqual(jobs[0][1], message["message_id"])
+        self.assertEqual(jobs[0][2], model_row[0])
+        self.assertEqual(jobs[0][3], "pending")
 
     def test_chat_messages_order_by_client_order_when_replies_are_persisted_later(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

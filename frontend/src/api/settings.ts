@@ -46,6 +46,7 @@ export type SettingsUpdatePayload = {
   model: {
     text_model_ref: string;
     video_model_ref: string;
+    embedding_model_ref?: string;
   };
   agent_runtime_defaults: {
     model: string;

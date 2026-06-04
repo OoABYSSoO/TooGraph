@@ -26,6 +26,7 @@ from app.core.storage.model_log_store import (
 from app.core.storage.provider_prompt_cache_store import (
     normalize_provider_prompt_cache_resource_retention_days,
 )
+from app.core.storage.embedding_model_sync import sync_default_embedding_model_from_settings
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.core.runtime.structured_output import normalize_structured_output_mode
 from app.tools.local_llm import (
@@ -53,6 +54,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 class SettingsModelPayload(BaseModel):
     text_model_ref: str = Field(alias="text_model_ref")
     video_model_ref: str = Field(alias="video_model_ref")
+    embedding_model_ref: str | None = Field(default=None, alias="embedding_model_ref")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -375,6 +377,7 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
     model_catalog = build_model_catalog(force_refresh=force_refresh_models)
     text_model_ref = str(model_catalog.get("default_text_model_ref") or get_default_text_model_ref(force_refresh=False))
     video_model_ref = str(model_catalog.get("default_video_model_ref") or get_default_video_model_ref(force_refresh=False))
+    embedding_model_ref = str(model_catalog.get("default_embedding_model_ref") or "")
     agent_thinking_level = normalize_thinking_level(get_default_agent_thinking_level())
     return {
         "model": {
@@ -382,6 +385,8 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
             "text_model_ref": text_model_ref,
             "video_model": resolve_runtime_model_name(video_model_ref),
             "video_model_ref": video_model_ref,
+            "embedding_model": resolve_runtime_model_name(embedding_model_ref) if embedding_model_ref else "",
+            "embedding_model_ref": embedding_model_ref,
         },
         "agent_runtime_defaults": {
             "model": text_model_ref,
@@ -414,19 +419,25 @@ def get_settings_endpoint() -> dict:
 
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
+    existing_settings = load_app_settings()
     normalized_text_model_ref = _normalize_optional_model_ref(payload.model.text_model_ref, default_provider="local")
     normalized_video_model_ref = _normalize_optional_model_ref(payload.model.video_model_ref, default_provider="local")
+    normalized_embedding_model_ref = (
+        _normalize_optional_model_ref(payload.model.embedding_model_ref, default_provider="local")
+        if payload.model.embedding_model_ref is not None
+        else _normalize_optional_model_ref(str(existing_settings.get("embedding_model_ref") or ""), default_provider="local")
+    )
     normalized_agent_model_ref = _normalize_optional_model_ref(payload.agent_runtime_defaults.model, default_provider="local")
 
     if normalized_agent_model_ref and normalized_agent_model_ref != normalized_text_model_ref:
         normalized_text_model_ref = normalized_agent_model_ref
 
-    existing_settings = load_app_settings()
     next_settings = _merge_model_providers(existing_settings, payload.model_providers)
     next_settings.update(
         {
             "text_model_ref": normalized_text_model_ref,
             "video_model_ref": normalized_video_model_ref,
+            "embedding_model_ref": normalized_embedding_model_ref,
             "agent_runtime_defaults": {
                 "thinking_enabled": payload.agent_runtime_defaults.normalized_thinking_level != THINKING_LEVEL_OFF,
                 "thinking_level": payload.agent_runtime_defaults.normalized_thinking_level,
@@ -459,7 +470,8 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
         else get_saved_ui_preferences(existing_settings)
     )
     next_settings.pop("buddy_permission_mode", None)
-    save_app_settings(next_settings)
+    saved_settings = save_app_settings(next_settings)
+    sync_default_embedding_model_from_settings(saved_settings, normalized_embedding_model_ref)
     return _build_settings_payload(force_refresh_models=False)
 
 

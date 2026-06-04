@@ -291,3 +291,31 @@ test("resolveNodeResizeDragMove delegates scaled deltas to node resize projectio
     size: { width: 500, height: 350 },
   });
 });
+
+test("resolveNodeResizeDragMove preserves unlimited agent node height during resize", () => {
+  const drag: CanvasNodeResizeDragState = {
+    nodeId: "agent",
+    nodeKind: "agent",
+    pointerId: 7,
+    handle: "se",
+    startClientX: 100,
+    startClientY: 100,
+    originPosition: { x: 24, y: 48 },
+    originSize: { width: 460, height: 720 },
+    captureElement: null,
+    moved: false,
+  };
+
+  const result = resolveNodeResizeDragMove({
+    drag,
+    pointer: { clientX: 120, clientY: 520 },
+    viewportScale: 1,
+  });
+
+  assert.equal(result.activated, true);
+  assert.deepEqual(result.update, {
+    nodeId: "agent",
+    position: { x: 24, y: 48 },
+    size: { width: 480, height: 1140 },
+  });
+});

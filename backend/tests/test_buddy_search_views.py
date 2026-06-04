@@ -18,38 +18,6 @@ from app.core.storage.run_store import save_run
 from app.main import app
 
 
-def _project_buddy_message_for_test_recall(message: dict[str, object]) -> dict[str, object]:
-    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
-
-    message_id = str(message["message_id"])
-    metadata = {
-        "session_id": str(message.get("session_id") or ""),
-        "role": str(message.get("role") or ""),
-        "run_id": str(message.get("run_id") or ""),
-    }
-    document = upsert_retrieval_document(
-        document_id=f"test_buddy_message_doc_{message_id}",
-        source_kind="buddy_message",
-        source_id=message_id,
-        title=f"{metadata['role']} message",
-        content=str(message.get("content") or ""),
-        scope={"session_id": metadata["session_id"], "role": metadata["role"]},
-        metadata=metadata,
-    )
-    [chunk] = upsert_retrieval_chunks(
-        document["document_id"],
-        [
-            {
-                "chunk_id": f"test_buddy_message_chunk_{message_id}",
-                "content": str(message.get("content") or ""),
-                "source_locator": {"field": "content"},
-                "metadata": metadata,
-            }
-        ],
-    )
-    return chunk
-
-
 def _project_memory_for_test_recall(memory: dict[str, object]) -> dict[str, object]:
     from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
@@ -144,7 +112,7 @@ class BuddySearchViewTests(unittest.TestCase):
                 database.initialize_storage()
                 from app.core.storage.embedding_store import process_pending_embedding_jobs, queue_embedding_job, register_embedding_model
 
-                model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+                model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
                 session = store.create_chat_session({"title": "Hybrid session"}, changed_by="user", change_reason="test")
                 message = store.append_chat_message(
                     session["session_id"],
@@ -152,15 +120,22 @@ class BuddySearchViewTests(unittest.TestCase):
                     changed_by="buddy",
                     change_reason="test",
                 )
-                _project_buddy_message_for_test_recall(message)
                 queue_embedding_job("buddy_message", message["message_id"], model["embedding_model_id"])
-                embedding_report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
+                with patch(
+                    "app.core.storage.embedding_store.embed_text_with_model_ref",
+                    return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+                ):
+                    embedding_report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
 
-                result = store.search_chat_sessions(
-                    query="refund audit",
-                    embedding_model_ref=model["embedding_model_id"],
-                    limit=5,
-                )
+                with patch(
+                    "app.core.storage.retrieval_store.embed_text_with_model_ref",
+                    return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+                ):
+                    result = store.search_chat_sessions(
+                        query="refund audit",
+                        embedding_model_ref=model["embedding_model_id"],
+                        limit=5,
+                    )
 
         self.assertGreaterEqual(embedding_report["completed_count"], 1)
         self.assertEqual(result["kind"], "buddy_session_search")
@@ -410,14 +385,10 @@ class BuddySearchViewTests(unittest.TestCase):
                 patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"),
             ):
                 database.initialize_storage()
-                from app.core.storage.embedding_store import (
-                    build_local_text_embedding,
-                    register_embedding_model,
-                    upsert_embedding_vector,
-                )
+                from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector
                 from app.core.storage.memory_store import create_memory_entry
 
-                model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+                model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
                 memory = create_memory_entry(
                     scope_kind="buddy_session",
                     scope_id="session_memory_search",
@@ -433,15 +404,19 @@ class BuddySearchViewTests(unittest.TestCase):
                 upsert_embedding_vector(
                     str(chunk["chunk_id"]),
                     model["embedding_model_id"],
-                    build_local_text_embedding(memory["content"], dimensions=16),
+                    [1.0, 0.0, 0.0],
                     str(chunk["content_hash"]),
                 )
 
-                result = store.search_memories(
-                    query="memory-search-evidence embedding",
-                    embedding_model_ref=model["embedding_model_id"],
-                    limit=5,
-                )
+                with patch(
+                    "app.core.storage.retrieval_store.embed_text_with_model_ref",
+                    return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+                ):
+                    result = store.search_memories(
+                        query="memory-search-evidence embedding",
+                        embedding_model_ref=model["embedding_model_id"],
+                        limit=5,
+                    )
 
         self.assertEqual(result["kind"], "memory_search")
         self.assertEqual(result["embedding_model_ref"], model["embedding_model_id"])

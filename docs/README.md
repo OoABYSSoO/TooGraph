@@ -381,7 +381,7 @@ RAG 路线图：
 - P1：明确 Buddy Home 只读能力；读取结果要在输出中标注 `authority=preference`。
 - P1：建立知识文档召回模板：输入问题和检索范围 -> query planning -> `retrieval_query_context_loader` -> citation-aware answer -> output。
 - P1：为 RAG 增加质量检查：检索命中、引用准确、资料不足拒答、过度引用、chunk 质量、上下文预算。
-- P2：接入真实 embedding provider 和 reranker，保留 `local-hash` 作为 deterministic fallback。
+- P2：接入真实 embedding provider 和 reranker；无真实 embedding 模型时只允许 lexical retrieval 或显式等待模型配置。
 - P2：支持用户文档知识库 ingestion：PDF/Word/HTML/Markdown、结构化 chunk、增量索引、删除一致性、版本管理。
 - P2：权限隔离和 metadata filter 要成为检索合同的一部分，不靠 prompt。
 - P3：探索 GraphRAG、RAPTOR、多模态 RAG 和 Agentic RAG，但先确保基础检索、引用和质量检查稳定。

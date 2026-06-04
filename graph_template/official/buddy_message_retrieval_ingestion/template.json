@@ -1,0 +1,357 @@
+{
+  "template_id": "buddy_message_retrieval_ingestion",
+  "label": "Buddy 历史消息检索入库",
+  "description": "从 Buddy 会话读取历史消息，生成确定性消息切片，并写入统一 retrieval_documents / retrieval_chunks；如在入库写入器中选择 embedding 模型，则同时排队 embedding_jobs。",
+  "default_graph_name": "Buddy 历史消息检索入库",
+  "state_schema": {
+    "session_id": {
+      "name": "Session ID",
+      "description": "需要入库的 Buddy 会话 ID。",
+      "type": "text",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "source_package": {
+      "name": "Source Package",
+      "description": "由 Buddy 消息来源加载器生成的规范化消息来源包。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "buddy_message_source_loader",
+        "nodeId": "load_buddy_messages",
+        "fieldKey": "source_package",
+        "managed": true
+      }
+    },
+    "chunks": {
+      "name": "Chunks",
+      "description": "由 source_chunker 生成的 Buddy 消息切片候选。",
+      "type": "json",
+      "value": [],
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "source_chunker",
+        "nodeId": "chunk_source_material",
+        "fieldKey": "chunks",
+        "managed": true
+      }
+    },
+    "ingestion_report": {
+      "name": "Ingestion Report",
+      "description": "检索入库写入器返回的入库报告。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "ingestion_report",
+        "managed": true
+      }
+    },
+    "indexed_chunks": {
+      "name": "Indexed Chunks",
+      "description": "已写入统一 retrieval_chunks 的切片记录。",
+      "type": "json",
+      "value": [],
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "indexed_chunks",
+        "managed": true
+      }
+    },
+    "embedding_jobs": {
+      "name": "Embedding Jobs",
+      "description": "入库写入器按 embedding_model_refs 排队的 embedding_jobs。",
+      "type": "json",
+      "value": [],
+      "color": "#d97706",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "embedding_jobs",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_session_id": {
+      "kind": "input",
+      "name": "Buddy Session ID",
+      "description": "输入需要读取并入库的 Buddy 会话 ID。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 360
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "session_id",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "load_buddy_messages": {
+      "kind": "tool",
+      "name": "Load Buddy Messages",
+      "description": "读取 Buddy 会话消息，并生成 source_chunker 可使用的规范化消息来源包。",
+      "ui": {
+        "position": {
+          "x": 560,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "session_id",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "buddy_message_source_loader",
+            "fieldKey": "session_id",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "source_package",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "buddy_message_source_loader",
+        "staticInputs": {
+          "limit": 200,
+          "after_client_order": -1
+        }
+      }
+    },
+    "chunk_source_material": {
+      "kind": "tool",
+      "name": "Chunk Buddy Messages",
+      "description": "按会话 turn 窗口生成确定性 Buddy 消息切片候选。",
+      "ui": {
+        "position": {
+          "x": 1120,
+          "y": 260
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 380
+        }
+      },
+      "reads": [
+        {
+          "state": "source_package",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "source_chunker",
+            "fieldKey": "source",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "chunks",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "source_chunker",
+        "staticInputs": {
+          "source_kind": "buddy_messages",
+          "strategy": "conversation_turn_window",
+          "limits": {
+            "max_chars": 2400,
+            "max_turns_per_chunk": 3,
+            "overlap_messages": 0
+          }
+        }
+      }
+    },
+    "write_retrieval_ingestion": {
+      "kind": "tool",
+      "name": "Write Retrieval Ingestion",
+      "description": "写入统一检索表，并按卡片中的 embedding_model_refs 选择排队 embedding_jobs。",
+      "ui": {
+        "position": {
+          "x": 1680,
+          "y": 240
+        },
+        "collapsed": false,
+        "size": {
+          "width": 480,
+          "height": 420
+        }
+      },
+      "reads": [
+        {
+          "state": "source_package",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "retrieval_ingestion_writer",
+            "fieldKey": "source",
+            "managed": true
+          }
+        },
+        {
+          "state": "chunks",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "retrieval_ingestion_writer",
+            "fieldKey": "chunks",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "ingestion_report",
+          "mode": "replace"
+        },
+        {
+          "state": "indexed_chunks",
+          "mode": "replace"
+        },
+        {
+          "state": "embedding_jobs",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "retrieval_ingestion_writer",
+        "staticInputs": {
+          "source_kind": "buddy_message",
+          "embedding_model_refs": "",
+          "scope": {
+            "collection": "buddy_history"
+          },
+          "metadata": {
+            "template_id": "buddy_message_retrieval_ingestion",
+            "role": "buddy_message_retrieval_ingestion"
+          }
+        }
+      }
+    },
+    "output_ingestion_report": {
+      "kind": "output",
+      "name": "Ingestion Report",
+      "description": "查看检索入库数量、写入切片和 embedding job 排队情况。",
+      "ui": {
+        "position": {
+          "x": 2260,
+          "y": 320
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "ingestion_report",
+          "required": true,
+          "binding": null
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_session_id",
+      "target": "load_buddy_messages"
+    },
+    {
+      "source": "load_buddy_messages",
+      "target": "chunk_source_material"
+    },
+    {
+      "source": "chunk_source_material",
+      "target": "write_retrieval_ingestion"
+    },
+    {
+      "source": "write_retrieval_ingestion",
+      "target": "output_ingestion_report"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "origin": "embedding",
+    "role": "buddy_message_retrieval_ingestion",
+    "capabilityDiscoverableDefault": false,
+    "requiredTools": [
+      "buddy_message_source_loader",
+      "source_chunker",
+      "retrieval_ingestion_writer"
+    ],
+    "permissions": [
+      "buddy_session_read"
+    ],
+    "outputContract": [
+      {
+        "state": "ingestion_report",
+        "role": "retrieval_ingestion_report",
+        "label": "Buddy message retrieval ingestion"
+      },
+      {
+        "state": "indexed_chunks",
+        "role": "retrieval_chunks",
+        "label": "Indexed Buddy message chunks"
+      },
+      {
+        "state": "embedding_jobs",
+        "role": "embedding_jobs",
+        "label": "Queued Buddy message embedding jobs"
+      }
+    ]
+  }
+}

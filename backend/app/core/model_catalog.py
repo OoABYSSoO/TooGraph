@@ -509,13 +509,18 @@ def _resolve_default_model_ref(
     provider_entries: list[dict[str, Any]],
     *,
     fallback_ref: str,
+    required_capability: str | None = None,
 ) -> str:
     provider_by_id = {provider["provider_id"]: provider for provider in provider_entries}
     if saved_ref:
         provider_id, model_id = split_model_ref(saved_ref, default_provider="local")
         provider = provider_by_id.get(provider_id)
         if provider and provider.get("configured"):
-            provider_models = [model["model"] for model in provider.get("models", [])]
+            provider_models = [
+                model["model"]
+                for model in provider.get("models", [])
+                if _model_matches_capability(model, required_capability)
+            ]
             if model_id in provider_models:
                 return build_model_ref(provider_id, model_id)
             if provider_models:
@@ -524,10 +529,21 @@ def _resolve_default_model_ref(
     for provider in provider_entries:
         if not provider.get("configured"):
             continue
-        models = provider.get("models") or []
+        models = [
+            model
+            for model in provider.get("models") or []
+            if _model_matches_capability(model, required_capability)
+        ]
         if models:
             return build_model_ref(provider["provider_id"], models[0]["model"])
     return fallback_ref
+
+
+def _model_matches_capability(model: dict[str, Any], required_capability: str | None) -> bool:
+    if not required_capability:
+        return True
+    capabilities = model.get("capabilities")
+    return isinstance(capabilities, dict) and bool(capabilities.get(required_capability))
 
 
 def get_default_text_model_ref(*, force_refresh: bool = False) -> str:
@@ -541,6 +557,10 @@ def get_default_video_model_name(*, force_refresh: bool = False) -> str:
 
 def get_default_video_model_ref(*, force_refresh: bool = False) -> str:
     return build_model_catalog(force_refresh=force_refresh)["default_video_model_ref"]
+
+
+def get_default_embedding_model_ref(*, force_refresh: bool = False) -> str:
+    return build_model_catalog(force_refresh=force_refresh)["default_embedding_model_ref"]
 
 
 def resolve_model_context_budget(model_ref: str | None, *, force_refresh: bool = False) -> dict[str, Any]:
@@ -610,6 +630,7 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
     fallback_text_ref = build_model_ref("local", local_text_model) if local_text_model else ""
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()
+    saved_embedding_model_ref = str(saved_settings.get("embedding_model_ref") or "").strip()
 
     return {
         "default_text_model_ref": _resolve_default_model_ref(
@@ -621,6 +642,12 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
             saved_video_model_ref,
             provider_entries,
             fallback_ref=build_model_ref("local", local_text_model) if local_text_model else "",
+        ),
+        "default_embedding_model_ref": _resolve_default_model_ref(
+            saved_embedding_model_ref,
+            provider_entries,
+            fallback_ref="",
+            required_capability="embedding",
         ),
         "providers": provider_entries,
         "provider_templates": [_normalize_provider_template_config(template) for template in list_provider_templates()],

@@ -56,12 +56,12 @@ class EmbeddingJobProcessorToolTests(unittest.TestCase):
         self.assertIn("pending embedding jobs", definition.localized["en-US"].description)
         self.assertIn("embedding_job_processor", get_tool_registry(include_disabled=True).keys())
 
-    def test_tool_processes_pending_local_embedding_jobs(self) -> None:
+    def test_tool_processes_pending_provider_embedding_jobs(self) -> None:
         from app.core.storage.embedding_store import queue_embedding_job, register_embedding_model
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
         module = _load_tool_module()
-        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
         document = upsert_retrieval_document(source_kind="memory_entry", source_id="mem_tool")
         upsert_retrieval_chunks(
             document["document_id"],
@@ -69,7 +69,11 @@ class EmbeddingJobProcessorToolTests(unittest.TestCase):
         )
         queue_embedding_job("memory_entry", "mem_tool", model["embedding_model_id"])
 
-        result = module.embedding_job_processor({"model_ref": model["embedding_model_id"], "limit": 5})
+        with patch(
+            "app.core.storage.embedding_store.embed_text_with_model_ref",
+            return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
+        ):
+            result = module.embedding_job_processor({"model_ref": model["embedding_model_id"], "limit": 5})
 
         self.assertEqual(result["status"], "succeeded")
         self.assertEqual(result["completed_count"], 1)

@@ -184,6 +184,33 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertIn("network", web_search["permissions"])
         self.assertEqual(web_search["permissionTier"], "external")
 
+    def test_capability_catalog_prefers_memory_recall_subgraph_over_atomic_recall_action(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_memory_recall_test")
+
+        catalog = selector.discover_capability_catalog()
+        memory_recall = next(item for item in catalog["subgraphs"] if item["key"] == "buddy_memory_recall")
+        recall_action = next(item for item in catalog["actions"] if item["key"] == "buddy_session_recall")
+
+        self.assertEqual(memory_recall["granularity"], "workflow")
+        self.assertIn("buddy_memory_recall", memory_recall["covers"])
+        self.assertIn("buddy_memory_recall", recall_action["covers"])
+        self.assertIn("evidence_package", memory_recall["produces"])
+        self.assertIn("raw_recall_results", recall_action["produces"])
+
+        result = selector.normalize_selected_capability(
+            {
+                "kind": "action",
+                "key": "buddy_session_recall",
+                "reason": "Need historical memory evidence before answering.",
+            },
+            catalog=catalog,
+        )
+
+        self.assertEqual(result["capability"]["kind"], "subgraph")
+        self.assertEqual(result["capability"]["key"], "buddy_memory_recall")
+        self.assertEqual(result["capability"]["reason"], "Need historical memory evidence before answering.")
+        self.assertTrue(result["needs_capability"])
+
     def test_capability_catalog_exposes_permission_tier(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_permission_test")
 

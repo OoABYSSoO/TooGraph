@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -214,7 +215,7 @@ def _save_chat_session_summary_if_requested(
     session_id = str(payload.get("session_id") or "").strip()
     if not session_id:
         return
-    get_chat_session(session_id)
+    session = get_chat_session(session_id)
     content = str(summary.get("content") or "").strip()
     if not content:
         return
@@ -259,6 +260,178 @@ def _save_chat_session_summary_if_requested(
             ),
         )
         connection.commit()
+    _project_chat_session_summary_to_retrieval(
+        summary_id=summary_id,
+        session_id=session_id,
+        session_title=str(session.get("title") or ""),
+        lineage_root_session_id=lineage_root_session_id,
+        content=content,
+        source_refs=source_refs,
+        source_run_id=source_run_id,
+        source_revision_id=revision_id,
+        embedding_model_refs=_embedding_model_refs_from_payload(payload),
+        updated_at=now,
+    )
+
+
+def _project_chat_session_summary_to_retrieval(
+    *,
+    summary_id: str,
+    session_id: str,
+    session_title: str,
+    lineage_root_session_id: str,
+    content: str,
+    source_refs: list[dict[str, Any]],
+    source_run_id: str,
+    source_revision_id: str,
+    embedding_model_refs: list[str],
+    updated_at: str,
+) -> None:
+    from app.core.storage.embedding_store import queue_embedding_job
+    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+    document = upsert_retrieval_document(
+        source_kind="buddy_session_summary",
+        source_id=summary_id,
+        source_revision_id=source_revision_id,
+        title=f"Session summary: {session_title or session_id}",
+        content=content,
+        scope={
+            "session_id": session_id,
+            "lineage_root_session_id": lineage_root_session_id,
+        },
+        metadata={
+            "role": "buddy_session_summary",
+            "session_id": session_id,
+            "lineage_root_session_id": lineage_root_session_id,
+            "source_run_id": source_run_id,
+            "summary_id": summary_id,
+            "updated_at": updated_at,
+        },
+        document_id=f"buddy_session_summary:{summary_id}",
+    )
+    upsert_retrieval_chunks(
+        document["document_id"],
+        [
+            {
+                "chunk_id": f"buddy_session_summary:{summary_id}:body",
+                "content": content,
+                "source_locator": {
+                    "summary_id": summary_id,
+                    "session_id": session_id,
+                    "lineage_root_session_id": lineage_root_session_id,
+                    "source_run_id": source_run_id,
+                    "source_revision_id": source_revision_id,
+                    "source_refs": deepcopy(source_refs),
+                },
+                "metadata": {
+                    "role": "buddy_session_summary",
+                    "session_id": session_id,
+                    "lineage_root_session_id": lineage_root_session_id,
+                    "source_run_id": source_run_id,
+                    "summary_id": summary_id,
+                    "source_ref_count": len(source_refs),
+                    "content_hash": _sha256_text(content),
+                },
+            }
+        ],
+    )
+    for model_ref in embedding_model_refs:
+        queue_embedding_job("buddy_session_summary", summary_id, model_ref)
+
+
+def _project_chat_message_to_retrieval(
+    *,
+    message: dict[str, Any],
+    session_title: str,
+    source_revision_id: str,
+    embedding_model_refs: list[str],
+) -> None:
+    from app.core.storage.embedding_store import queue_embedding_job
+    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+    message_id = str(message.get("message_id") or "").strip()
+    session_id = str(message.get("session_id") or "").strip()
+    role = str(message.get("role") or "").strip()
+    content = str(message.get("content") or "")
+    if not message_id or not session_id or not content.strip():
+        return
+    metadata = {
+        "role": role,
+        "session_id": session_id,
+        "message_id": message_id,
+        "client_order": message.get("client_order"),
+        "include_in_context": bool(message.get("include_in_context", True)),
+        "run_id": str(message.get("run_id") or ""),
+        "created_at": str(message.get("created_at") or ""),
+        "updated_at": str(message.get("updated_at") or ""),
+        "source_revision_id": source_revision_id,
+        "message_metadata": _coerce_dict(message.get("metadata")),
+    }
+    document = upsert_retrieval_document(
+        source_kind="buddy_message",
+        source_id=message_id,
+        source_revision_id=source_revision_id,
+        title=f"Buddy {role} message: {session_title or session_id}",
+        content=content,
+        scope={
+            "session_id": session_id,
+            "role": role,
+        },
+        metadata=metadata,
+        document_id=f"buddy_message:{message_id}",
+    )
+    upsert_retrieval_chunks(
+        document["document_id"],
+        [
+            {
+                "chunk_id": f"buddy_message:{message_id}:body",
+                "content": content,
+                "source_locator": {
+                    "message_id": message_id,
+                    "session_id": session_id,
+                    "role": role,
+                    "client_order": message.get("client_order"),
+                    "run_id": str(message.get("run_id") or ""),
+                    "source_revision_id": source_revision_id,
+                    "field": "content",
+                },
+                "metadata": {
+                    **metadata,
+                    "content_hash": _sha256_text(content),
+                },
+            }
+        ],
+    )
+    for model_ref in embedding_model_refs:
+        queue_embedding_job("buddy_message", message_id, model_ref)
+
+
+def _normalize_embedding_model_refs(value: Any) -> list[str]:
+    if isinstance(value, str):
+        raw_items = value.replace("\n", ",").split(",")
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+    refs: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text and text not in refs:
+            refs.append(text)
+    return refs
+
+
+def _embedding_model_refs_from_payload(payload: dict[str, Any]) -> list[str]:
+    if "embedding_model_refs" in payload:
+        return _normalize_embedding_model_refs(payload.get("embedding_model_refs"))
+    from app.core.storage.embedding_model_sync import get_default_embedding_model_refs_from_settings
+
+    return get_default_embedding_model_refs_from_settings()
+
+
+def _sha256_text(value: str) -> str:
+    return f"sha256:{hashlib.sha256(str(value or '').encode('utf-8')).hexdigest()}"
 
 
 def _normalize_summary_source_refs(value: Any) -> list[dict[str, Any]]:
@@ -1447,6 +1620,7 @@ def append_chat_message(
         "created_at": now,
         "updated_at": now,
     }
+    message_revision_id = f"msgrev_{uuid4().hex[:12]}"
     with _connection() as connection:
         if message["client_order"] is None:
             message["client_order"] = _next_chat_message_client_order(connection, session_id)
@@ -1476,7 +1650,7 @@ def append_chat_message(
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                f"msgrev_{uuid4().hex[:12]}",
+                message_revision_id,
                 message["message_id"],
                 message["session_id"],
                 message["role"],
@@ -1506,6 +1680,12 @@ def append_chat_message(
             (next_title, now, session_id),
         )
         connection.commit()
+    _project_chat_message_to_retrieval(
+        message=message,
+        session_title=next_title,
+        source_revision_id=message_revision_id,
+        embedding_model_refs=_embedding_model_refs_from_payload(payload),
+    )
     return _get_chat_message(str(message["message_id"]))
 
 

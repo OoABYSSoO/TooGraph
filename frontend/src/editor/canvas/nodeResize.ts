@@ -1,4 +1,4 @@
-import type { GraphNodeSize, GraphPosition } from "@/types/node-system";
+import type { GraphNode, GraphNodeSize, GraphPosition } from "@/types/node-system";
 
 export const MIN_NODE_RESIZE_WIDTH = 320;
 export const MIN_NODE_RESIZE_HEIGHT = 220;
@@ -14,7 +14,9 @@ export type NodeResizeResult = {
   size: GraphNodeSize;
 };
 
-export function normalizeNodeSize(value: unknown): GraphNodeSize | null {
+type ResizableNodeKind = GraphNode["kind"];
+
+export function normalizeNodeSize(value: unknown, nodeKind?: ResizableNodeKind): GraphNodeSize | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -28,7 +30,7 @@ export function normalizeNodeSize(value: unknown): GraphNodeSize | null {
   }
   return {
     width: clampNodeResizeWidth(Math.round(width)),
-    height: clampNodeResizeHeight(Math.round(height)),
+    height: clampNodeResizeHeight(Math.round(height), nodeKind),
   };
 }
 
@@ -38,13 +40,14 @@ export function resolveNodeResize(input: {
   originSize: GraphNodeSize;
   deltaX: number;
   deltaY: number;
+  nodeKind?: ResizableNodeKind;
 }): NodeResizeResult {
   const originRight = input.originPosition.x + input.originSize.width;
   const originBottom = input.originPosition.y + input.originSize.height;
   const widthDirection = input.handle.endsWith("e") ? 1 : -1;
   const heightDirection = input.handle.startsWith("s") ? 1 : -1;
   const nextWidth = clampNodeResizeWidth(input.originSize.width + input.deltaX * widthDirection);
-  const nextHeight = clampNodeResizeHeight(input.originSize.height + input.deltaY * heightDirection);
+  const nextHeight = clampNodeResizeHeight(input.originSize.height + input.deltaY * heightDirection, input.nodeKind);
 
   return {
     position: {
@@ -62,6 +65,11 @@ function clampNodeResizeWidth(width: number): number {
   return Math.min(Math.max(width, MIN_NODE_RESIZE_WIDTH), MAX_NODE_RESIZE_WIDTH);
 }
 
-function clampNodeResizeHeight(height: number): number {
-  return Math.min(Math.max(height, MIN_NODE_RESIZE_HEIGHT), MAX_NODE_RESIZE_HEIGHT);
+function clampNodeResizeHeight(height: number, nodeKind?: ResizableNodeKind): number {
+  const minimumHeight = Math.max(height, MIN_NODE_RESIZE_HEIGHT);
+  return isNodeResizeHeightUnlimited(nodeKind) ? minimumHeight : Math.min(minimumHeight, MAX_NODE_RESIZE_HEIGHT);
+}
+
+export function isNodeResizeHeightUnlimited(nodeKind?: ResizableNodeKind) {
+  return nodeKind === "agent";
 }

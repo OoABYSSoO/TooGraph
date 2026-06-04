@@ -53,7 +53,7 @@ class EmbeddingModelRegistryToolTests(unittest.TestCase):
 
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Embedding Model Registry")
-        self.assertIn("register embedding models", definition.description)
+        self.assertIn("注册 embedding 模型", definition.description)
         self.assertIn("embedding_model_registry", get_tool_registry(include_disabled=True).keys())
 
     def test_tool_registers_and_lists_embedding_models(self) -> None:

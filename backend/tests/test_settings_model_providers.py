@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -304,6 +306,112 @@ class SettingsModelProviderTests(unittest.TestCase):
             {"dimensions": 4096},
         )
         self.assertEqual(saved_model["permissions"], ["rerank"])
+
+    def test_update_settings_persists_default_embedding_model_ref(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "local/gemma",
+                                    "video_model_ref": "local/gemma",
+                                    "embedding_model_ref": "local/text-embedding-qwen3-embedding-8b",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "local/gemma",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(saved_payload["embedding_model_ref"], "local/text-embedding-qwen3-embedding-8b")
+
+    def test_update_settings_registers_default_embedding_model(self) -> None:
+        from app.core.storage import database
+
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    with patch("app.api.routes_settings.load_app_settings", return_value={}):
+                        with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                            with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                                with TestClient(app) as client:
+                                    response = client.post(
+                                        "/api/settings",
+                                        json={
+                                            "model": {
+                                                "text_model_ref": "local/gemma",
+                                                "video_model_ref": "local/gemma",
+                                                "embedding_model_ref": "local/text-embedding-qwen3-embedding-8b",
+                                            },
+                                            "agent_runtime_defaults": {
+                                                "model": "local/gemma",
+                                                "thinking_enabled": False,
+                                                "thinking_level": "off",
+                                                "temperature": 0.2,
+                                            },
+                                            "model_providers": {
+                                                "local": {
+                                                    "label": "Local",
+                                                    "transport": "openai-compatible",
+                                                    "base_url": "http://127.0.0.1:1234/v1",
+                                                    "api_key": "",
+                                                    "enabled": True,
+                                                    "auth_header": "Authorization",
+                                                    "auth_scheme": "Bearer",
+                                                    "models": [
+                                                        {
+                                                            "model": "gemma",
+                                                            "label": "Gemma",
+                                                            "modalities": ["text"],
+                                                            "capabilities": {"chat": True, "embedding": False},
+                                                        },
+                                                        {
+                                                            "model": "text-embedding-qwen3-embedding-8b",
+                                                            "label": "text-embedding-qwen3-embedding-8b",
+                                                            "capabilities": {"chat": False, "embedding": True},
+                                                            "embedding": {"dimensions": 4096},
+                                                        },
+                                                    ],
+                                                }
+                                            },
+                                        },
+                                    )
+
+                    with closing(sqlite3.connect(database.DB_PATH)) as connection:
+                        model_row = connection.execute(
+                            """
+                            SELECT provider_key, model, dimensions, enabled, metadata_json
+                            FROM embedding_models
+                            WHERE provider_key = 'local' AND model = 'text-embedding-qwen3-embedding-8b'
+                            """
+                        ).fetchone()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(saved_payload["embedding_model_ref"], "local/text-embedding-qwen3-embedding-8b")
+        self.assertIsNotNone(model_row)
+        self.assertEqual(model_row[:4], ("local", "text-embedding-qwen3-embedding-8b", 4096, 1))
+        self.assertEqual(json.loads(model_row[4])["source"], "model_providers.default_embedding_model_ref")
 
     def test_update_settings_persists_model_context_budget(self) -> None:
         saved_payload: dict = {}
@@ -839,6 +947,7 @@ class SettingsModelProviderTests(unittest.TestCase):
         catalog = {
             "default_text_model_ref": "local/current-text",
             "default_video_model_ref": "local/current-video",
+            "default_embedding_model_ref": "local/current-embedding",
             "providers": [],
             "provider_templates": [],
         }
@@ -852,6 +961,7 @@ class SettingsModelProviderTests(unittest.TestCase):
         build_catalog.assert_called_once_with(force_refresh=True)
         self.assertEqual(payload["model"]["text_model_ref"], "local/current-text")
         self.assertEqual(payload["model"]["video_model_ref"], "local/current-video")
+        self.assertEqual(payload["model"]["embedding_model_ref"], "local/current-embedding")
         self.assertEqual(payload["agent_runtime_defaults"]["model"], "local/current-text")
         self.assertEqual(payload["agent_runtime_defaults"]["thinking_level"], "medium")
 
@@ -1201,6 +1311,43 @@ class SettingsModelProviderTests(unittest.TestCase):
             {"dimensions": 1024},
         )
         self.assertEqual(local_provider["models"][0]["permissions"], ["rerank"])
+
+    def test_catalog_resolves_default_embedding_model_from_embedding_capable_models(self) -> None:
+        saved_settings = {
+            "text_model_ref": "local/gemma",
+            "video_model_ref": "local/gemma",
+            "embedding_model_ref": "local/missing-embedding-model",
+            "model_providers": {
+                "local": {
+                    "label": "Local",
+                    "transport": "openai-compatible",
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "enabled": True,
+                    "models": [
+                        {
+                            "model": "gemma",
+                            "label": "Gemma",
+                            "capabilities": {"chat": True, "embedding": False},
+                        },
+                        {
+                            "model": "text-embedding-qwen3-embedding-8b",
+                            "label": "text-embedding-qwen3-embedding-8b",
+                            "capabilities": {"chat": False, "embedding": True},
+                            "embedding": {"dimensions": 4096},
+                        },
+                    ],
+                }
+            },
+        }
+
+        from app.core import model_catalog
+
+        with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=[]):
+                    catalog = model_catalog.build_model_catalog(force_refresh=False)
+
+        self.assertEqual(catalog["default_embedding_model_ref"], "local/text-embedding-qwen3-embedding-8b")
 
     def test_catalog_exposes_provider_credential_pool_metadata(self) -> None:
         saved_settings = {

@@ -15,7 +15,7 @@ export function buildNodeTransformStyle(position: GraphPosition) {
 }
 
 export function buildNodeCardSizeStyle(node: Pick<GraphNode, "kind" | "ui">) {
-  const size = normalizeNodeSize(node.ui.size) ?? resolveFallbackNodeSize(node);
+  const size = normalizeNodeSize(node.ui.size, node.kind) ?? resolveFallbackNodeSize(node);
   return {
     "--node-card-width": `${size.width}px`,
     "--node-card-min-height": `${size.height}px`,
@@ -43,7 +43,7 @@ export function resolveNodeRenderedSize(input: {
   node: Pick<GraphNode, "kind" | "ui">;
   measuredNodeSizes: Record<string, MeasuredNodeSize>;
 }): GraphNodeSize {
-  return input.measuredNodeSizes[input.nodeId] ?? normalizeNodeSize(input.node.ui.size) ?? resolveFallbackNodeSize(input.node);
+  return input.measuredNodeSizes[input.nodeId] ?? normalizeNodeSize(input.node.ui.size, input.node.kind) ?? resolveFallbackNodeSize(input.node);
 }
 
 export function resolveMinimapRunState(status: string | undefined): MinimapNodeRunState {

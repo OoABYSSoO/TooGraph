@@ -64,7 +64,7 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
         from app.core.storage.embedding_store import register_embedding_model
 
         module = _load_tool_module()
-        model = register_embedding_model(provider_key="local-hash", model="hashing-v1", dimensions=16)
+        model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
 
         result = module.retrieval_ingestion_writer(
             {

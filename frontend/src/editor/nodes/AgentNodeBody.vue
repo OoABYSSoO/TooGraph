@@ -337,6 +337,8 @@ defineExpose({
 .node-card__prompt-surface {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 10px;
   cursor: text;
 }

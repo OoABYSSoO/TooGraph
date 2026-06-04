@@ -12,6 +12,26 @@
   "metadata": {
     "internal": true
   },
+  "capability": {
+    "granularity": "atomic",
+    "covers": [
+      "buddy_memory_recall",
+      "historical_context",
+      "conversation_recall",
+      "source_grounding"
+    ],
+    "produces": [
+      "raw_recall_results",
+      "source_refs",
+      "context_package"
+    ],
+    "taskTags": [
+      "memory",
+      "recall",
+      "history",
+      "grounding"
+    ]
+  },
   "stateInputSchema": [
     {
       "key": "recall_request",

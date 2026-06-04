@@ -22,7 +22,7 @@
       "key": "provider_key",
       "name": "Provider Key",
       "valueType": "text",
-      "description": "模型供应商 key，例如 local-hash、local、openai 或 openrouter。"
+      "description": "模型供应商 key，例如 openai、openrouter，或已配置的 OpenAI-compatible provider。"
     },
     {
       "key": "model",

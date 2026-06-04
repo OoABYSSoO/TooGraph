@@ -8,27 +8,27 @@
 
 标题：TooGraph 的知识库检索，开始补证据链了
 
-这次更新把知识库检索从基础关键词匹配推进到混合检索。它做了三件具体事：给 chunk 增加 content hash 和本地 hash embedding；把 FTS、LIKE、向量候选合并排序；把 citation id、chunk id、source、section 和 retrieval score 留给下游模板。
+这次更新把知识库检索从基础关键词匹配推进到混合检索。它做了三件具体事：给 chunk 增加 content hash，并用已配置的 embedding provider/model 生成向量；把 FTS、LIKE、向量候选合并排序；把 citation id、chunk id、source、section 和 retrieval score 留给下游模板。
 
 我更关心第三点。业务模板真正需要的不是“搜到一段话”，而是能说清楚这段话来自哪里、为什么被选中、能不能被评测复查。
 
-限制也要讲清楚：现在的 embedding 是 deterministic local-hash baseline，还不是外部语义 embedding。高精度召回、RSS 接入、网页抓取和检索质量评测都还在后面。
+限制也要讲清楚：高精度召回、RSS 接入、网页抓取和检索质量评测都还在后面。
 
 ## 小红书
 
 标题：别只说 RAG，先把引用链补上
 
 TooGraph 这次做了一个偏工程但很关键的更新：知识库检索结果开始带 citation id、chunk id、来源和分数。  
-它还不是终点，当前 embedding 只是本地 hash baseline。  
+它还不是终点，embedding provider、reranker 和检索评测还需要继续完善。
 但这一步的价值是：业务模板以后可以解释“我为什么引用这段材料”。
 
 ## X Thread
 
 1. TooGraph knowledge retrieval update: not magic search, but auditability.
-2. Chunks now carry content hash and deterministic local hash embeddings.
+2. Chunks now carry content hash and provider/model embeddings.
 3. Retrieval merges FTS, LIKE, and vector candidates.
 4. Runtime context returns citation id, chunk id, source, section, metadata, and scores.
-5. Limitation: local-hash is a baseline. Provider/model embeddings and retrieval validation checks are still needed.
+5. Limitation: provider/model configuration, reranking, and retrieval validation checks still need to mature.
 
 ## 发布计划
 

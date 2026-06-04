@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "embedding_job_processor",
   "name": "Embedding Job Processor",
-  "description": "处理待执行的 embedding jobs，支持哈希模型和 OpenAI-compatible embedding provider。",
+  "description": "处理待执行的 embedding jobs，通过已注册的真实 embedding provider 生成向量。",
   "version": "0.1.0",
   "timeoutSeconds": 60,
   "permissions": [],
@@ -60,11 +60,11 @@
   "localized": {
     "zh-CN": {
       "name": "Embedding 任务处理器",
-      "description": "处理待执行的 embedding jobs，支持哈希模型和 OpenAI-compatible embedding provider。"
+      "description": "处理待执行的 embedding jobs，通过已注册的真实 embedding provider 生成向量。"
     },
     "en-US": {
       "name": "Embedding Job Processor",
-      "description": "Processes pending embedding jobs for hashing models and OpenAI-compatible embedding providers."
+      "description": "Processes pending embedding jobs through registered embedding providers."
     }
   }
 }
