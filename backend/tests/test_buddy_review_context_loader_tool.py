@@ -37,7 +37,7 @@ class BuddyReviewContextLoaderToolTests(unittest.TestCase):
 
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Review Context Loader")
-        self.assertIn("source Buddy graph run", definition.description)
+        self.assertIn("Buddy 图运行", definition.description)
         self.assertIn("buddy_review_context_loader", get_tool_registry(include_disabled=True).keys())
 
     def test_loader_reconstructs_review_context_from_source_run_record(self) -> None:

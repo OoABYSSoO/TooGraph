@@ -12,9 +12,9 @@ from app.core.storage.json_file_utils import utc_now_iso
 from app.templates.loader import load_template_record
 
 
-SCHEDULE_KINDS = {"manual", "interval", "cron"}
+SCHEDULE_KINDS = {"manual", "interval", "cron", "event"}
 TERMINAL_JOB_RUN_STATUSES = {"completed", "failed", "cancelled", "skipped"}
-RETRYABLE_TRIGGER_REASONS = {"schedule", "retry"}
+RETRYABLE_TRIGGER_REASONS = {"schedule", "event", "retry"}
 SUPPORTED_DELIVERY_TARGET_KINDS = {"local_audit", "job_run_metadata", "message_outlet"}
 EXTERNAL_DELIVERY_TARGET_KINDS = {"webhook", "http_webhook"}
 SENSITIVE_DELIVERY_TARGET_KEYWORDS = (
@@ -72,18 +72,27 @@ def create_scheduled_graph_job(payload: dict[str, Any], *, now: str | None = Non
 def update_scheduled_graph_job(job_id: str, payload: dict[str, Any], *, now: str | None = None) -> dict[str, Any]:
     existing = load_scheduled_graph_job(job_id)
     normalized_now = _normalize_timestamp(now)
+    incoming_payload = payload if isinstance(payload, dict) else {}
     next_payload = {
         **existing,
-        **(payload if isinstance(payload, dict) else {}),
+        **incoming_payload,
         "job_id": existing["job_id"],
     }
+    schedule_change_payload = dict(incoming_payload)
+    if _is_official_scheduled_graph_job(existing):
+        next_payload["template_id"] = existing["template_id"]
+        schedule_change_payload.pop("template_id", None)
+        next_payload["metadata"] = {
+            **(next_payload.get("metadata") if isinstance(next_payload.get("metadata"), dict) else {}),
+            "source": str(existing.get("metadata", {}).get("source") or "official_seed"),
+        }
     normalized = _normalize_job_payload(next_payload, now=normalized_now)
     normalized["job_id"] = existing["job_id"]
     normalized["created_at"] = existing["created_at"]
     normalized["last_run_id"] = existing["last_run_id"]
     normalized["updated_at"] = normalized_now
     schedule_changed = any(
-        key in (payload if isinstance(payload, dict) else {})
+        key in schedule_change_payload
         for key in ("template_id", "schedule_kind", "schedule_expr", "timezone", "enabled")
     )
     if schedule_changed:
@@ -133,6 +142,11 @@ def update_scheduled_graph_job(job_id: str, payload: dict[str, Any], *, now: str
     if cursor.rowcount == 0:
         raise KeyError(existing["job_id"])
     return load_scheduled_graph_job(existing["job_id"])
+
+
+def _is_official_scheduled_graph_job(job: dict[str, Any]) -> bool:
+    metadata = job.get("metadata") if isinstance(job.get("metadata"), dict) else {}
+    return metadata.get("source") in {"official_seed", "official"}
 
 
 def delete_scheduled_graph_job(job_id: str) -> bool:
@@ -197,6 +211,26 @@ def list_due_scheduled_graph_jobs(*, now: str | None = None, limit: int = 25) ->
             LIMIT ?
             """,
             (normalized_now, max(1, min(int(limit or 25), 100))),
+        ).fetchall()
+    return [_job_from_row(row) for row in rows]
+
+
+def list_event_scheduled_graph_jobs(event_name: str, *, include_disabled: bool = False) -> list[dict[str, Any]]:
+    normalized_event_name = _compact_text(event_name)
+    if not normalized_event_name:
+        return []
+    enabled_clause = "" if include_disabled else "AND enabled = 1"
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT *
+            FROM scheduled_graph_jobs
+            WHERE schedule_kind = 'event'
+                AND schedule_expr = ?
+                {enabled_clause}
+            ORDER BY updated_at DESC, created_at DESC, job_id
+            """,
+            (normalized_event_name,),
         ).fetchall()
     return [_job_from_row(row) for row in rows]
 
@@ -621,10 +655,12 @@ def _normalize_job_payload(payload: dict[str, Any], *, now: str | None) -> dict[
         raise ValueError(f"template_id '{template_id}' is in development.")
     schedule_kind = _compact_text(payload.get("schedule_kind") or "manual").lower()
     if schedule_kind not in SCHEDULE_KINDS:
-        raise ValueError("schedule_kind must be manual, interval, or cron.")
+        raise ValueError("schedule_kind must be manual, interval, event, or cron.")
     schedule_expr = _compact_text(payload.get("schedule_expr"))
     if schedule_kind == "interval":
         _interval_delta(schedule_expr)
+    if schedule_kind == "event" and not schedule_expr:
+        raise ValueError("schedule_expr is required for event jobs.")
     input_bindings = payload.get("input_bindings")
     if not isinstance(input_bindings, dict):
         input_bindings = payload.get("input_values") if isinstance(payload.get("input_values"), dict) else {}

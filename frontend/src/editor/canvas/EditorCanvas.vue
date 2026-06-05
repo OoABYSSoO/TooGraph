@@ -318,6 +318,7 @@
           @reorder-port-state="emit('reorder-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @update-tool-config="emit('update-tool-config', $event)"
+          @promote-tool-static-input="emit('promote-tool-static-input', $event)"
           @update-batch-config="emit('update-batch-config', $event)"
           @update-batch-worker="emit('update-batch-worker', $event)"
           @toggle-agent-breakpoint="emit('toggle-agent-breakpoint', $event)"
@@ -696,6 +697,7 @@ const emit = defineEmits<{
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-tool-config", payload: { nodeId: string; patch: Partial<ToolNode["config"]> }): void;
+  (event: "promote-tool-static-input", payload: { nodeId: string; fieldKey: string }): void;
   (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
   (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;

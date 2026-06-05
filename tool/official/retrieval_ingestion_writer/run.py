@@ -23,7 +23,8 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
         source_documents = _source_documents_by_id(source)
         scope = _coerce_dict(inputs.get("scope"))
         base_metadata = _coerce_dict(inputs.get("metadata"))
-        embedding_model_refs = _normalize_model_refs(inputs.get("embedding_model_refs"))
+        explicit_embedding_model_refs = _normalize_model_refs(inputs.get("embedding_model_refs"))
+        embedding_model_refs = explicit_embedding_model_refs or _default_embedding_model_refs()
 
         chunks_by_source: dict[str, list[dict[str, Any]]] = {}
         for chunk in chunks:
@@ -153,6 +154,15 @@ def _normalize_model_refs(value: Any) -> list[str]:
         if text and text not in refs:
             refs.append(text)
     return refs
+
+
+def _default_embedding_model_refs() -> list[str]:
+    try:
+        from app.core.storage.embedding_model_sync import get_default_embedding_model_refs_from_settings
+
+        return get_default_embedding_model_refs_from_settings()
+    except Exception:
+        return []
 
 
 def _public_document(document: dict[str, Any]) -> dict[str, Any]:

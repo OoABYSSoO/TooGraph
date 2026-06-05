@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.buddy import background_review, commands, improvement_candidates, store
+from app.scheduler import runner as scheduler_runner
 
 
 router = APIRouter(prefix="/api/buddy", tags=["buddy"])
@@ -385,9 +386,26 @@ def list_chat_messages_endpoint(
 
 
 @router.post("/sessions/{session_id}/messages")
-def append_chat_message_endpoint(session_id: str, payload: BuddyChatMessagePayload) -> dict[str, Any]:
+def append_chat_message_endpoint(
+    session_id: str,
+    payload: BuddyChatMessagePayload,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
     try:
-        return store.append_chat_message(session_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
+        message = store.append_chat_message(session_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
+        scheduler_runner.run_event_scheduled_graph_jobs(
+            "buddy.message.created",
+            event={
+                "session_id": session_id,
+                "message_id": str(message.get("message_id") or ""),
+                "role": str(message.get("role") or ""),
+                "run_id": str(message.get("run_id") or ""),
+                "include_in_context": bool(message.get("include_in_context", True)),
+            },
+            background_tasks=background_tasks,
+            requested_by="buddy_message_created",
+        )
+        return message
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Buddy session not found") from exc
     except ValueError as exc:

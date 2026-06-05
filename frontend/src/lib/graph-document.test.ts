@@ -27,6 +27,7 @@ const {
   updateBatchNodeSubgraphWorkerInDocument,
   disconnectManagedToolInputStateInDocument,
   disconnectManagedActionInputStateInDocument,
+  promoteToolStaticInputToGraphInputInDocument,
   updateToolNodeConfigInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
@@ -4625,6 +4626,97 @@ test("updateToolNodeConfigInDocument materializes manifest card inputs and keeps
       },
     });
   }
+});
+
+test("promoteToolStaticInputToGraphInputInDocument turns a card value into an input node", () => {
+  assert.equal(typeof promoteToolStaticInputToGraphInputInDocument, "function");
+
+  const sourceChunkerTool: ToolDefinition = {
+    ...jsonPassthroughTool,
+    toolKey: "source_chunker",
+    name: "Source Chunker",
+    inputPresentation: {
+      source_kind: {
+        mode: "static",
+        control: "select",
+        default: "buddy_messages",
+        options: [
+          { label: "Chat history", value: "buddy_messages" },
+          { label: "Knowledge documents", value: "normalized_documents" },
+        ],
+      },
+      source: { mode: "state" },
+    },
+    inputSchema: [
+      { key: "source_kind", name: "Source Kind", valueType: "text", description: "Memory or knowledge source category." },
+      { key: "source", name: "Source", valueType: "json", description: "Normalized source package." },
+    ],
+    outputSchema: [{ key: "chunks", name: "Chunks", valueType: "json", description: "" }],
+  };
+  const document = updateToolNodeConfigInDocument(
+    {
+      graph_id: null,
+      name: "Promote Tool Static Input Graph",
+      state_schema: {},
+      nodes: {
+        tool_node: {
+          kind: "tool",
+          name: "Tool",
+          description: "",
+          ui: { position: { x: 640, y: 260 } },
+          reads: [],
+          writes: [],
+          config: { toolKey: "" },
+        },
+      },
+      edges: [],
+      conditional_edges: [],
+      metadata: {},
+    } satisfies GraphPayload,
+    "tool_node",
+    (current) => ({ ...current, toolKey: "source_chunker", staticInputs: { source_kind: "normalized_documents" } }),
+    { toolDefinitions: [sourceChunkerTool] },
+  );
+
+  const result = promoteToolStaticInputToGraphInputInDocument(document, "tool_node", "source_kind", {
+    toolDefinitions: [sourceChunkerTool],
+  });
+  const node = result.document.nodes.tool_node;
+
+  assert.notEqual(result.document, document);
+  assert.equal(result.inputNodeId, "input_tool_node_source_kind");
+  assert.equal(node.kind, "tool");
+  if (node.kind === "tool") {
+    assert.deepEqual(node.config.staticInputs, {});
+    assert.deepEqual(node.config.promotedInputFields, ["source_kind"]);
+    assert.deepEqual(
+      node.reads.map((binding) => binding.binding?.kind === "tool_input" ? [binding.binding.fieldKey, binding.state] : ["", ""]),
+      [
+        ["source_kind", result.stateKey],
+        ["source", node.reads.find((binding) => binding.binding?.kind === "tool_input" && binding.binding.fieldKey === "source")?.state],
+      ],
+    );
+  }
+
+  const inputNode = result.document.nodes.input_tool_node_source_kind;
+  assert.equal(inputNode.kind, "input");
+  if (inputNode.kind === "input") {
+    assert.equal(inputNode.name, "Source Kind");
+    assert.deepEqual(inputNode.writes, [{ state: result.stateKey, mode: "replace" }]);
+    assert.deepEqual(inputNode.config.value, "normalized_documents");
+    assert.deepEqual(inputNode.config.valuePresentation, {
+      control: "select",
+      default: "buddy_messages",
+      options: [
+        { label: "Chat history", value: "buddy_messages" },
+        { label: "Knowledge documents", value: "normalized_documents" },
+      ],
+    });
+  }
+  assert.equal(result.document.state_schema[result.stateKey]?.name, "Source Kind");
+  assert.equal(result.document.state_schema[result.stateKey]?.description, "Memory or knowledge source category.");
+  assert.equal(result.document.state_schema[result.stateKey]?.value, "normalized_documents");
+  assert.deepEqual(result.document.edges, [{ source: "input_tool_node_source_kind", target: "tool_node" }]);
 });
 
 test("updateToolNodeConfigInDocument prunes stale static inputs when the selected tool changes", () => {

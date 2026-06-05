@@ -305,8 +305,11 @@ def process_pending_embedding_jobs(model_ref: str = "", limit: int = 50) -> dict
 
     completed_count = sum(1 for job in processed_jobs if job.get("status") == "completed")
     failed_count = sum(1 for job in processed_jobs if job.get("status") == "failed")
+    status = "failed" if failed_count else "succeeded"
+    error = f"{failed_count} embedding job(s) failed." if failed_count else ""
     return {
-        "status": "succeeded",
+        "status": status,
+        **({"error": error} if error else {}),
         "processed_count": len(processed_jobs),
         "completed_count": completed_count,
         "failed_count": failed_count,

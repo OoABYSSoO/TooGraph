@@ -189,6 +189,48 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertEqual(report["processed_jobs"][0]["chunk_id"], chunk["chunk_id"])
         self.assertEqual(results[0]["chunk_id"], chunk["chunk_id"])
 
+    def test_process_pending_embedding_jobs_reports_failed_status_when_provider_errors(self) -> None:
+        from app.core.storage.embedding_store import (
+            process_pending_embedding_jobs,
+            queue_embedding_job,
+            register_embedding_model,
+        )
+        from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+        model = register_embedding_model(provider_key="local", model="test-embedding", dimensions=3)
+        document = upsert_retrieval_document(source_kind="buddy_message", source_id="session_1:msg_1:msg_1")
+        [chunk] = upsert_retrieval_chunks(
+            document["document_id"],
+            [{"chunk_id": "chunk_failed_provider", "content": "Provider failure should be visible."}],
+        )
+        [job] = queue_embedding_job("buddy_message", "session_1:msg_1:msg_1", model["embedding_model_id"])
+
+        with patch(
+            "app.core.storage.embedding_store.embed_text_with_model_ref",
+            side_effect=RuntimeError("provider offline"),
+        ):
+            report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
+
+        with closing(sqlite3.connect(database.DB_PATH)) as connection:
+            job_row = connection.execute(
+                "SELECT status, last_error FROM embedding_jobs WHERE job_id = ?",
+                (job["job_id"],),
+            ).fetchone()
+            vector_count = connection.execute(
+                "SELECT COUNT(*) FROM embedding_vectors WHERE chunk_id = ?",
+                (chunk["chunk_id"],),
+            ).fetchone()[0]
+
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["processed_count"], 1)
+        self.assertEqual(report["completed_count"], 0)
+        self.assertEqual(report["failed_count"], 1)
+        self.assertEqual(report["processed_jobs"][0]["status"], "failed")
+        self.assertIn("provider offline", report["processed_jobs"][0]["error"])
+        self.assertEqual(job_row[0], "failed")
+        self.assertIn("provider offline", job_row[1])
+        self.assertEqual(vector_count, 0)
+
     def test_search_embedding_vectors_uses_application_cosine_similarity(self) -> None:
         from app.core.storage.embedding_store import (
             register_embedding_model,

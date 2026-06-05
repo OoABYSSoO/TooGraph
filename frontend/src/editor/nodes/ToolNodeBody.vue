@@ -56,12 +56,23 @@
         <span class="tool-node-body__field-label">Card values</span>
       </div>
       <div v-if="compactStaticInputFields.length > 0" class="tool-node-body__static-compact-grid">
-        <label
+        <div
           v-for="field in compactStaticInputFields"
           :key="field.key"
           class="tool-node-body__static-compact-field"
         >
-          <span class="tool-node-body__static-input-name">{{ field.name || field.key }}</span>
+          <div class="tool-node-body__static-field-heading">
+            <span class="tool-node-body__static-input-name">{{ field.name || field.key }}</span>
+            <button
+              type="button"
+              class="tool-node-body__promote-button"
+              title="Promote to graph input"
+              @pointerdown.stop
+              @click.stop="promoteStaticInputField(field.key)"
+            >
+              Input
+            </button>
+          </div>
           <ToographSelect
             v-if="isSelectStaticField(field)"
             class="tool-node-body__static-select"
@@ -108,7 +119,7 @@
           <div v-if="staticInputErrors[field.key]" class="tool-node-body__static-error">
             {{ staticInputErrors[field.key] }}
           </div>
-        </label>
+        </div>
       </div>
 
       <section
@@ -117,8 +128,19 @@
         class="tool-node-body__limits-card"
       >
         <div class="tool-node-body__limits-header">
-          <span class="tool-node-body__static-input-name">{{ field.name || field.key }}</span>
-          <span class="tool-node-body__static-input-key">{{ field.key }} · {{ field.valueType }}</span>
+          <div class="tool-node-body__limits-title">
+            <span class="tool-node-body__static-input-name">{{ field.name || field.key }}</span>
+            <span class="tool-node-body__static-input-key">{{ field.key }} · {{ field.valueType }}</span>
+          </div>
+          <button
+            type="button"
+            class="tool-node-body__promote-button"
+            title="Promote to graph input"
+            @pointerdown.stop
+            @click.stop="promoteStaticInputField(field.key)"
+          >
+            Input
+          </button>
         </div>
         <div class="tool-node-body__limits-grid">
           <label
@@ -303,6 +325,7 @@ const props = defineProps<{
   body: ToolBodyViewModel;
   selectedToolKey: string;
   staticInputs: Record<string, unknown>;
+  promotedInputFields: string[];
   targetAgentNodeId: string;
   targetAgentNodeOptions: Array<{ value: string; label: string }>;
   toolDefinitions: ToolDefinition[];
@@ -333,6 +356,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: "select-tool", toolKey: string): void;
   (event: "update-static-inputs", staticInputs: Record<string, unknown>): void;
+  (event: "promote-static-input", fieldKey: string): void;
   (event: "update-target-agent-node", nodeId: string): void;
   (event: "pointer-enter", anchorId: string): void;
   (event: "pointer-leave", anchorId: string): void;
@@ -361,6 +385,7 @@ const selectedToolDefinition = computed(() =>
   availableToolDefinitions.value.find((definition) => definition.toolKey === props.selectedToolKey),
 );
 const selectedToolInputFields = computed(() => selectedToolDefinition.value?.inputSchema ?? []);
+const promotedInputFieldKeys = computed(() => new Set(props.promotedInputFields));
 const selectedToolCardInputFields = computed(() =>
   selectedToolInputFields.value.filter((field) => isCardStaticInputField(field)),
 );
@@ -406,6 +431,9 @@ watch(
 );
 
 function isCardStaticInputField(field: ToolIoField) {
+  if (promotedInputFieldKeys.value.has(field.key)) {
+    return false;
+  }
   const presentation = resolveInputPresentation(field.key);
   if (presentation?.mode === "state") {
     return false;
@@ -531,6 +559,10 @@ function updateObjectStaticInputProperty(fieldKey: string, propertyKey: string, 
   const field = selectedToolInputFields.value.find((candidate) => candidate.key === fieldKey);
   const currentValue = field ? staticInputObjectValue(field) : {};
   updateStaticInputValue(fieldKey, { ...currentValue, [propertyKey]: value });
+}
+
+function promoteStaticInputField(fieldKey: string) {
+  emit("promote-static-input", fieldKey);
 }
 
 function hasObjectPropertySelectOptions(property: ToolInputPresentationProperty) {
@@ -729,6 +761,45 @@ function clearStaticInputDrafts(fieldKeys: string[]) {
   gap: 5px;
 }
 
+.tool-node-body__static-field-heading,
+.tool-node-body__limits-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.tool-node-body__static-field-heading {
+  justify-content: space-between;
+}
+
+.tool-node-body__limits-title {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.tool-node-body__promote-button {
+  flex: 0 0 auto;
+  min-height: 22px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(239, 246, 255, 0.78);
+  color: #1d4ed8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.tool-node-body__promote-button:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(219, 234, 254, 0.88);
+}
+
 .tool-node-body__static-value-switch {
   --el-switch-on-color: #2563eb;
   --el-switch-off-color: rgba(100, 116, 139, 0.3);
@@ -771,7 +842,7 @@ function clearStaticInputDrafts(fieldKeys: string[]) {
 
 .tool-node-body__limits-header {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;

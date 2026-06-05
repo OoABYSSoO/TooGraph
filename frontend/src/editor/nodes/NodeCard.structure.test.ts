@@ -114,15 +114,26 @@ test("ToolNodeBody renders deterministic tool selection with managed ports", () 
   assert.match(componentSource, /<section v-else-if="view\.body\.kind === 'tool'" class="node-card__body node-card__body--tool">/);
   assert.match(componentSource, /<ToolNodeBody[\s\S]*:selected-tool-key="selectedToolKey"[\s\S]*:tool-definitions="toolDefinitions"[\s\S]*:tool-definitions-loading="toolDefinitionsLoading"[\s\S]*:tool-definitions-error="toolDefinitionsError"[\s\S]*@select-tool="selectTool"/);
   assert.match(componentSource, /<ToolNodeBody[\s\S]*:target-agent-node-id="toolTargetAgentNodeId"[\s\S]*:target-agent-node-options="toolTargetAgentNodeOptions"[\s\S]*@update-target-agent-node="updateToolTargetAgentNode"/);
-  assert.match(componentSource, /<ToolNodeBody[\s\S]*:static-inputs="toolStaticInputs"[\s\S]*@update-static-inputs="updateToolStaticInputs"/);
+  assert.match(componentSource, /<ToolNodeBody[\s\S]*:static-inputs="toolStaticInputs"[\s\S]*:promoted-input-fields="toolPromotedInputFields"[\s\S]*@update-static-inputs="updateToolStaticInputs"/);
+  assert.match(componentSource, /<ToolNodeBody[\s\S]*@promote-static-input="promoteToolStaticInput"/);
   assert.match(componentSource, /const toolStaticInputs = computed\(\(\) => props\.node\.kind === "tool" \? props\.node\.config\.staticInputs \?\? \{\} : \{\}\);/);
+  assert.match(componentSource, /const toolPromotedInputFields = computed\(\(\) => props\.node\.kind === "tool" \? props\.node\.config\.promotedInputFields \?\? \[\] : \[\]\);/);
   assert.match(componentSource, /function updateToolStaticInputs\(staticInputs: Record<string, unknown>\)/);
+  assert.match(componentSource, /\(event: "promote-tool-static-input", payload: \{ nodeId: string; fieldKey: string \}\): void;/);
+  assert.match(componentSource, /function promoteToolStaticInput\(fieldKey: string\)/);
   assert.match(toolNodeBodySource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
   assert.match(toolNodeBodySource, /import \{ ElInput, ElInputNumber, ElOption, ElSwitch \} from "element-plus";/);
   assert.match(toolNodeBodySource, /<ToographSelect[\s\S]*class="tool-node-body__tool-select"[\s\S]*:model-value="selectedToolKey"[\s\S]*filterable[\s\S]*popper-class="tool-node-body__tool-popper"[\s\S]*@update:model-value="emit\('select-tool', String\(\$event \?\? ''\)\)"/);
   assert.match(toolNodeBodySource, /staticInputs: Record<string, unknown>;/);
+  assert.match(toolNodeBodySource, /promotedInputFields: string\[\];/);
   assert.match(toolNodeBodySource, /\(event: "update-static-inputs", staticInputs: Record<string, unknown>\): void;/);
+  assert.match(toolNodeBodySource, /\(event: "promote-static-input", fieldKey: string\): void;/);
+  assert.match(toolNodeBodySource, /@pointerdown\.stop/);
+  assert.match(toolNodeBodySource, /@click\.stop="promoteStaticInputField\(field\.key\)"/);
+  assert.match(toolNodeBodySource, /promoteStaticInputField\(field\.key\)/);
   assert.match(toolNodeBodySource, /selectedToolCardInputFields/);
+  assert.match(toolNodeBodySource, /const promotedInputFieldKeys = computed\(\(\) => new Set\(props\.promotedInputFields\)\);/);
+  assert.match(toolNodeBodySource, /promotedInputFieldKeys\.value\.has\(field\.key\)/);
   assert.match(toolNodeBodySource, /resolveInputPresentation/);
   assert.match(toolNodeBodySource, /commitStaticInputDraft/);
   assert.match(toolNodeBodySource, /applyStaticInputOptionUpdates/);
@@ -172,6 +183,29 @@ test("NodeCard renders input state pills with leading anchor slots", () => {
   assert.match(primaryStatePortSource, /side === 'input'[\s\S]*'node-card__port-pill--input node-card__port-pill--dock-start'/);
   assert.match(primaryStatePortSource, /`\$\{props\.nodeId\}:\$\{anchorSlotKind\.value\}:\$\{props\.port\.key\}`/);
   assert.match(primaryStatePortSource, /class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"/);
+});
+
+test("InputNodeBody renders value presentation controls from input config", () => {
+  assert.match(componentSource, /:input-value-presentation="inputValuePresentation"/);
+  assert.match(componentSource, /:input-raw-value="inputStateValue"/);
+  assert.match(componentSource, /:input-value-type="inputValueType"/);
+  assert.match(componentSource, /@update-input-value="updateInputValue"/);
+  assert.match(componentSource, /const inputValuePresentation = computed/);
+  assert.match(componentSource, /const inputValueType = computed/);
+  assert.match(inputNodeBodySource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
+  assert.match(inputNodeBodySource, /import \{[\s\S]*ElInput,[\s\S]*ElInputNumber,[\s\S]*ElOption,[\s\S]*ElSwitch[\s\S]*\} from "element-plus";/);
+  assert.match(inputNodeBodySource, /inputValuePresentation: InputValuePresentation \| null;/);
+  assert.match(inputNodeBodySource, /inputRawValue: unknown;/);
+  assert.match(inputNodeBodySource, /inputValueType: string;/);
+  assert.match(inputNodeBodySource, /props\.inputValueType\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(inputNodeBodySource, /v-else-if="inputPresentationControl === 'select'"/);
+  assert.match(inputNodeBodySource, /<ToographSelect[\s\S]*:model-value="inputPresentationSelectValue"/);
+  assert.match(inputNodeBodySource, /v-else-if="inputPresentationControl === 'number'"/);
+  assert.match(inputNodeBodySource, /<ElInputNumber[\s\S]*:model-value="inputPresentationNumberValue"/);
+  assert.match(inputNodeBodySource, /v-else-if="inputPresentationControl === 'boolean'"/);
+  assert.match(inputNodeBodySource, /<ElSwitch[\s\S]*:model-value="Boolean\(inputRawValue\)"/);
+  assert.match(inputNodeBodySource, /v-else-if="inputPresentationControl === 'object'"/);
+  assert.match(inputNodeBodySource, /\(event: "update-input-value", value: unknown\): void;/);
 });
 
 test("AgentNodeBody keeps input and output state pill lanes in paired equal columns", () => {

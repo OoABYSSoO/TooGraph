@@ -25,7 +25,8 @@ REPLY_STATE_KEYS = {"state_27", "state_25", "state_26", "state_16", "state_18"}
 
 def buddy_review_context_loader(payload: dict[str, Any] | None, *, context: dict[str, Any] | None = None) -> dict[str, Any]:
     inputs = payload if isinstance(payload, dict) else {}
-    source_run_id = _text(inputs.get("source_run_id") or _dict(context).get("source_run_id"))
+    invocation_context = _dict(context)
+    source_run_id = _text(inputs.get("source_run_id") or invocation_context.get("source_run_id"))
     if not source_run_id:
         return _failed_result(
             source_run_id="",

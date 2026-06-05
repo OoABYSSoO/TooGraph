@@ -193,6 +193,9 @@
         :show-legacy-uploaded-asset-hint="showLegacyUploadedAssetHint"
         :is-input-value-editable="isInputValueEditable"
         :input-value-text="inputValueText"
+        :input-raw-value="inputStateValue"
+        :input-value-type="inputValueType"
+        :input-value-presentation="inputValuePresentation"
         @update:boundary-selection="handleInputBoundarySelection"
         @local-folder-root-input="handleLocalFolderRootInput"
         @local-folder-refresh="handleLocalFolderRefresh"
@@ -203,6 +206,7 @@
         @asset-drop="handleInputAssetDrop"
         @clear-asset="clearInputAsset"
         @input-value="handleInputValueInput"
+        @update-input-value="updateInputValue"
       >
         <template #primary-output>
           <PrimaryStatePort
@@ -361,6 +365,7 @@
         :body="view.body"
         :selected-tool-key="selectedToolKey"
         :static-inputs="toolStaticInputs"
+        :promoted-input-fields="toolPromotedInputFields"
         :target-agent-node-id="toolTargetAgentNodeId"
         :target-agent-node-options="toolTargetAgentNodeOptions"
         :tool-definitions="toolDefinitions"
@@ -406,6 +411,7 @@
         @commit-create="commitPortStateCreate"
         @select-tool="selectTool"
         @update-static-inputs="updateToolStaticInputs"
+        @promote-static-input="promoteToolStaticInput"
         @update-target-agent-node="updateToolTargetAgentNode"
       />
     </section>
@@ -767,6 +773,7 @@ const emit = defineEmits<{
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-tool-config", payload: { nodeId: string; patch: Partial<ToolNode["config"]> }): void;
+  (event: "promote-tool-static-input", payload: { nodeId: string; fieldKey: string }): void;
   (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
   (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
@@ -1009,6 +1016,19 @@ const isInputValueEditable = computed(() => view.value.body.kind === "input" && 
 const inputValueText = computed(() => {
   return view.value.body.kind === "input" ? view.value.body.valueText : "";
 });
+const inputValuePresentation = computed(() =>
+  props.node.kind === "input" ? props.node.config.valuePresentation ?? null : null,
+);
+const inputValueType = computed(() => {
+  if (props.node.kind !== "input") {
+    return "text";
+  }
+  const stateKey = inputStateKey.value;
+  if (stateKey) {
+    return String(props.stateSchema[stateKey]?.type ?? props.node.config.boundaryType ?? "text");
+  }
+  return String(props.node.config.boundaryType ?? "text");
+});
 const inputStateValue = computed(() => {
   if (props.node.kind !== "input") {
     return "";
@@ -1094,6 +1114,7 @@ const agentModelOptions = computed(() =>
 const selectedActionKey = computed(() => props.node.kind === "agent" ? props.node.config.actionKey.trim() : "");
 const selectedToolKey = computed(() => props.node.kind === "tool" ? props.node.config.toolKey.trim() : "");
 const toolStaticInputs = computed(() => props.node.kind === "tool" ? props.node.config.staticInputs ?? {} : {});
+const toolPromotedInputFields = computed(() => props.node.kind === "tool" ? props.node.config.promotedInputFields ?? [] : []);
 const availableActionDefinitions = computed(() =>
   props.node.kind === "agent" ? listSelectableActionDefinitions(props.actionDefinitions) : [],
 );
@@ -1534,6 +1555,16 @@ function updateToolTargetAgentNode(targetAgentNodeId: string) {
 
 function updateToolStaticInputs(staticInputs: Record<string, unknown>) {
   emitToolConfigPatch({ staticInputs });
+}
+
+function promoteToolStaticInput(fieldKey: string) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "tool") {
+    return;
+  }
+  emit("promote-tool-static-input", { nodeId: props.nodeId, fieldKey });
 }
 
 function handleActionInstructionInput(payload: { actionKey: string; content: string }) {
@@ -2188,6 +2219,10 @@ function handleInputValueInput(event: Event) {
     return;
   }
   emitInputValuePatch(target.value);
+}
+
+function updateInputValue(value: unknown) {
+  emitInputValuePatch(value);
 }
 
 function handleInputBoundarySelection(nextType: string | number | boolean) {

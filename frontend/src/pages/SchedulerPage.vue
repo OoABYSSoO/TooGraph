@@ -51,67 +51,6 @@
         {{ t("scheduler.actionFailed", { error: actionError }) }}
       </article>
 
-      <section
-        v-if="officialMaintenanceRecommendations.length > 0"
-        class="scheduler-page__maintenance-guide"
-        :aria-label="t('scheduler.officialMaintenanceTitle')"
-      >
-        <div class="scheduler-page__panel-heading">
-          <div>
-            <span class="scheduler-page__section-kicker">{{ t("scheduler.officialMaintenanceEyebrow") }}</span>
-            <h3>{{ t("scheduler.officialMaintenanceTitle") }}</h3>
-            <p class="scheduler-page__muted">{{ t("scheduler.officialMaintenanceBody") }}</p>
-          </div>
-        </div>
-        <div class="scheduler-page__maintenance-list">
-          <article
-            v-for="recommendation in officialMaintenanceRecommendations"
-            :key="recommendation.job_id"
-            class="scheduler-page__maintenance-card"
-          >
-            <div>
-              <span
-                :class="recommendation.enabled ? 'scheduler-page__status scheduler-page__status--enabled' : 'scheduler-page__status'"
-              >
-                {{ recommendation.enabled ? t("scheduler.enabledStatus") : t("scheduler.disabledStatus") }}
-              </span>
-              <h4>{{ recommendation.title }}</h4>
-              <p>{{ recommendation.description }}</p>
-              <small>{{ recommendation.template_id }} · {{ recommendation.schedule }}</small>
-            </div>
-            <ElButton
-              v-if="recommendation.action === 'enable'"
-              type="primary"
-              :loading="pendingActionKey === jobActionKey(recommendation.job_id, 'toggle')"
-              :disabled="Boolean(pendingActionKey)"
-              data-virtual-affordance-id="scheduler.officialMaintenance.enable"
-              :data-virtual-affordance-label="t('scheduler.enable')"
-              data-virtual-affordance-role="button"
-              data-virtual-affordance-zone="scheduler.officialMaintenance"
-              data-virtual-affordance-actions="click"
-              @click="toggleJobEnabled(recommendation.job_id, true)"
-            >
-              {{ t("scheduler.enable") }}
-            </ElButton>
-            <ElButton
-              v-else
-              type="primary"
-              :loading="pendingActionKey === jobActionKey(recommendation.job_id, 'run')"
-              :disabled="Boolean(pendingActionKey)"
-              data-virtual-affordance-id="scheduler.officialMaintenance.runNow"
-              :data-virtual-affordance-label="t('scheduler.runNow')"
-              data-virtual-affordance-role="button"
-              data-virtual-affordance-zone="scheduler.officialMaintenance"
-              data-virtual-affordance-actions="click"
-              @click="runJobNow(recommendation.job_id)"
-            >
-              <ElIcon aria-hidden="true"><VideoPlay /></ElIcon>
-              <span>{{ t("scheduler.runNow") }}</span>
-            </ElButton>
-          </article>
-        </div>
-      </section>
-
       <section class="scheduler-page__layout">
         <aside class="scheduler-page__job-panel" :aria-label="t('scheduler.jobList')">
           <div class="scheduler-page__panel-heading">
@@ -196,6 +135,10 @@
                 <strong>{{ formatSchedule(selectedJob) }}</strong>
               </article>
               <article>
+                <span>{{ t("scheduler.triggerMode") }}</span>
+                <strong>{{ selectedJobTriggerProfile.modeLabel }}</strong>
+              </article>
+              <article>
                 <span>{{ t("scheduler.nextRun") }}</span>
                 <strong>{{ formatTimestamp(selectedJob.next_run_at) }}</strong>
               </article>
@@ -215,6 +158,7 @@
                 <strong>{{ selectedJob.timezone || "UTC" }}</strong>
               </article>
             </section>
+            <p class="scheduler-page__trigger-description">{{ selectedJobTriggerProfile.description }}</p>
 
             <ElForm class="scheduler-page__form scheduler-page__edit-form" label-position="top">
               <section class="scheduler-page__form-section">
@@ -235,6 +179,7 @@
                       filterable
                       popper-class="toograph-select-popper"
                       :loading="templatesLoading"
+                      :disabled="!canEditSelectedJobTemplate"
                       :placeholder="t('scheduler.templatePlaceholder')"
                       @change="syncEditDraftInputs"
                     >
@@ -248,6 +193,9 @@
                         <small class="scheduler-page__option-id">{{ template.template_id }}</small>
                       </ElOption>
                     </ElSelect>
+                    <p v-if="!canEditSelectedJobTemplate" class="scheduler-page__field-hint">
+                      {{ t("scheduler.officialTemplateLocked") }}
+                    </p>
                   </ElFormItem>
                   <ElFormItem :label="t('scheduler.scheduleKind')">
                     <ElSelect v-model="editDraft.schedule_kind" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
@@ -261,6 +209,10 @@
                         <ElOption v-for="option in intervalUnitOptions" :key="option.value" :label="option.label" :value="option.value" />
                       </ElSelect>
                     </div>
+                  </ElFormItem>
+                  <ElFormItem v-if="editDraft.schedule_kind === 'event'" :label="t('scheduler.eventName')">
+                    <ElInput v-model="editDraft.schedule_expr" :placeholder="t('scheduler.eventNamePlaceholder')" />
+                    <p class="scheduler-page__field-hint">{{ t("scheduler.eventNameHint") }}</p>
                   </ElFormItem>
                   <ElFormItem v-if="editDraft.schedule_kind === 'cron'" :label="t('scheduler.advancedCron')">
                     <ElInput v-model="editDraft.schedule_expr" :placeholder="t('scheduler.scheduleExprPlaceholder')" />
@@ -288,10 +240,62 @@
                       <p v-if="row.description">{{ row.description }}</p>
                     </div>
                     <div class="scheduler-page__input-control">
+                      <ElSelect
+                        v-if="inputRowControl(row) === 'select'"
+                        class="scheduler-page__select toograph-select"
+                        popper-class="toograph-select-popper"
+                        :model-value="inputRowSelectValue(row, editDraft)"
+                        @update:model-value="(value: string | number | boolean | undefined) => setDraftInputValue(editDraft, row.state_key, value ?? '')"
+                      >
+                        <ElOption
+                          v-for="option in row.presentation?.options ?? []"
+                          :key="String(option.value)"
+                          :label="option.label"
+                          :value="option.value"
+                        />
+                      </ElSelect>
+                      <div v-else-if="inputRowControl(row) === 'object'" class="scheduler-page__input-object-grid">
+                        <label
+                          v-for="property in inputRowObjectProperties(row, editDraft)"
+                          :key="property.key"
+                          class="scheduler-page__input-object-field"
+                        >
+                          <span>{{ property.name || property.key }}</span>
+                          <ElInputNumber
+                            v-if="isNumberInputProperty(property)"
+                            :model-value="inputRowObjectPropertyNumberValue(row, editDraft, property)"
+                            :min="property.min ?? undefined"
+                            :max="property.max ?? undefined"
+                            :step="property.step ?? 1"
+                            controls-position="right"
+                            @update:model-value="(value: number | undefined) => setDraftObjectInputValue(editDraft, row, property.key, Number(value ?? 0))"
+                          />
+                          <ElSwitch
+                            v-else-if="isBooleanInputProperty(property)"
+                            :model-value="Boolean(inputRowObjectPropertyValue(row, editDraft, property))"
+                            :width="64"
+                            inline-prompt
+                            active-text="On"
+                            inactive-text="Off"
+                            @update:model-value="(value: string | number | boolean) => setDraftObjectInputValue(editDraft, row, property.key, Boolean(value))"
+                          />
+                          <ElInput
+                            v-else
+                            :model-value="String(inputRowObjectPropertyValue(row, editDraft, property) ?? '')"
+                            @update:model-value="(value: string) => setDraftObjectInputValue(editDraft, row, property.key, value)"
+                          />
+                        </label>
+                      </div>
                       <ElSwitch
-                        v-if="row.type === 'boolean'"
+                        v-else-if="inputRowControl(row) === 'boolean'"
                         :model-value="Boolean(editDraft.input_values[row.state_key])"
                         @change="(value: unknown) => setDraftInputValue(editDraft, row.state_key, Boolean(value))"
+                      />
+                      <ElInputNumber
+                        v-else-if="inputRowControl(row) === 'number'"
+                        :model-value="inputRowNumberValue(row, editDraft)"
+                        controls-position="right"
+                        @update:model-value="(value: number | undefined) => setDraftInputValue(editDraft, row.state_key, String(value ?? 0))"
                       />
                       <ElInput
                         v-else-if="row.type === 'number'"
@@ -540,6 +544,10 @@
               </ElSelect>
             </div>
           </ElFormItem>
+          <ElFormItem v-if="createDraft.schedule_kind === 'event'" :label="t('scheduler.eventName')">
+            <ElInput v-model="createDraft.schedule_expr" :placeholder="t('scheduler.eventNamePlaceholder')" />
+            <p class="scheduler-page__field-hint">{{ t("scheduler.eventNameHint") }}</p>
+          </ElFormItem>
           <ElFormItem v-if="createDraft.schedule_kind === 'cron'" :label="t('scheduler.advancedCron')">
             <ElInput v-model="createDraft.schedule_expr" :placeholder="t('scheduler.scheduleExprPlaceholder')" />
           </ElFormItem>
@@ -563,10 +571,62 @@
                   <p v-if="row.description">{{ row.description }}</p>
                 </div>
                 <div class="scheduler-page__input-control">
+                  <ElSelect
+                    v-if="inputRowControl(row) === 'select'"
+                    class="scheduler-page__select toograph-select"
+                    popper-class="toograph-select-popper"
+                    :model-value="inputRowSelectValue(row, createDraft)"
+                    @update:model-value="(value: string | number | boolean | undefined) => setDraftInputValue(createDraft, row.state_key, value ?? '')"
+                  >
+                    <ElOption
+                      v-for="option in row.presentation?.options ?? []"
+                      :key="String(option.value)"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </ElSelect>
+                  <div v-else-if="inputRowControl(row) === 'object'" class="scheduler-page__input-object-grid">
+                    <label
+                      v-for="property in inputRowObjectProperties(row, createDraft)"
+                      :key="property.key"
+                      class="scheduler-page__input-object-field"
+                    >
+                      <span>{{ property.name || property.key }}</span>
+                      <ElInputNumber
+                        v-if="isNumberInputProperty(property)"
+                        :model-value="inputRowObjectPropertyNumberValue(row, createDraft, property)"
+                        :min="property.min ?? undefined"
+                        :max="property.max ?? undefined"
+                        :step="property.step ?? 1"
+                        controls-position="right"
+                        @update:model-value="(value: number | undefined) => setDraftObjectInputValue(createDraft, row, property.key, Number(value ?? 0))"
+                      />
+                      <ElSwitch
+                        v-else-if="isBooleanInputProperty(property)"
+                        :model-value="Boolean(inputRowObjectPropertyValue(row, createDraft, property))"
+                        :width="64"
+                        inline-prompt
+                        active-text="On"
+                        inactive-text="Off"
+                        @update:model-value="(value: string | number | boolean) => setDraftObjectInputValue(createDraft, row, property.key, Boolean(value))"
+                      />
+                      <ElInput
+                        v-else
+                        :model-value="String(inputRowObjectPropertyValue(row, createDraft, property) ?? '')"
+                        @update:model-value="(value: string) => setDraftObjectInputValue(createDraft, row, property.key, value)"
+                      />
+                    </label>
+                  </div>
                   <ElSwitch
-                    v-if="row.type === 'boolean'"
+                    v-else-if="inputRowControl(row) === 'boolean'"
                     :model-value="Boolean(createDraft.input_values[row.state_key])"
                     @change="(value: unknown) => setDraftInputValue(createDraft, row.state_key, Boolean(value))"
+                  />
+                  <ElInputNumber
+                    v-else-if="inputRowControl(row) === 'number'"
+                    :model-value="inputRowNumberValue(row, createDraft)"
+                    controls-position="right"
+                    @update:model-value="(value: number | undefined) => setDraftInputValue(createDraft, row.state_key, String(value ?? 0))"
                   />
                   <ElInput
                     v-else-if="row.type === 'number'"
@@ -751,22 +811,26 @@ import {
 import AppShell from "@/layouts/AppShell.vue";
 import type { BuddyChatSession } from "@/types/buddy";
 import type { MessagePlatformBinding, MessagePlatformSession } from "@/types/message-platforms";
-import type { TemplateRecord } from "@/types/node-system";
+import type { InputValuePresentationProperty, TemplateRecord } from "@/types/node-system";
 import type { ScheduledGraphJob, ScheduledGraphJobRun, ScheduledMessageOutletKind } from "@/types/scheduler";
 
 import {
-  buildOfficialSchedulerEnableRecommendations,
   buildDefaultScheduledGraphJobDraft,
   buildScheduledGraphJobDraftFromJob,
   buildScheduledGraphJobInputRows,
   buildScheduledGraphJobPayload,
   buildSchedulerOverview,
+  buildScheduledGraphJobTriggerProfile,
+  canEditScheduledGraphJobTemplate,
   formatSchedule,
+  isOfficialScheduledGraphJob,
   normalizeJobRunStatus,
   resetScheduledGraphJobInputValue,
   sortScheduledGraphJobRuns,
   sortScheduledGraphJobs,
   type ScheduledGraphJobDraft,
+  type ScheduledGraphJobInputRow,
+  type ScheduledInputDraftValue,
   withTemplateInputDraft,
 } from "./schedulerPageModel.ts";
 
@@ -798,10 +862,12 @@ const selectedCreateTemplate = computed(() => templateById(createDraft.value.tem
 const editInputRows = computed(() => buildScheduledGraphJobInputRows(selectedEditTemplate.value, editDraft.value));
 const createInputRows = computed(() => buildScheduledGraphJobInputRows(selectedCreateTemplate.value, createDraft.value));
 const sortedRuns = computed(() => sortScheduledGraphJobRuns(jobRuns.value));
-const officialMaintenanceRecommendations = computed(() => {
-  locale.value;
-  return buildOfficialSchedulerEnableRecommendations(jobs.value);
-});
+const canEditSelectedJobTemplate = computed(() => selectedJob.value ? canEditScheduledGraphJobTemplate(selectedJob.value) : true);
+const selectedJobTriggerProfile = computed(() =>
+  selectedJob.value
+    ? buildScheduledGraphJobTriggerProfile(selectedJob.value)
+    : { modeLabel: t("common.none"), description: t("scheduler.triggerProfileFallback") },
+);
 const overview = computed(() => {
   locale.value;
   return buildSchedulerOverview(jobs.value);
@@ -809,6 +875,7 @@ const overview = computed(() => {
 const scheduleKindOptions = computed(() => [
   { label: t("scheduler.manual"), value: "manual" },
   { label: t("scheduler.interval"), value: "interval" },
+  { label: t("scheduler.event"), value: "event" },
   { label: t("scheduler.advancedCron"), value: "cron" },
 ]);
 const intervalUnitOptions = computed(() => [
@@ -1004,11 +1071,125 @@ function syncCreateDraftInputs() {
   createDraft.value = withTemplateInputDraft(createDraft.value, selectedCreateTemplate.value);
 }
 
-function setDraftInputValue(draft: ScheduledGraphJobDraft, stateKey: string, value: string | boolean) {
+function setDraftInputValue(draft: ScheduledGraphJobDraft, stateKey: string, value: ScheduledInputDraftValue) {
   draft.input_values = {
     ...draft.input_values,
     [stateKey]: value,
   };
+}
+
+function inputRowControl(row: ScheduledGraphJobInputRow) {
+  const control = row.presentation?.control ?? null;
+  if (control === "select" || control === "object" || control === "number" || control === "boolean") {
+    return control;
+  }
+  if (row.type === "boolean") {
+    return "boolean";
+  }
+  if (row.type === "number") {
+    return "number";
+  }
+  return "";
+}
+
+function inputRowNumberValue(row: ScheduledGraphJobInputRow, draft: ScheduledGraphJobDraft) {
+  const numericValue = Number(draft.input_values[row.state_key] ?? row.default_value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function inputRowSelectValue(row: ScheduledGraphJobInputRow, draft: ScheduledGraphJobDraft) {
+  const value = draft.input_values[row.state_key] ?? row.default_value ?? "";
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : "";
+}
+
+function inputRowObjectProperties(row: ScheduledGraphJobInputRow, draft: ScheduledGraphJobDraft) {
+  return (row.presentation?.properties ?? []).filter((property) => isInputObjectPropertyVisible(row, draft, property));
+}
+
+function isInputObjectPropertyVisible(
+  row: ScheduledGraphJobInputRow,
+  draft: ScheduledGraphJobDraft,
+  property: InputValuePresentationProperty,
+) {
+  const condition = property.visibleWhen;
+  if (!condition?.field) {
+    return true;
+  }
+  const objectValue = inputRowObjectValue(row, draft);
+  if (!Object.prototype.hasOwnProperty.call(objectValue, condition.field)) {
+    return true;
+  }
+  return String(objectValue[condition.field] ?? "") === String(condition.equals ?? "");
+}
+
+function inputRowObjectValue(row: ScheduledGraphJobInputRow, draft: ScheduledGraphJobDraft): Record<string, unknown> {
+  const value = draft.input_values[row.state_key];
+  if (isPlainRecord(value)) {
+    return { ...value };
+  }
+  if (isPlainRecord(row.default_value)) {
+    return { ...row.default_value };
+  }
+  return {};
+}
+
+function inputRowObjectPropertyValue(
+  row: ScheduledGraphJobInputRow,
+  draft: ScheduledGraphJobDraft,
+  property: InputValuePresentationProperty,
+) {
+  const objectValue = inputRowObjectValue(row, draft);
+  if (Object.prototype.hasOwnProperty.call(objectValue, property.key)) {
+    return objectValue[property.key];
+  }
+  return defaultInputObjectPropertyValue(property);
+}
+
+function inputRowObjectPropertyNumberValue(
+  row: ScheduledGraphJobInputRow,
+  draft: ScheduledGraphJobDraft,
+  property: InputValuePresentationProperty,
+) {
+  const numericValue = Number(inputRowObjectPropertyValue(row, draft, property));
+  return Number.isFinite(numericValue) ? numericValue : Number(defaultInputObjectPropertyValue(property) ?? 0);
+}
+
+function setDraftObjectInputValue(
+  draft: ScheduledGraphJobDraft,
+  row: ScheduledGraphJobInputRow,
+  propertyKey: string,
+  value: unknown,
+) {
+  setDraftInputValue(draft, row.state_key, {
+    ...inputRowObjectValue(row, draft),
+    [propertyKey]: value,
+  });
+}
+
+function isNumberInputProperty(property: InputValuePresentationProperty) {
+  const valueType = property.valueType?.trim().toLowerCase() ?? "";
+  return valueType === "number" || valueType === "integer";
+}
+
+function isBooleanInputProperty(property: InputValuePresentationProperty) {
+  return property.valueType?.trim().toLowerCase() === "boolean";
+}
+
+function defaultInputObjectPropertyValue(property: InputValuePresentationProperty) {
+  if (Object.prototype.hasOwnProperty.call(property, "default")) {
+    return property.default;
+  }
+  if (isBooleanInputProperty(property)) {
+    return false;
+  }
+  if (isNumberInputProperty(property)) {
+    return 0;
+  }
+  return "";
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function resetEditInputValue(stateKey: string) {
@@ -1024,7 +1205,7 @@ function jobActionKey(jobId: string, action: string) {
 }
 
 function isOfficialJob(job: ScheduledGraphJob) {
-  return job.metadata?.source === "official_seed" || job.metadata?.source === "official";
+  return isOfficialScheduledGraphJob(job);
 }
 
 function isPlatformOutlet(outlet: ScheduledMessageOutletKind): outlet is "feishu" | "telegram" {
@@ -1109,7 +1290,6 @@ onMounted(() => {
 
 .scheduler-page__header,
 .scheduler-page__overview,
-.scheduler-page__maintenance-guide,
 .scheduler-page__job-panel,
 .scheduler-page__detail-panel,
 .scheduler-page__runs-panel {
@@ -1152,6 +1332,13 @@ onMounted(() => {
   line-height: 1.65;
 }
 
+.scheduler-page__field-hint {
+  margin: 6px 0 0;
+  color: var(--toograph-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .scheduler-page__header-actions,
 .scheduler-page__detail-actions,
 .scheduler-page__job-card-actions,
@@ -1192,47 +1379,6 @@ onMounted(() => {
   overflow-wrap: anywhere;
   color: var(--toograph-text-strong);
   font-size: 1.14rem;
-}
-
-.scheduler-page__maintenance-guide {
-  display: grid;
-  gap: 14px;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.scheduler-page__maintenance-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.scheduler-page__maintenance-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-  min-width: 0;
-  border: 1px solid rgba(120, 53, 15, 0.1);
-  border-radius: 8px;
-  padding: 14px;
-  background: rgba(255, 252, 247, 0.76);
-}
-
-.scheduler-page__maintenance-card h4 {
-  margin: 8px 0 0;
-  color: var(--toograph-text-strong);
-  font-size: 1rem;
-  line-height: 1.25;
-}
-
-.scheduler-page__maintenance-card p,
-.scheduler-page__maintenance-card small {
-  display: block;
-  margin: 7px 0 0;
-  color: var(--toograph-text-muted);
-  font-size: 0.84rem;
-  line-height: 1.5;
 }
 
 .scheduler-page__notice,
@@ -1411,13 +1557,24 @@ onMounted(() => {
 
 .scheduler-page__facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
 
 .scheduler-page__facts article {
   padding: 12px;
+}
+
+.scheduler-page__trigger-description {
+  margin: 10px 0 0;
+  border: 1px solid rgba(120, 53, 15, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--toograph-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 .scheduler-page__detail-grid {
@@ -1575,6 +1732,32 @@ onMounted(() => {
   min-width: 0;
 }
 
+.scheduler-page__input-object-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(201, 107, 31, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 250, 241, 0.6);
+  padding: 8px;
+}
+
+.scheduler-page__input-object-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.scheduler-page__input-object-field > span {
+  overflow: hidden;
+  color: rgba(60, 41, 20, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .scheduler-page__input-reset {
   justify-self: end;
 }
@@ -1644,10 +1827,13 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .scheduler-page__layout,
   .scheduler-page__detail-grid,
-  .scheduler-page__maintenance-list,
   .scheduler-page__form-grid,
   .scheduler-page__interval-control,
   .scheduler-page__input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduler-page__input-object-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1659,7 +1845,6 @@ onMounted(() => {
 
   .scheduler-page__header,
   .scheduler-page__detail-heading,
-  .scheduler-page__maintenance-card,
   .scheduler-page__run-row {
     grid-template-columns: 1fr;
     flex-direction: column;

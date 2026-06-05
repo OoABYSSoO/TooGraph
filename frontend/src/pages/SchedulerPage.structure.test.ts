@@ -23,15 +23,24 @@ test("SchedulerPage loads jobs including disabled official seeds and exposes pri
   assert.match(source, /data-virtual-affordance-id="scheduler\.job\.toggle"/);
   assert.match(source, /data-virtual-affordance-id="scheduler\.job\.runNow"/);
   assert.match(source, /data-virtual-affordance-zone="scheduler\.jobList"/);
-  assert.match(source, /buildOfficialSchedulerEnableRecommendations/);
-  assert.match(source, /scheduler\.officialMaintenanceTitle/);
-  assert.match(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.enable"/);
-  assert.match(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.runNow"/);
+  assert.match(source, /canEditSelectedJobTemplate/);
+  assert.match(source, /canEditScheduledGraphJobTemplate/);
+  assert.match(source, /:disabled="!canEditSelectedJobTemplate"/);
+  assert.match(source, /scheduler\.officialTemplateLocked/);
+  assert.doesNotMatch(source, /buildOfficialSchedulerEnableRecommendations/);
+  assert.doesNotMatch(source, /scheduler\.officialMaintenanceTitle/);
+  assert.doesNotMatch(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.enable"/);
+  assert.doesNotMatch(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.runNow"/);
   assert.match(source, /<ElDialog/);
   assert.match(source, /<ElSelect/);
   assert.match(source, /editDraft/);
   assert.match(source, /scheduler\.runInputs/);
   assert.match(source, /scheduler\.repeatEvery/);
+  assert.match(source, /scheduler\.eventName/);
+  assert.match(source, /editDraft\.schedule_kind === 'event'/);
+  assert.match(source, /createDraft\.schedule_kind === 'event'/);
+  assert.match(source, /buildScheduledGraphJobTriggerProfile/);
+  assert.match(source, /selectedJobTriggerProfile/);
   assert.match(source, /scheduler\.messageOutlet/);
   assert.match(source, /scheduler\.sessionMode/);
   assert.doesNotMatch(source, /selectedJob\.retry_policy/);
@@ -43,4 +52,13 @@ test("SchedulerPage loads jobs including disabled official seeds and exposes pri
 test("SchedulerPage links scheduler runs back to run detail records", () => {
   assert.match(source, /`\/runs\/\$\{encodeURIComponent\(run\.run_id\)\}`/);
   assert.match(source, /`\/runs\/\$\{encodeURIComponent\(selectedJob\.last_run_id\)\}`/);
+});
+
+test("SchedulerPage renders graph input rows with presentation-aware controls", () => {
+  assert.match(source, /inputRowControl\(row\)/);
+  assert.match(source, /v-if="inputRowControl\(row\) === 'select'"/);
+  assert.match(source, /row\.presentation\?\.options/);
+  assert.match(source, /v-else-if="inputRowControl\(row\) === 'object'"/);
+  assert.match(source, /inputRowObjectProperties\(row,\s*(editDraft|createDraft)\)/);
+  assert.match(source, /setDraftObjectInputValue/);
 });

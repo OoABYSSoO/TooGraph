@@ -140,6 +140,7 @@ test("EditorWorkspaceShell loads Tool definitions and routes Tool node edits thr
   assert.match(componentSource, /:tool-definitions-loading="toolDefinitionsLoading"/);
   assert.match(componentSource, /:tool-definitions-error="toolDefinitionsError"/);
   assert.match(componentSource, /@update-tool-config="updateToolConfigForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
+  assert.match(componentSource, /@promote-tool-static-input="promoteToolStaticInputForTab\(tab\.tabId, \$event\.nodeId, \$event\.fieldKey\)"/);
   assert.match(
     componentSource,
     /const \{[\s\S]*actionDefinitions,[\s\S]*toolDefinitions,[\s\S]*toolDefinitionsLoading,[\s\S]*toolDefinitionsError,[\s\S]*\} = useWorkspaceResourceController\(\{/,
@@ -249,7 +250,7 @@ test("EditorWorkspaceShell delegates graph mutation actions to a workspace compo
   assert.match(componentSource, /import \{ useWorkspaceGraphMutationActions \} from "\.\/useWorkspaceGraphMutationActions\.ts";/);
   assert.match(
     componentSource,
-    /const \{[\s\S]*addStateReaderBinding,[\s\S]*removeStateReaderBinding,[\s\S]*addStateWriterBinding,[\s\S]*bindNodePortStateForTab,[\s\S]*createNodePortStateForTab,[\s\S]*deleteNodeForTab,[\s\S]*deleteNodesForTab,[\s\S]*connectStateBindingForTab,[\s\S]*connectStateInputSourceForTab,[\s\S]*deleteStateField,[\s\S]*removeStateWriterBinding,[\s\S]*\} = useWorkspaceGraphMutationActions\(\{/,
+    /const \{[\s\S]*addStateReaderBinding,[\s\S]*removeStateReaderBinding,[\s\S]*addStateWriterBinding,[\s\S]*bindNodePortStateForTab,[\s\S]*createNodePortStateForTab,[\s\S]*deleteNodeForTab,[\s\S]*deleteNodesForTab,[\s\S]*connectStateBindingForTab,[\s\S]*connectStateInputSourceForTab,[\s\S]*promoteToolStaticInputForTab,[\s\S]*deleteStateField,[\s\S]*removeStateWriterBinding,[\s\S]*\} = useWorkspaceGraphMutationActions\(\{/,
   );
   assert.match(
     componentSource,

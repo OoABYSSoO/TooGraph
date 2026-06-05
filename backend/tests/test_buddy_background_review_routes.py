@@ -84,8 +84,13 @@ class BuddyBackgroundReviewRouteTests(unittest.TestCase):
         self.assertEqual(review_run["metadata"]["buddy_template_id"], "buddy_autonomous_review")
         self.assertEqual(review_run["metadata"]["buddy_review_trigger_reason"], "visible_buddy_run_completed")
         self.assertEqual(review_run["metadata"]["buddy_model_ref"], "openai/gpt-4.1")
+        self.assertEqual(review_run["metadata"]["runtime_context"]["buddy_background_review_id"], body["review_id"])
         self.assertEqual(
-            review_run["graph_snapshot"]["nodes"]["input_source_run_id"]["config"]["value"],
+            review_run["graph_snapshot"]["nodes"]["input_review_source_selection_mode"]["config"]["value"],
+            "explicit",
+        )
+        self.assertEqual(
+            review_run["graph_snapshot"]["nodes"]["select_review_source"]["config"]["staticInputs"]["source_run_id"],
             "run_visible_1",
         )
 

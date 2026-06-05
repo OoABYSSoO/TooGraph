@@ -198,8 +198,8 @@ npm start
 - `buddy_messages_fts`、`buddy_messages_fts_trigram`、`retrieval_chunks_fts`、`retrieval_chunks_fts_trigram`、embedding vectors 和 hybrid audit 表已进入统一数据库。
 - `discover` 支持 snippet、bookend_start、messages、bookend_end、messages_before、messages_after、rank/newest/oldest 排序、CJK trigram 和短 token LIKE fallback。
 - `buddy_sessions` 已包含 `parent_session_id`、`source`、`ended_at`、`end_reason` 等字段。
-- `memory_review_template_binding` 已进入 Buddy store 和 command 路径，默认绑定 `buddy_autonomous_review`，变更可记录 revision。
-- `buddy_autonomous_review` is the background review and low-risk memory writeback flow: it recalls related sessions, prepares `memory_update_plan`, `user_context_update_plan`, `structured_memory_update_plan`, `buddy_identity_update_plan`, and `capability_usage_update_plan`, then writes safe updates through controlled writer nodes with revisions.
+- `memory_review_template_binding` 已进入 Buddy store 和 command 路径；官方 `buddy_autonomous_review` 不再要求外部绑定 `source_run_id`，复盘来源由图内 `buddy_review_source_selector` Tool 选择，变更仍可记录 revision。
+- `buddy_autonomous_review` is the background review and low-risk memory writeback flow: it selects an unreviewed completed Buddy run through `buddy_review_source_selector`, loads that run snapshot, recalls related sessions, prepares `memory_update_plan`, `user_context_update_plan`, `structured_memory_update_plan`, `buddy_identity_update_plan`, and `capability_usage_update_plan`, then writes safe updates through controlled writer nodes with revisions.
 - `buddy_home_writer` 负责 `memory_document.update` 等低风险 Buddy Home 写回，并留下 command/revision；它仍是唯一写入口，不把写文件逻辑藏进后端策略。
 - `buddy_context_compaction` 是独立内部模板，专门处理会话压缩摘要：保护最近原文，迭代更新 `session_summary`，只允许生成 `session_summary.update` 写回命令，不触碰 `MEMORY.md`、`USER.md`、伙伴身份设定或全局运行权限设置。
 
@@ -524,7 +524,7 @@ operation:
 
 - 官方默认主循环是 `buddy_autonomous_loop`。它已经切换到改良输入边界：绑定页只绑定当前用户消息，历史、会话摘要、当前 session id 等运行时上下文由 `buddy_history_context_loader` Tool 在图内组装；同时保留上下文压力检查、可选上下文压缩、回复与能力选择、一次动态能力执行、能力结果复盘和 output-boundary 胶囊。
 - 临时的 `buddy_main_loop_test` 已并入官方主循环，不再作为独立官方模板保留。
-- `buddy_autonomous_review` is the background review graph: it loads context from a completed run snapshot, recalls related history and memory, prepares long-term memory, user context, Buddy identity, structured memory, and capability usage updates, then writes low-risk updates through controlled writer nodes.
+- `buddy_autonomous_review` is the background review graph: scheduled runs use `buddy_review_source_selector` to select an unreviewed completed Buddy run, then load that snapshot, recall related history and memory, prepare long-term memory, user context, Buddy identity, structured memory, and capability usage updates, and write low-risk updates through controlled writer nodes.
 - Buddy Home 规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`。`AGENTS.md` 是运行/项目上下文说明，通常不由复盘记忆自动更新；`SOUL.md`、`USER.md`、`MEMORY.md` 和结构化数据库记忆分别承担身份、用户画像、长期记忆正文和召回索引。
 
 Hermes Agent 参考基线：

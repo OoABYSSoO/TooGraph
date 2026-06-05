@@ -22,7 +22,10 @@ const visibleRunTemplateEffectsSourcePath = resolve(currentDirectory, "useBuddyV
 const visibleRunTemplateEffectsSource = existsSync(visibleRunTemplateEffectsSourcePath)
   ? readFileSync(visibleRunTemplateEffectsSourcePath, "utf8")
   : "";
-const autonomousReviewRunSource = readFileSync(resolve(currentDirectory, "useBuddyAutonomousReviewRun.ts"), "utf8");
+const autonomousReviewRunSourcePath = resolve(currentDirectory, "useBuddyAutonomousReviewRun.ts");
+const autonomousReviewRunSource = existsSync(autonomousReviewRunSourcePath)
+  ? readFileSync(autonomousReviewRunSourcePath, "utf8")
+  : "";
 const contextCompactionRunPath = resolve(currentDirectory, "useBuddyContextCompactionRun.ts");
 const contextCompactionRunSource = existsSync(contextCompactionRunPath)
   ? readFileSync(contextCompactionRunPath, "utf8")
@@ -658,7 +661,6 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.doesNotMatch(componentSource, /fetchBuddyRunTemplateBinding/);
   assert.match(boundRunTemplateSource, /import \{[\s\S]*fetchBuddyRunTemplateBinding,[\s\S]*fetchBuddySessionSummary,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
-  assert.match(autonomousReviewRunSource, /import \{ enqueueBuddyBackgroundReview \} from "\.\.\/api\/buddy\.ts";/);
   assert.match(chatSessionsSource, /import \{[\s\S]*createBuddyChatSession,[\s\S]*deleteBuddyChatSession,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.match(componentSource, /import \{ Close, FullScreen, Plus, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElSelect \} from "element-plus";/);
@@ -750,27 +752,18 @@ test("BuddyWidget starts visible runs from the saved template binding", () => {
   assert.doesNotMatch(componentSource, /fetchTemplate\("buddy_autonomous_loop"\)/);
 });
 
-test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {
-  assert.notEqual(visibleRunTemplateEffectsSource, "");
-  assert.match(autonomousReviewRunSource, /enqueueBuddyBackgroundReview/);
-  assert.doesNotMatch(autonomousReviewRunSource, /buildBuddyReviewGraph/);
-  assert.doesNotMatch(autonomousReviewRunSource, /fetchBuddyMemoryReviewTemplateBinding/);
-  assert.match(visibleRunTemplateEffectsSource, /useBuddyAutonomousReviewRun/);
+test("BuddyWidget leaves background memory review to Scheduler jobs", () => {
+  assert.equal(autonomousReviewRunSource, "");
+  assert.equal(visibleRunTemplateEffectsSource, "");
+  assert.doesNotMatch(componentSource, /enqueueBuddyBackgroundReview/);
+  assert.doesNotMatch(componentSource, /useBuddyAutonomousReviewRun/);
+  assert.doesNotMatch(componentSource, /useBuddyVisibleRunTemplateEffects/);
+  assert.doesNotMatch(componentSource, /startBuddyVisibleRunTemplateEffects/);
+  assert.doesNotMatch(componentSource, /abortBuddyVisibleRunTemplateEffects/);
   assert.doesNotMatch(visibleRunTemplateEffectsSource, /useBuddyContextCompactionRun/);
   assert.doesNotMatch(visibleRunTemplateEffectsSource, /startBuddyContextCompactionRun/);
   assert.doesNotMatch(visibleRunTemplateEffectsSource, /abortContextCompactionRuns/);
   assert.doesNotMatch(visibleRunTemplateEffectsSource, /trigger: "background"/);
-  assert.match(componentSource, /import \{ useBuddyVisibleRunTemplateEffects \} from "\.\/useBuddyVisibleRunTemplateEffects\.ts";/);
-  assert.match(componentSource, /const \{[\s\S]*startBuddyVisibleRunTemplateEffects,[\s\S]*abortBuddyVisibleRunTemplateEffects,[\s\S]*\} = useBuddyVisibleRunTemplateEffects\(\{[\s\S]*buddyModelRef,[\s\S]*pollRunUntilFinished,[\s\S]*notifyBuddyDataChanged: buddyContextStore\.notifyBuddyDataChanged,[\s\S]*\}\);/);
-  assert.doesNotMatch(componentSource, /useBuddyVisibleRunTemplateEffects\(\{[\s\S]*currentSessionId,/);
-  assert.match(componentSource, /void startBuddyVisibleRunTemplateEffects\(\{/);
-  assert.match(visibleRunTemplateEffectsSource, /void startBuddyAutonomousReviewRun\(request\.runDetail\);/);
-  assert.match(autonomousReviewRunSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
-  assert.match(autonomousReviewRunSource, /const reviewRun = await enqueueBuddyBackgroundReview\(\{[\s\S]*source_run_id: mainRun\.run_id,[\s\S]*buddy_model_ref: buddyModelRef\.value,[\s\S]*\}\);/);
-  assert.match(autonomousReviewRunSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.review_run_id\);/);
-  assert.match(autonomousReviewRunSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
-  assert.match(componentSource, /abortBuddyVisibleRunTemplateEffects\(\);/);
-  assert.doesNotMatch(componentSource, /import \{ useBuddyAutonomousReviewRun \} from "\.\/useBuddyAutonomousReviewRun\.ts";/);
   assert.doesNotMatch(componentSource, /startBuddyAutonomousReviewRun/);
   assert.doesNotMatch(componentSource, /abortBackgroundReviewRuns/);
   assert.doesNotMatch(componentSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
@@ -781,7 +774,7 @@ test("BuddyWidget starts autonomous review as a separate background run after th
 
 test("BuddyWidget leaves visible context compaction inside the official run template", () => {
   assert.notEqual(boundRunTemplateSource, "");
-  assert.notEqual(visibleRunTemplateEffectsSource, "");
+  assert.equal(visibleRunTemplateEffectsSource, "");
   assert.match(boundRunTemplateSource, /fetchBuddySessionSummary/);
   assert.match(boundRunTemplateSource, /const sessionSummary = await fetchBuddySessionSummary\(\);/);
   assert.match(boundRunTemplateSource, /sessionSummary: sessionSummary\.content,/);

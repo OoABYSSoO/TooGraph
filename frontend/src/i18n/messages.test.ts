@@ -49,6 +49,9 @@ test("i18n messages expose scheduler management labels", () => {
   assert.equal(messages["zh-CN"].scheduler.messageOutlet, "消息出口");
   assert.equal(messages["zh-CN"].scheduler.runInputs, "运行输入");
   assert.equal(messages["zh-CN"].scheduler.repeatEvery, "每隔");
+  assert.equal(messages["zh-CN"].scheduler.event, "事件");
+  assert.equal(messages["zh-CN"].scheduler.eventName, "事件名称");
+  assert.doesNotMatch(messages["zh-CN"].scheduler.eventNameHint, /\{\{/);
   assert.equal(messages["zh-CN"].scheduler.intervalUnitHours, "小时");
   assert.equal(messages["zh-CN"].scheduler.outletBuddy, "Buddy");
   assert.equal(messages["zh-CN"].scheduler.outletFeishu, "飞书");
@@ -61,6 +64,9 @@ test("i18n messages expose scheduler management labels", () => {
   assert.equal(messages["en-US"].scheduler.messageOutlet, "Message outlet");
   assert.equal(messages["en-US"].scheduler.runInputs, "Run inputs");
   assert.equal(messages["en-US"].scheduler.repeatEvery, "Every");
+  assert.equal(messages["en-US"].scheduler.event, "Event");
+  assert.equal(messages["en-US"].scheduler.eventName, "Event name");
+  assert.doesNotMatch(messages["en-US"].scheduler.eventNameHint, /\{\{/);
   assert.equal(messages["en-US"].scheduler.intervalUnitHours, "hours");
   assert.equal(messages["en-US"].scheduler.outletBuddy, "Buddy");
   assert.equal(messages["en-US"].scheduler.outletFeishu, "Feishu");

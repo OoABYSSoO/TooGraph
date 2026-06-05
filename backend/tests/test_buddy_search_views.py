@@ -55,6 +55,45 @@ def _project_memory_for_test_recall(memory: dict[str, object]) -> dict[str, obje
     return chunk
 
 
+def _project_buddy_message_window_for_test_recall(message: dict[str, object]) -> dict[str, object]:
+    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+    message_id = str(message["message_id"])
+    session_id = str(message["session_id"])
+    source_id = f"{session_id}:{message_id}:{message_id}"
+    content = str(message.get("content") or "")
+    document = upsert_retrieval_document(
+        document_id=f"test_buddy_message_window_doc_{message_id}",
+        source_kind="buddy_message",
+        source_id=source_id,
+        title="Buddy message window",
+        content=content,
+        scope={"session_id": session_id},
+        metadata={"role": "buddy_message_window", "message_ids": [message_id]},
+    )
+    [chunk] = upsert_retrieval_chunks(
+        document["document_id"],
+        [
+            {
+                "chunk_id": f"test_buddy_message_window_chunk_{message_id}",
+                "content": content,
+                "source_locator": {
+                    "session_id": session_id,
+                    "message_ids": [message_id],
+                    "primary_message_ids": [message_id],
+                },
+                "metadata": {
+                    "strategy": "conversation_turn_window",
+                    "session_id": session_id,
+                    "message_ids": [message_id],
+                    "primary_message_ids": [message_id],
+                },
+            }
+        ],
+    )
+    return chunk
+
+
 class BuddySearchViewTests(unittest.TestCase):
     def test_search_sessions_returns_lineage_aware_message_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -120,7 +159,8 @@ class BuddySearchViewTests(unittest.TestCase):
                     changed_by="buddy",
                     change_reason="test",
                 )
-                queue_embedding_job("buddy_message", message["message_id"], model["embedding_model_id"])
+                chunk = _project_buddy_message_window_for_test_recall(message)
+                queue_embedding_job("buddy_message", str(chunk["source_id"]), model["embedding_model_id"])
                 with patch(
                     "app.core.storage.embedding_store.embed_text_with_model_ref",
                     return_value=([1.0, 0.0, 0.0], {"provider_id": "openai", "model": "text-embedding-3-small"}),
@@ -153,7 +193,10 @@ class BuddySearchViewTests(unittest.TestCase):
         self.assertEqual(ranking_report["embedding_model_ref"], model["embedding_model_id"])
         self.assertGreaterEqual(ranking_report["result_count"], 1)
         self.assertEqual(ranking_report["ranked_results"][0]["rank"], 1)
-        self.assertEqual(ranking_report["ranked_results"][0]["source_ref"]["source_id"], message["message_id"])
+        self.assertIn(
+            message["message_id"],
+            ranking_report["ranked_results"][0]["source_ref"]["source_locator"]["message_ids"],
+        )
         self.assertIn("lexical_score + vector_score", ranking_report["score_formula"])
 
     def test_search_sessions_expands_hit_message_and_run_source_refs(self) -> None:

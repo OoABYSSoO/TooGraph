@@ -4,13 +4,69 @@
   "description": "可见 Buddy 回复完成后的后台复盘模板：从源 run 恢复上下文，召回相关会话，判断并自主写入低风险记忆、用户上下文、伙伴身份和能力使用统计更新。",
   "default_graph_name": "自主复盘",
   "state_schema": {
+    "review_source_selection_mode": {
+      "name": "review_source_selection_mode",
+      "description": "??????????? auto_unreviewed???????????????? completed Buddy run?",
+      "type": "text",
+      "value": "auto_unreviewed",
+      "color": "#0f766e",
+      "binding": null
+    },
     "source_run_id": {
       "name": "source_run_id",
-      "description": "触发本次自主复盘的可见 Buddy run ID。",
+      "description": "????????????? Buddy run ID??????????????? completed Buddy run?",
       "type": "text",
       "value": "",
       "color": "#475569",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_source_selector",
+        "nodeId": "select_review_source",
+        "fieldKey": "selected_source_run_id",
+        "managed": true
+      }
+    },
+    "has_review_source": {
+      "name": "has_review_source",
+      "description": "???????????????????? Buddy run?",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_source_selector",
+        "nodeId": "select_review_source",
+        "fieldKey": "has_source_run",
+        "managed": true
+      }
+    },
+    "review_id": {
+      "name": "review_id",
+      "description": "?????????????????????? ID?",
+      "type": "text",
+      "value": "",
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_source_selector",
+        "nodeId": "select_review_source",
+        "fieldKey": "review_id",
+        "managed": true
+      }
+    },
+    "review_source_selection_report": {
+      "name": "review_source_selection_report",
+      "description": "?????????????????????????????????",
+      "type": "json",
+      "value": {},
+      "color": "#64748b",
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_source_selector",
+        "nodeId": "select_review_source",
+        "fieldKey": "selection_report",
+        "managed": true
+      }
     },
     "current_session_id": {
       "name": "current_session_id",
@@ -539,27 +595,126 @@
     }
   },
   "nodes": {
-    "input_source_run_id": {
-      "kind": "input",
-      "name": "源运行 ID",
-      "description": "",
+    "select_review_source": {
+      "kind": "tool",
+      "name": "??????",
+      "description": "????????? completed Buddy run???????????????????",
       "ui": {
         "position": {
           "x": 60,
-          "y": 60
+          "y": -560
         },
-        "collapsed": false
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 260
+        }
       },
-      "reads": [],
+      "reads": [
+        {
+          "state": "review_source_selection_mode",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "buddy_review_source_selector",
+            "fieldKey": "mode",
+            "managed": true
+          }
+        }
+      ],
       "writes": [
         {
           "state": "source_run_id",
           "mode": "replace"
+        },
+        {
+          "state": "has_review_source",
+          "mode": "replace"
+        },
+        {
+          "state": "review_id",
+          "mode": "replace"
+        },
+        {
+          "state": "review_source_selection_report",
+          "mode": "replace"
         }
       ],
       "config": {
-        "value": "",
-        "boundaryType": "text"
+        "toolKey": "buddy_review_source_selector",
+        "staticInputs": {
+          "source_run_id": ""
+        }
+      }
+    },
+    "has_review_source": {
+      "kind": "condition",
+      "name": "????????",
+      "description": "????????? Buddy run ?????????????????????????",
+      "ui": {
+        "position": {
+          "x": 560,
+          "y": -560
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 240
+        }
+      },
+      "reads": [
+        {
+          "state": "has_review_source",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 1,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.has_review_source",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "output_review_source_selection_report": {
+      "kind": "output",
+      "name": "????????",
+      "description": "????????????????? no-op ???",
+      "ui": {
+        "position": {
+          "x": 1040,
+          "y": -560
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "review_source_selection_report",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
       }
     },
     "input_buddy_context": {
@@ -1799,12 +1954,43 @@
       "config": {
         "toolKey": "buddy_review_context_loader"
       }
+    },
+    "input_review_source_selection_mode": {
+      "kind": "input",
+      "name": "????????",
+      "description": "??????????????????????????? Buddy run?",
+      "ui": {
+        "position": {
+          "x": -420,
+          "y": -560
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "review_source_selection_mode",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "auto_unreviewed",
+        "boundaryType": "text"
+      }
     }
   },
   "edges": [
     {
-      "source": "input_source_run_id",
-      "target": "load_review_context"
+      "source": "input_review_source_selection_mode",
+      "target": "select_review_source"
+    },
+    {
+      "source": "select_review_source",
+      "target": "has_review_source"
     },
     {
       "source": "load_review_context",
@@ -1897,6 +2083,14 @@
   ],
   "conditional_edges": [
     {
+      "source": "has_review_source",
+      "branches": {
+        "true": "load_review_context",
+        "false": "output_review_source_selection_report",
+        "exhausted": "output_review_source_selection_report"
+      }
+    },
+    {
       "source": "has_memory_updates",
       "branches": {
         "true": "write_memory_updates",
@@ -1956,7 +2150,8 @@
       "session-recall",
       "memory-plan",
       "memory-writeback",
-      "source-run-context"
+      "source-run-context",
+      "review-source-selector"
     ],
     "requiredActions": [
       "buddy_session_recall",
@@ -1968,10 +2163,8 @@
       "buddy_home_write",
       "buddy_memory_write"
     ],
-    "buddyMemoryReviewRuntimeInputBindings": {
-      "input_source_run_id": "source_run_id"
-    },
     "requiredTools": [
+      "buddy_review_source_selector",
       "buddy_review_context_loader"
     ]
   }

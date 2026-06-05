@@ -23,7 +23,9 @@ import type {
   GraphDocument,
   GraphNode,
   GraphPayload,
+  InputBoundaryConfigType,
   InputNode,
+  InputValuePresentation,
   OutputNode,
   ReadBinding,
   StateDefinition,
@@ -675,11 +677,16 @@ export function updateToolNodeConfigInDocument<T extends GraphPayload | GraphDoc
 
   const selectedToolDefinition = options.toolDefinitions?.find((definition) => definition.toolKey === nextConfig.toolKey.trim());
   const isContextPressureTool = nextConfig.toolKey.trim() === "buddy_context_pressure_check";
+  const promotedInputFields = normalizePromotedToolInputFields(nextConfig.promotedInputFields, selectedToolDefinition);
   nextNode.config = {
     ...nextConfig,
-    staticInputs: filterToolStaticInputs(nextConfig.staticInputs, selectedToolDefinition),
+    promotedInputFields,
+    staticInputs: filterToolStaticInputs(nextConfig.staticInputs, selectedToolDefinition, promotedInputFields),
     dynamicStateInputs: Boolean(selectedToolDefinition?.dynamicStateInputs),
   };
+  if (promotedInputFields.length === 0) {
+    delete nextNode.config.promotedInputFields;
+  }
   if (isContextPressureTool) {
     nextNode.config.targetAgentNodeId = nextConfig.targetAgentNodeId ?? "";
   } else {
@@ -690,29 +697,137 @@ export function updateToolNodeConfigInDocument<T extends GraphPayload | GraphDoc
   return nextDocument;
 }
 
+export type PromoteToolStaticInputToGraphInputResult<T extends GraphPayload | GraphDocument> = {
+  document: T;
+  inputNodeId: string | null;
+  stateKey: string | null;
+};
+
+export function promoteToolStaticInputToGraphInputInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  fieldKey: string,
+  options: { toolDefinitions?: ToolDefinition[] } = {},
+): PromoteToolStaticInputToGraphInputResult<T> {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "tool") {
+    return { document, inputNodeId: null, stateKey: null };
+  }
+  const toolKey = node.config.toolKey.trim();
+  const toolDefinition = options.toolDefinitions?.find((definition) => definition.toolKey === toolKey);
+  const field = toolDefinition?.inputSchema?.find((candidate) => candidate.key === fieldKey);
+  if (!toolDefinition || !field || toolDefinition.dynamicStateInputs) {
+    return { document, inputNodeId: null, stateKey: null };
+  }
+
+  const staticValue = resolvePromotedToolStaticInputValue(node, toolDefinition, field);
+  const promotedDocument = updateToolNodeConfigInDocument(
+    document,
+    nodeId,
+    (current) => {
+      const nextStaticInputs = { ...(current.staticInputs ?? {}) };
+      delete nextStaticInputs[fieldKey];
+      return {
+        ...current,
+        staticInputs: nextStaticInputs,
+        promotedInputFields: [...normalizePromotedToolInputFields(current.promotedInputFields, toolDefinition), fieldKey],
+      };
+    },
+    options,
+  );
+  const nextDocument = promotedDocument === document ? cloneGraphDocument(document) : promotedDocument;
+  const nextNode = nextDocument.nodes[nodeId];
+  if (!nextNode || nextNode.kind !== "tool") {
+    return { document: nextDocument, inputNodeId: null, stateKey: null };
+  }
+  const readBinding = nextNode.reads.find((binding) =>
+    binding.binding?.kind === "tool_input" &&
+    binding.binding.toolKey === toolKey &&
+    binding.binding.fieldKey === fieldKey
+  );
+  const stateKey = readBinding?.state ?? null;
+  if (!stateKey || !nextDocument.state_schema[stateKey]) {
+    return { document: nextDocument, inputNodeId: null, stateKey: null };
+  }
+  const valuePresentation = toolInputPresentationToInputValuePresentation(toolDefinition.inputPresentation?.[fieldKey]);
+
+  nextDocument.state_schema[stateKey] = {
+    ...nextDocument.state_schema[stateKey],
+    name: field.name.trim() || field.key,
+    description: field.description.trim() || `${toolDefinition.name.trim() || toolDefinition.toolKey} input: ${field.key}`,
+    value: clonePlainValue(staticValue),
+  };
+  const inputNodeId = nextAvailableNodeId(nextDocument, `input_${nodeId}_${fieldKey}`);
+  nextDocument.nodes[inputNodeId] = {
+    kind: "input",
+    name: field.name.trim() || field.key,
+    description: field.description.trim() || `${toolDefinition.name.trim() || toolDefinition.toolKey} input: ${field.key}`,
+    ui: {
+      position: {
+        x: (nextNode.ui?.position?.x ?? 0) - 360,
+        y: nextNode.ui?.position?.y ?? 0,
+      },
+    },
+    reads: [],
+    writes: [{ state: stateKey, mode: "replace" }],
+    config: {
+      value: clonePlainValue(staticValue),
+      boundaryType: inputBoundaryTypeForStateType(nextDocument.state_schema[stateKey].type),
+      ...(valuePresentation ? { valuePresentation } : {}),
+    },
+  } satisfies InputNode;
+  if (!nextDocument.edges.some((edge) => edge.source === inputNodeId && edge.target === nodeId)) {
+    nextDocument.edges = [...nextDocument.edges, { source: inputNodeId, target: nodeId }];
+  }
+  return { document: nextDocument, inputNodeId, stateKey };
+}
+
+function toolInputPresentationToInputValuePresentation(
+  presentation: NonNullable<ToolDefinition["inputPresentation"]>[string] | undefined,
+): InputValuePresentation | undefined {
+  if (!presentation) {
+    return undefined;
+  }
+  const { mode: _mode, ...valuePresentation } = presentation;
+  if (Object.keys(valuePresentation).length === 0) {
+    return undefined;
+  }
+  return clonePlainValue(valuePresentation) as InputValuePresentation;
+}
+
 function filterToolStaticInputs(
   staticInputs: Record<string, unknown> | undefined,
   definition: ToolDefinition | undefined,
+  promotedInputFields: readonly string[] = [],
 ): Record<string, unknown> {
   if (!staticInputs || !definition?.inputSchema?.length || definition.dynamicStateInputs) {
-    return materializeToolPresentationStaticInputs({}, definition);
+    return materializeToolPresentationStaticInputs({}, definition, promotedInputFields);
   }
   const activeInputKeys = new Set(definition.inputSchema.map((field) => field.key));
-  const filteredStaticInputs = Object.fromEntries(Object.entries(staticInputs).filter(([fieldKey]) => activeInputKeys.has(fieldKey)));
-  return materializeToolPresentationStaticInputs(filteredStaticInputs, definition);
+  const promotedFieldKeys = new Set(promotedInputFields);
+  const filteredStaticInputs = Object.fromEntries(
+    Object.entries(staticInputs).filter(([fieldKey]) => activeInputKeys.has(fieldKey) && !promotedFieldKeys.has(fieldKey)),
+  );
+  return materializeToolPresentationStaticInputs(filteredStaticInputs, definition, promotedInputFields);
 }
 
 function materializeToolPresentationStaticInputs(
   staticInputs: Record<string, unknown>,
   definition: ToolDefinition | undefined,
+  promotedInputFields: readonly string[] = [],
 ): Record<string, unknown> {
   if (!definition?.inputSchema?.length || definition.dynamicStateInputs) {
     return {};
   }
   const nextStaticInputs = { ...staticInputs };
+  const promotedFieldKeys = new Set(promotedInputFields);
   for (const field of definition.inputSchema) {
     const presentation = definition.inputPresentation?.[field.key];
-    if (presentation?.mode !== "static" || Object.prototype.hasOwnProperty.call(nextStaticInputs, field.key)) {
+    if (
+      presentation?.mode !== "static" ||
+      promotedFieldKeys.has(field.key) ||
+      Object.prototype.hasOwnProperty.call(nextStaticInputs, field.key)
+    ) {
       continue;
     }
     nextStaticInputs[field.key] = defaultToolStaticInputValue(field, presentation);
@@ -738,6 +853,53 @@ function defaultToolStaticInputValue(
     return {};
   }
   return "";
+}
+
+function normalizePromotedToolInputFields(
+  value: ToolNode["config"]["promotedInputFields"],
+  definition: ToolDefinition | undefined,
+): string[] {
+  if (!Array.isArray(value) || !definition?.inputSchema?.length || definition.dynamicStateInputs) {
+    return [];
+  }
+  const activeInputKeys = new Set(definition.inputSchema.map((field) => field.key));
+  const promotedInputFields: string[] = [];
+  for (const rawFieldKey of value) {
+    const fieldKey = String(rawFieldKey ?? "").trim();
+    if (fieldKey && activeInputKeys.has(fieldKey) && !promotedInputFields.includes(fieldKey)) {
+      promotedInputFields.push(fieldKey);
+    }
+  }
+  return promotedInputFields;
+}
+
+function resolvePromotedToolStaticInputValue(node: ToolNode, definition: ToolDefinition, field: ToolIoField) {
+  if (Object.prototype.hasOwnProperty.call(node.config.staticInputs ?? {}, field.key)) {
+    return clonePlainValue(node.config.staticInputs?.[field.key]);
+  }
+  return defaultToolStaticInputValue(field, definition.inputPresentation?.[field.key]);
+}
+
+function nextAvailableNodeId(document: GraphPayload | GraphDocument, base: string) {
+  const compactBase = base
+    .trim()
+    .replace(/[^a-zA-Z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "node";
+  let candidate = compactBase;
+  let index = 2;
+  while (document.nodes[candidate]) {
+    candidate = `${compactBase}_${index}`;
+    index += 1;
+  }
+  return candidate;
+}
+
+function inputBoundaryTypeForStateType(type: string): InputBoundaryConfigType {
+  const normalizedType = type.trim().toLowerCase();
+  if (normalizedType === "file" || normalizedType === "image" || normalizedType === "audio" || normalizedType === "video") {
+    return normalizedType;
+  }
+  return "text";
 }
 
 export function updateBatchNodeSubgraphWorkerInDocument<T extends GraphPayload | GraphDocument>(
@@ -936,11 +1098,16 @@ export function reconcileToolBindingsInDocument<T extends GraphPayload | GraphDo
       continue;
     }
     const selectedToolDefinition = toolDefinitions.find((definition) => definition.toolKey === node.config.toolKey.trim());
+    const promotedInputFields = normalizePromotedToolInputFields(node.config.promotedInputFields, selectedToolDefinition);
     node.config = {
       ...node.config,
-      staticInputs: filterToolStaticInputs(node.config.staticInputs, selectedToolDefinition),
+      promotedInputFields,
+      staticInputs: filterToolStaticInputs(node.config.staticInputs, selectedToolDefinition, promotedInputFields),
       dynamicStateInputs: Boolean(selectedToolDefinition?.dynamicStateInputs),
     };
+    if (promotedInputFields.length === 0) {
+      delete node.config.promotedInputFields;
+    }
     reconcileToolStateInputBindings(nextDocument, nodeId, toolDefinitions);
     reconcileToolOutputBindings(nextDocument, nodeId, toolDefinitions);
   }

@@ -83,9 +83,7 @@ ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
     "capability_review",
     "public_response",
 }
-REQUIRED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
-    "source_run_id",
-}
+REQUIRED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES: set[str] = set()
 DEFAULT_RUN_TEMPLATE_BINDING = {
     "version": RUN_TEMPLATE_BINDING_VERSION,
     "template_id": "buddy_autonomous_loop",
@@ -96,9 +94,7 @@ DEFAULT_RUN_TEMPLATE_BINDING = {
 DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING = {
     "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
     "template_id": "buddy_autonomous_review",
-    "input_bindings": {
-        "input_source_run_id": "source_run_id",
-    },
+    "input_bindings": {},
 }
 
 
@@ -338,73 +334,6 @@ def _project_chat_session_summary_to_retrieval(
     )
     for model_ref in embedding_model_refs:
         queue_embedding_job("buddy_session_summary", summary_id, model_ref)
-
-
-def _project_chat_message_to_retrieval(
-    *,
-    message: dict[str, Any],
-    session_title: str,
-    source_revision_id: str,
-    embedding_model_refs: list[str],
-) -> None:
-    from app.core.storage.embedding_store import queue_embedding_job
-    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
-
-    message_id = str(message.get("message_id") or "").strip()
-    session_id = str(message.get("session_id") or "").strip()
-    role = str(message.get("role") or "").strip()
-    content = str(message.get("content") or "")
-    if not message_id or not session_id or not content.strip():
-        return
-    metadata = {
-        "role": role,
-        "session_id": session_id,
-        "message_id": message_id,
-        "client_order": message.get("client_order"),
-        "include_in_context": bool(message.get("include_in_context", True)),
-        "run_id": str(message.get("run_id") or ""),
-        "created_at": str(message.get("created_at") or ""),
-        "updated_at": str(message.get("updated_at") or ""),
-        "source_revision_id": source_revision_id,
-        "message_metadata": _coerce_dict(message.get("metadata")),
-    }
-    document = upsert_retrieval_document(
-        source_kind="buddy_message",
-        source_id=message_id,
-        source_revision_id=source_revision_id,
-        title=f"Buddy {role} message: {session_title or session_id}",
-        content=content,
-        scope={
-            "session_id": session_id,
-            "role": role,
-        },
-        metadata=metadata,
-        document_id=f"buddy_message:{message_id}",
-    )
-    upsert_retrieval_chunks(
-        document["document_id"],
-        [
-            {
-                "chunk_id": f"buddy_message:{message_id}:body",
-                "content": content,
-                "source_locator": {
-                    "message_id": message_id,
-                    "session_id": session_id,
-                    "role": role,
-                    "client_order": message.get("client_order"),
-                    "run_id": str(message.get("run_id") or ""),
-                    "source_revision_id": source_revision_id,
-                    "field": "content",
-                },
-                "metadata": {
-                    **metadata,
-                    "content_hash": _sha256_text(content),
-                },
-            }
-        ],
-    )
-    for model_ref in embedding_model_refs:
-        queue_embedding_job("buddy_message", message_id, model_ref)
 
 
 def _normalize_embedding_model_refs(value: Any) -> list[str]:
@@ -684,6 +613,25 @@ def get_background_review_run(review_id: str) -> dict[str, Any]:
         ).fetchone()
     if not row:
         raise KeyError(normalized_review_id)
+    return _background_review_from_row(row)
+
+
+def get_background_review_run_by_review_run_id(review_run_id: str) -> dict[str, Any]:
+    normalized_review_run_id = str(review_run_id or "").strip()
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT review_id, source_run_id, review_run_id, template_id, status, trigger_reason,
+                   metadata_json, error, created_at, updated_at, started_at, completed_at
+            FROM buddy_background_review_runs
+            WHERE review_run_id = ?
+            ORDER BY created_at DESC, review_id DESC
+            LIMIT 1
+            """,
+            (normalized_review_run_id,),
+        ).fetchone()
+    if not row:
+        raise KeyError(normalized_review_run_id)
     return _background_review_from_row(row)
 
 
@@ -1680,12 +1628,6 @@ def append_chat_message(
             (next_title, now, session_id),
         )
         connection.commit()
-    _project_chat_message_to_retrieval(
-        message=message,
-        session_title=next_title,
-        source_revision_id=message_revision_id,
-        embedding_model_refs=_embedding_model_refs_from_payload(payload),
-    )
     return _get_chat_message(str(message["message_id"]))
 
 
@@ -2025,29 +1967,51 @@ def _search_chat_message_hits_hybrid(
     )
     hits: list[dict[str, Any]] = []
     for result in results:
-        message_id = str(_coerce_dict(result.get("source_ref")).get("source_id") or result.get("source_id") or "").strip()
-        if not message_id:
-            continue
-        try:
-            message = _get_chat_message(message_id)
-            session = get_chat_session(str(message.get("session_id") or ""))
-        except KeyError:
-            continue
-        if not _is_recall_context_message(message, role_filter) or not _is_recall_visible_session(session):
-            continue
-        hits.append(
-            {
-                "message_id": message_id,
-                "session_id": str(message.get("session_id") or ""),
-                "role": str(message.get("role") or ""),
-                "snippet": str(result.get("snippet") or "") or _make_text_snippet(str(message.get("content") or ""), tokens=_query_search_tokens(query)),
-                "created_at": str(message.get("created_at") or ""),
-                "parent_session_id": session.get("parent_session_id"),
-                "source": str(session.get("source") or "buddy"),
-                "retrieval": _coerce_dict(result.get("retrieval")),
-            }
-        )
+        for message_id in _retrieval_result_message_ids(result):
+            try:
+                message = _get_chat_message(message_id)
+                session = get_chat_session(str(message.get("session_id") or ""))
+            except KeyError:
+                continue
+            if not _is_recall_context_message(message, role_filter) or not _is_recall_visible_session(session):
+                continue
+            hits.append(
+                {
+                    "message_id": message_id,
+                    "session_id": str(message.get("session_id") or ""),
+                    "role": str(message.get("role") or ""),
+                    "snippet": str(result.get("snippet") or "") or _make_text_snippet(str(message.get("content") or ""), tokens=_query_search_tokens(query)),
+                    "created_at": str(message.get("created_at") or ""),
+                    "parent_session_id": session.get("parent_session_id"),
+                    "source": str(session.get("source") or "buddy"),
+                    "retrieval": _coerce_dict(result.get("retrieval")),
+                }
+            )
     return _dedupe_hit_rows(hits)
+
+
+def _retrieval_result_message_ids(result: dict[str, Any]) -> list[str]:
+    source_ref = _coerce_dict(result.get("source_ref"))
+    source_locator = _coerce_dict(source_ref.get("source_locator"))
+    metadata = _coerce_dict(result.get("metadata"))
+    message_ids: list[str] = []
+
+    def append_id(value: Any) -> None:
+        message_id = str(value or "").strip()
+        if message_id and message_id not in message_ids:
+            message_ids.append(message_id)
+
+    for source in (source_locator, metadata):
+        for key in ("primary_message_ids", "message_ids"):
+            values = source.get(key)
+            if isinstance(values, list):
+                for value in values:
+                    append_id(value)
+            else:
+                append_id(values)
+        append_id(source.get("message_id"))
+    append_id(source_ref.get("source_id") or result.get("source_id"))
+    return message_ids
 
 
 def _search_chat_message_hits_fts(
@@ -2938,26 +2902,16 @@ def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[s
             "updated_at": str(payload.get("updated_at") or utc_now_iso()),
         }
 
-    input_bindings: dict[str, str] = {}
-    for node_id, source in raw_bindings.items():
-        normalized_node_id = str(node_id or "").strip()
+    for source in raw_bindings.values():
         normalized_source = str(source or "").strip()
-        if not normalized_node_id or not normalized_source:
-            continue
-        if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
+        if not normalized_source or normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
             continue
         if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
             raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
-        if normalized_source in input_bindings.values():
-            raise ValueError(f"Buddy memory review input source is already bound: {normalized_source}")
-        input_bindings[normalized_node_id] = normalized_source
-    missing_sources = sorted(REQUIRED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES - set(input_bindings.values()))
-    if missing_sources:
-        raise ValueError(f"Missing required Buddy memory review input source(s): {', '.join(missing_sources)}")
     return {
         "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
         "template_id": template_id,
-        "input_bindings": input_bindings,
+        "input_bindings": {},
         "updated_at": str(payload.get("updated_at") or utc_now_iso()),
     }
 

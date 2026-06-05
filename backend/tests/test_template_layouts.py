@@ -255,15 +255,16 @@ class TemplateLayoutTests(unittest.TestCase):
         review_template = templates["buddy_autonomous_review"]
         self.assertEqual(review_template["source"], "official")
         self.assertEqual(review_template["label"], "自主复盘")
-        self.assertEqual(
-            review_template["metadata"].get("buddyMemoryReviewRuntimeInputBindings"),
-            {"input_source_run_id": "source_run_id"},
-        )
+        self.assertNotIn("buddyMemoryReviewRuntimeInputBindings", review_template["metadata"])
+        self.assertIn("buddy_review_source_selector", review_template["metadata"].get("requiredTools", []))
         self.assertIn("buddy_review_context_loader", review_template["metadata"].get("requiredTools", []))
         self.assertEqual(
             sorted(node_id for node_id, node in review_template["nodes"].items() if node["kind"] == "input"),
-            ["input_buddy_context", "input_source_run_id"],
+            ["input_buddy_context", "input_review_source_selection_mode"],
         )
+        self.assertEqual(review_template["nodes"]["select_review_source"]["kind"], "tool")
+        self.assertEqual(review_template["nodes"]["select_review_source"]["config"]["toolKey"], "buddy_review_source_selector")
+        self.assertEqual(review_template["nodes"]["has_review_source"]["kind"], "condition")
         self.assertEqual(review_template["nodes"]["load_review_context"]["kind"], "tool")
         self.assertEqual(review_template["nodes"]["load_review_context"]["config"]["toolKey"], "buddy_review_context_loader")
         self.assertEqual(review_template["state_schema"]["conversation_history"]["type"], "json")
@@ -271,7 +272,20 @@ class TemplateLayoutTests(unittest.TestCase):
             review_template["state_schema"]["current_session_id"]["binding"]["fieldKey"],
             "current_session_id",
         )
-        self.assertIn({"source": "input_source_run_id", "target": "load_review_context"}, review_template["edges"])
+        self.assertEqual(review_template["state_schema"]["source_run_id"]["binding"]["fieldKey"], "selected_source_run_id")
+        self.assertIn({"source": "input_review_source_selection_mode", "target": "select_review_source"}, review_template["edges"])
+        self.assertIn({"source": "select_review_source", "target": "has_review_source"}, review_template["edges"])
+        self.assertIn(
+            {
+                "source": "has_review_source",
+                "branches": {
+                    "true": "load_review_context",
+                    "false": "output_review_source_selection_report",
+                    "exhausted": "output_review_source_selection_report",
+                },
+            },
+            review_template["conditional_edges"],
+        )
         self.assertIn({"source": "load_review_context", "target": "recall_related_sessions"}, review_template["edges"])
         self.assertIn({"source": "load_review_context", "target": "draft_autonomous_review"}, review_template["edges"])
 
@@ -3152,7 +3166,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             set(states),
             {
+                "review_source_selection_mode",
                 "source_run_id",
+                "has_review_source",
+                "review_id",
+                "review_source_selection_report",
                 "current_session_id",
                 "user_message",
                 "conversation_history",
@@ -3195,7 +3213,11 @@ class TemplateLayoutTests(unittest.TestCase):
                 "capability_usage_write_result",
             },
         )
+        self.assertEqual(states["review_source_selection_mode"]["type"], "text")
         self.assertEqual(states["current_session_id"]["type"], "text")
+        self.assertEqual(states["has_review_source"]["type"], "boolean")
+        self.assertEqual(states["review_id"]["type"], "text")
+        self.assertEqual(states["review_source_selection_report"]["type"], "json")
         self.assertEqual(states["conversation_history"]["type"], "json")
         self.assertEqual(states["public_response"]["type"], "markdown")
         self.assertEqual(states["review_context_report"]["type"], "json")
@@ -3264,6 +3286,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             [
+                "output_review_source_selection_report",
                 "output_autonomous_review",
                 "output_memory_review_result",
                 "output_user_context_review_result",
@@ -3292,10 +3315,45 @@ class TemplateLayoutTests(unittest.TestCase):
             "input_capability_result",
             "input_capability_review",
             "input_public_response",
+            "input_source_run_id",
             "output_session_recall_result",
             "output_memory_filter_report",
         ]:
             self.assertNotIn(removed_node_id, nodes)
+        selector_node = nodes["select_review_source"]
+        self.assertEqual(selector_node["kind"], "tool")
+        self.assertEqual(selector_node["config"]["toolKey"], "buddy_review_source_selector")
+        self.assertEqual(selector_node["config"]["staticInputs"], {"source_run_id": ""})
+        self.assertEqual(
+            _read_contracts(selector_node["reads"]),
+            [
+                {
+                    "state": "review_source_selection_mode",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "buddy_review_source_selector",
+                        "fieldKey": "mode",
+                        "managed": True,
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            selector_node["writes"],
+            [
+                {"state": "source_run_id", "mode": "replace"},
+                {"state": "has_review_source", "mode": "replace"},
+                {"state": "review_id", "mode": "replace"},
+                {"state": "review_source_selection_report", "mode": "replace"},
+            ],
+        )
+        self.assertEqual(nodes["has_review_source"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_review_source"]["config"]["rule"],
+            {"source": "$state.has_review_source", "operator": "==", "value": True},
+        )
         loader_node = nodes["load_review_context"]
         self.assertEqual(loader_node["kind"], "tool")
         self.assertEqual(loader_node["config"]["toolKey"], "buddy_review_context_loader")
@@ -3569,6 +3627,14 @@ class TemplateLayoutTests(unittest.TestCase):
             template["conditional_edges"],
             [
                 {
+                    "source": "has_review_source",
+                    "branches": {
+                        "true": "load_review_context",
+                        "false": "output_review_source_selection_report",
+                        "exhausted": "output_review_source_selection_report",
+                    },
+                },
+                {
                     "source": "has_memory_updates",
                     "branches": {
                         "true": "write_memory_updates",
@@ -3613,7 +3679,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             template["edges"],
             [
-                {"source": "input_source_run_id", "target": "load_review_context"},
+                {"source": "input_review_source_selection_mode", "target": "select_review_source"},
+                {"source": "select_review_source", "target": "has_review_source"},
                 {"source": "load_review_context", "target": "recall_related_sessions"},
                 {"source": "load_review_context", "target": "draft_autonomous_review"},
                 {"source": "input_buddy_context", "target": "draft_autonomous_review"},

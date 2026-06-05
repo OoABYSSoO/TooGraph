@@ -338,7 +338,6 @@ import BuddyRunTrace from "./BuddyRunTrace.vue";
 import BuddySessionHistory from "./BuddySessionHistory.vue";
 import BuddyVirtualOperationBanner from "./BuddyVirtualOperationBanner.vue";
 import { useBuddyBoundRunTemplate } from "./useBuddyBoundRunTemplate.ts";
-import { useBuddyVisibleRunTemplateEffects } from "./useBuddyVisibleRunTemplateEffects.ts";
 import { useBuddyChatSessions } from "./useBuddyChatSessions.ts";
 import { useBuddyGraphEditPlaybackExecutor } from "./useBuddyGraphEditPlaybackExecutor.ts";
 import { useBuddyMessages, type BuddyMessage, type BuddyQueuedTurn } from "./useBuddyMessages.ts";
@@ -700,7 +699,6 @@ onBeforeUnmount(() => {
   disposeBuddyMascotMotionController();
   closeEventSource();
   activeAbortController?.abort();
-  abortBuddyVisibleRunTemplateEffects();
 });
 
 watch(canBuddyRoam, (canRoam) => {
@@ -1110,9 +1108,6 @@ function finishBuddyVisibleRun(
       includeInContext: includeReplyInContext,
     });
   }
-  void startBuddyVisibleRunTemplateEffects({
-    runDetail,
-  });
   mood.value = runDetail.status === "failed" ? "error" : runDetail.status === "cancelled" ? "idle" : "speaking";
   if (runDetail.status === "completed") {
     buddyContextStore.notifyBuddyDataChanged();
@@ -1304,15 +1299,6 @@ const {
   buddyMode,
   buddyModelRef,
   buildPageOperationRuntimeContext,
-});
-
-const {
-  startBuddyVisibleRunTemplateEffects,
-  abortBuddyVisibleRunTemplateEffects,
-} = useBuddyVisibleRunTemplateEffects({
-  buddyModelRef,
-  pollRunUntilFinished,
-  notifyBuddyDataChanged: buddyContextStore.notifyBuddyDataChanged,
 });
 
 const {

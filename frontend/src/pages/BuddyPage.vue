@@ -425,156 +425,6 @@
               </div>
             </ElForm>
           </article>
-          <article class="buddy-page__panel">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.binding.memoryReviewTitle") }}</h3>
-                <p>{{ t("buddyPage.binding.memoryReviewBody") }}</p>
-              </div>
-            </div>
-            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
-              <ElFormItem :label="t('buddyPage.binding.memoryReviewTemplate')">
-                <ElSelect
-                  ref="memoryReviewBindingTemplateSelectRef"
-                  v-model="memoryReviewBindingDraft.template_id"
-                  class="buddy-page__template-select toograph-select"
-                  :loading="isLoadingMemoryReviewBindingTemplate"
-                  :teleported="true"
-                  :fit-input-width="true"
-                  placement="bottom-start"
-                  :fallback-placements="buddyBindingSelectFallbackPlacements"
-                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                  filterable
-                  @change="selectMemoryReviewBindingTemplate"
-                >
-                  <ElOption
-                    v-for="option in memoryReviewBindingTemplateOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                    :disabled="option.disabled"
-                  >
-                    <span class="buddy-page__template-option">
-                      <strong>{{ option.name }}</strong>
-                      <small>{{ option.disabledReason || option.value }}</small>
-                    </span>
-                  </ElOption>
-                </ElSelect>
-              </ElFormItem>
-              <ElAlert
-                v-if="!memoryReviewBindingValidation.valid"
-                type="warning"
-                show-icon
-                :closable="false"
-                :title="memoryReviewBindingValidation.issues.join(' ')"
-              />
-              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.memoryReviewInput')">
-                <article
-                  v-for="row in memoryReviewBindingSourceRows"
-                  :key="row.source"
-                  class="buddy-page__binding-card"
-                  :class="{
-                    'buddy-page__binding-card--required': row.required,
-                    'buddy-page__binding-card--empty': !row.selectedNodeId,
-                  }"
-                >
-                  <header class="buddy-page__binding-card-header">
-                    <div class="buddy-page__binding-source">
-                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
-                      <small>{{ row.source }}</small>
-                    </div>
-                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
-                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
-                    </ElTag>
-                  </header>
-
-                  <label class="buddy-page__binding-picker">
-                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
-                    <ElSelect
-                      :ref="memoryReviewBindingInputSelectRefHandler(row.source)"
-                      class="buddy-page__binding-select toograph-select"
-                      :model-value="row.selectedNodeId"
-                      :placeholder="t('buddyPage.binding.selectInputNode')"
-                      :clearable="!row.required"
-                      :disabled="!selectedMemoryReviewBindingTemplate"
-                      :teleported="true"
-                      :fit-input-width="true"
-                      placement="bottom-start"
-                      :fallback-placements="buddyBindingSelectFallbackPlacements"
-                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                      filterable
-                      @change="setMemoryReviewBindingInputNode(row.source, $event)"
-                    >
-                      <ElOption
-                        v-if="!row.required"
-                        :label="t('buddyPage.binding.sources.none')"
-                        value=""
-                      >
-                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
-                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
-                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
-                        </span>
-                      </ElOption>
-                      <ElOption
-                        v-for="option in memoryReviewBindingInputNodeOptionsForSource(row.source)"
-                        :key="option.value"
-                        :label="option.label"
-                        :value="option.value"
-                        :disabled="option.disabled"
-                      >
-                        <span
-                          class="buddy-page__binding-option"
-                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
-                        >
-                          <span class="buddy-page__binding-option-main">
-                            <strong>{{ option.nodeName }}</strong>
-                            <small>{{ option.stateName || t("common.state") }}</small>
-                          </span>
-                          <code>{{ option.stateKey || option.value }}</code>
-                          <small v-if="memoryReviewBindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
-                            {{ memoryReviewBindingOptionDisabledReason(option) }}
-                          </small>
-                        </span>
-                      </ElOption>
-                    </ElSelect>
-                  </label>
-
-                  <div
-                    v-if="selectedMemoryReviewBindingInputRow(row.selectedNodeId)"
-                    class="buddy-page__binding-state-card"
-                    aria-live="polite"
-                  >
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
-                    <code>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
-                  </div>
-                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
-                  </div>
-                </article>
-              </section>
-              <div class="buddy-page__actions buddy-page__binding-actions">
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--primary"
-                  type="primary"
-                  :loading="isSavingMemoryReviewBinding"
-                  :disabled="!memoryReviewBindingValidation.valid"
-                  @click="saveMemoryReviewBinding"
-                >
-                  <ElIcon><Check /></ElIcon>
-                  <span>{{ t("buddyPage.binding.saveMemoryReview") }}</span>
-                </ElButton>
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
-                  :disabled="isSavingMemoryReviewBinding"
-                  @click="resetMemoryReviewBindingToDefault"
-                >
-                  {{ t("buddyPage.binding.resetMemoryReviewDefault") }}
-                </ElButton>
-              </div>
-            </ElForm>
-          </article>
         </ElTabPane>
 
         <ElTabPane :label="t('buddyPage.tabs.mascotDebug')" name="mascot-debug">
@@ -739,7 +589,6 @@ import {
   fetchBuddyCommands,
   fetchBuddyHomeFiles,
   fetchBuddyMemoryDocument,
-  fetchBuddyMemoryReviewTemplateBinding,
   fetchBuddyIdentity,
   fetchBuddyRevisions,
   fetchBuddyRunTemplateBinding,
@@ -747,7 +596,6 @@ import {
   fetchBuddyUserContextDocument,
   restoreBuddyRevision,
   updateBuddyMemoryDocument,
-  updateBuddyMemoryReviewTemplateBinding,
   updateBuddyIdentity,
   updateBuddyRunTemplateBinding,
   updateBuddySessionSummary,
@@ -757,20 +605,12 @@ import { fetchTemplate, fetchTemplates } from "@/api/graphs";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import {
-  BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS,
   BUDDY_RUN_INPUT_SOURCE_OPTIONS,
-  buildBuddyMemoryReviewInputNodeOptions,
-  buildBuddyMemoryReviewTemplateInputRows,
-  buildBuddyMemoryReviewTemplateSourceRows,
   buildBuddyRunInputNodeOptions,
   buildBuddyRunTemplateInputRows,
   buildBuddyRunTemplateSourceRows,
-  buildDefaultBuddyMemoryReviewTemplateBinding,
   buildDefaultBuddyRunTemplateBinding,
-  isBuddyMemoryReviewTemplateRecord,
-  setBuddyMemoryReviewTemplateSourceBinding,
   setBuddyRunTemplateSourceBinding,
-  validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "@/buddy/buddyTemplateBindingModel";
 import AppShell from "@/layouts/AppShell.vue";
@@ -782,8 +622,6 @@ import type {
   BuddyHomeFileEntry,
   BuddyHomeFiles,
   BuddyMemoryDocument,
-  BuddyMemoryReviewInputSource,
-  BuddyMemoryReviewTemplateBinding,
   BuddyIdentity,
   BuddyRevision,
   BuddyRunInputSource,
@@ -819,11 +657,9 @@ const isSavingUserContext = ref(false);
 const isSavingMemory = ref(false);
 const isSavingSummary = ref(false);
 const isSavingBinding = ref(false);
-const isSavingMemoryReviewBinding = ref(false);
 const isLoadingPausedRuns = ref(false);
 const isLoadingPausedRunDetail = ref(false);
 const isLoadingBindingTemplate = ref(false);
-const isLoadingMemoryReviewBindingTemplate = ref(false);
 const pausedRunActionBusy = ref(false);
 const restoreActionId = ref("");
 const errorMessage = ref("");
@@ -835,18 +671,14 @@ const homeFiles = ref<BuddyHomeFiles>(defaultHomeFiles());
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const availableTemplates = ref<TemplateRecord[]>([]);
 const selectedBindingTemplate = ref<TemplateRecord | null>(null);
-const selectedMemoryReviewBindingTemplate = ref<TemplateRecord | null>(null);
 const bindingDraft = ref<BuddyRunTemplateBinding>(buildDefaultBuddyRunTemplateBinding());
-const memoryReviewBindingDraft = ref<BuddyMemoryReviewTemplateBinding>(buildDefaultBuddyMemoryReviewTemplateBinding());
 const buddyBindingSelectFallbackPlacements: ("bottom-start" | "top-start")[] = ["bottom-start", "top-start"];
 type BindingSelectInstance = {
   blur?: () => void;
   handleClose?: () => void;
 };
 const bindingTemplateSelectRef = ref<BindingSelectInstance | null>(null);
-const memoryReviewBindingTemplateSelectRef = ref<BindingSelectInstance | null>(null);
 const bindingInputSelectRefs = new Map<BuddyRunInputSource, BindingSelectInstance>();
-const memoryReviewBindingInputSelectRefs = new Map<BuddyMemoryReviewInputSource, BindingSelectInstance>();
 const revisions = ref<BuddyRevision[]>([]);
 const commands = ref<BuddyCommandRecord[]>([]);
 const lastCommand = ref<BuddyCommandRecord | null>(null);
@@ -865,13 +697,6 @@ const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(order
 const bindingInputRows = computed(() => buildBuddyRunTemplateInputRows(selectedBindingTemplate.value));
 const bindingSourceRows = computed(() => buildBuddyRunTemplateSourceRows(bindingDraft.value, selectedBindingTemplate.value));
 const bindingValidation = computed(() => validateBuddyRunTemplateBinding(selectedBindingTemplate.value, bindingDraft.value));
-const memoryReviewBindingInputRows = computed(() => buildBuddyMemoryReviewTemplateInputRows(selectedMemoryReviewBindingTemplate.value));
-const memoryReviewBindingSourceRows = computed(() =>
-  buildBuddyMemoryReviewTemplateSourceRows(memoryReviewBindingDraft.value, selectedMemoryReviewBindingTemplate.value),
-);
-const memoryReviewBindingValidation = computed(() =>
-  validateBuddyMemoryReviewTemplateBinding(selectedMemoryReviewBindingTemplate.value, memoryReviewBindingDraft.value),
-);
 const bindingTemplateOptions = computed(() =>
   availableTemplates.value.map((template) => {
     const breakpointBlocked =
@@ -891,32 +716,6 @@ const bindingTemplateOptions = computed(() =>
     };
   }),
 );
-const memoryReviewBindingTemplateOptions = computed(() => {
-  const templates = [...availableTemplates.value];
-  const selectedTemplate = selectedMemoryReviewBindingTemplate.value;
-  if (selectedTemplate && !templates.some((template) => template.template_id === selectedTemplate.template_id)) {
-    templates.unshift(selectedTemplate);
-  }
-  return templates.map((template) => {
-    const breakpointBlocked =
-      template.hasBreakpointMetadata || template.capabilityDiscoverableBlockedReason === "breakpoint_metadata";
-    const disabledReason =
-      template.status === "disabled"
-        ? t("buddyPage.binding.templateDisabled")
-        : breakpointBlocked
-          ? t("buddyPage.binding.templateBreakpointBlocked")
-          : !isBuddyMemoryReviewTemplateRecord(template)
-            ? t("buddyPage.binding.memoryReviewTemplateRoleBlocked")
-            : "";
-    return {
-      label: `${template.label} (${template.template_id})`,
-      name: template.label,
-      value: template.template_id,
-      disabled: Boolean(disabledReason),
-      disabledReason,
-    };
-  });
-});
 const historyTargetOptions = computed(() =>
   BUDDY_REVISION_HISTORY_TARGET_FILTERS.map((value) => ({
     label: t(`buddyPage.history.targets.${value}`),
@@ -1035,17 +834,8 @@ function bindingInputNodeOptionsForSource(source: BuddyRunInputSource) {
   return buildBuddyRunInputNodeOptions(selectedBindingTemplate.value, bindingDraft.value, source);
 }
 
-function memoryReviewBindingInputNodeOptionsForSource(source: BuddyMemoryReviewInputSource) {
-  return buildBuddyMemoryReviewInputNodeOptions(selectedMemoryReviewBindingTemplate.value, memoryReviewBindingDraft.value, source);
-}
-
 function bindingInputSourceLabel(source: BuddyRunInputSource) {
   const option = BUDDY_RUN_INPUT_SOURCE_OPTIONS.find((candidate) => candidate.value === source);
-  return option ? t(option.labelKey) : source;
-}
-
-function memoryReviewBindingInputSourceLabel(source: BuddyMemoryReviewInputSource) {
-  const option = BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS.find((candidate) => candidate.value === source);
   return option ? t(option.labelKey) : source;
 }
 
@@ -1056,27 +846,11 @@ function bindingOptionDisabledReason(option: BuddyRunInputNodeOption) {
   return option.disabledReason;
 }
 
-function memoryReviewBindingOptionDisabledReason(option: BuddyRunInputNodeOption) {
-  if (option.disabledSource) {
-    return t("buddyPage.binding.alreadyBoundTo", {
-      source: memoryReviewBindingInputSourceLabel(option.disabledSource as BuddyMemoryReviewInputSource),
-    });
-  }
-  return option.disabledReason;
-}
-
 function selectedBindingInputRow(nodeId: string): BuddyRunTemplateInputRow | null {
   if (!nodeId) {
     return null;
   }
   return bindingInputRows.value.find((row) => row.nodeId === nodeId) ?? null;
-}
-
-function selectedMemoryReviewBindingInputRow(nodeId: string): BuddyRunTemplateInputRow | null {
-  if (!nodeId) {
-    return null;
-  }
-  return memoryReviewBindingInputRows.value.find((row) => row.nodeId === nodeId) ?? null;
 }
 
 function setBindingInputSelectRef(source: BuddyRunInputSource, select: unknown) {
@@ -1091,18 +865,6 @@ function bindingInputSelectRefHandler(source: BuddyRunInputSource) {
   return (select: unknown) => setBindingInputSelectRef(source, select);
 }
 
-function setMemoryReviewBindingInputSelectRef(source: BuddyMemoryReviewInputSource, select: unknown) {
-  if (!select) {
-    memoryReviewBindingInputSelectRefs.delete(source);
-    return;
-  }
-  memoryReviewBindingInputSelectRefs.set(source, select as BindingSelectInstance);
-}
-
-function memoryReviewBindingInputSelectRefHandler(source: BuddyMemoryReviewInputSource) {
-  return (select: unknown) => setMemoryReviewBindingInputSelectRef(source, select);
-}
-
 function closeSelect(select: BindingSelectInstance | null | undefined) {
   select?.handleClose?.();
   select?.blur?.();
@@ -1111,12 +873,6 @@ function closeSelect(select: BindingSelectInstance | null | undefined) {
 function closeBindingSelect(source?: BuddyRunInputSource) {
   void nextTick(() => {
     closeSelect(source ? bindingInputSelectRefs.get(source) : bindingTemplateSelectRef.value);
-  });
-}
-
-function closeMemoryReviewBindingSelect(source?: BuddyMemoryReviewInputSource) {
-  void nextTick(() => {
-    closeSelect(source ? memoryReviewBindingInputSelectRefs.get(source) : memoryReviewBindingTemplateSelectRef.value);
   });
 }
 
@@ -1154,15 +910,6 @@ async function repairRunTemplateBindingIfNeeded(binding: BuddyRunTemplateBinding
   return repaired;
 }
 
-function normalizeMemoryReviewBindingDraft(binding: BuddyMemoryReviewTemplateBinding): BuddyMemoryReviewTemplateBinding {
-  return {
-    version: binding.version ?? 1,
-    template_id: binding.template_id || buildDefaultBuddyMemoryReviewTemplateBinding().template_id,
-    input_bindings: { ...(binding.input_bindings ?? {}) },
-    updated_at: binding.updated_at,
-  };
-}
-
 function hasActiveBuddyPageWrite() {
   return Boolean(
       isLoading.value ||
@@ -1171,11 +918,9 @@ function hasActiveBuddyPageWrite() {
       isSavingMemory.value ||
       isSavingSummary.value ||
       isSavingBinding.value ||
-      isSavingMemoryReviewBinding.value ||
       isLoadingPausedRuns.value ||
       isLoadingPausedRunDetail.value ||
       isLoadingBindingTemplate.value ||
-      isLoadingMemoryReviewBindingTemplate.value ||
       pausedRunActionBusy.value ||
       restoreActionId.value,
   );
@@ -1196,7 +941,6 @@ async function loadAll(options: LoadAllOptions = {}) {
       commandList,
       templateList,
       runBinding,
-      memoryReviewBinding,
     ] = await Promise.all([
       fetchBuddyIdentity(),
       fetchBuddyUserContextDocument(),
@@ -1207,7 +951,6 @@ async function loadAll(options: LoadAllOptions = {}) {
       fetchBuddyCommands(),
       fetchTemplates(),
       fetchBuddyRunTemplateBinding(),
-      fetchBuddyMemoryReviewTemplateBinding(),
     ]);
     identityDraft.value = identity;
     userContextDraft.value = userContextDocument;
@@ -1219,9 +962,7 @@ async function loadAll(options: LoadAllOptions = {}) {
     availableTemplates.value = templateList;
     const repairedRunBinding = await repairRunTemplateBindingIfNeeded(runBinding);
     bindingDraft.value = normalizeBindingDraft(repairedRunBinding);
-    memoryReviewBindingDraft.value = normalizeMemoryReviewBindingDraft(memoryReviewBinding);
     await loadBindingTemplate(bindingDraft.value.template_id);
-    await loadMemoryReviewBindingTemplate(memoryReviewBindingDraft.value.template_id);
     await loadPausedRuns({ silent: true });
     errorMessage.value = "";
     hasLoaded.value = true;
@@ -1244,19 +985,6 @@ async function loadBindingTemplate(templateId: string) {
     selectedBindingTemplate.value = await fetchTemplate(templateId);
   } finally {
     isLoadingBindingTemplate.value = false;
-  }
-}
-
-async function loadMemoryReviewBindingTemplate(templateId: string) {
-  if (!templateId) {
-    selectedMemoryReviewBindingTemplate.value = null;
-    return;
-  }
-  try {
-    isLoadingMemoryReviewBindingTemplate.value = true;
-    selectedMemoryReviewBindingTemplate.value = await fetchTemplate(templateId);
-  } finally {
-    isLoadingMemoryReviewBindingTemplate.value = false;
   }
 }
 
@@ -1443,39 +1171,14 @@ async function selectBindingTemplate(value: unknown) {
   await loadBindingTemplate(templateId);
 }
 
-async function selectMemoryReviewBindingTemplate(value: unknown) {
-  closeMemoryReviewBindingSelect();
-  const templateId = String(value || "");
-  memoryReviewBindingDraft.value = {
-    ...memoryReviewBindingDraft.value,
-    template_id: templateId,
-    input_bindings: {},
-  };
-  await loadMemoryReviewBindingTemplate(templateId);
-}
-
 function setBindingInputNode(source: BuddyRunInputSource, value: unknown) {
   bindingDraft.value = setBuddyRunTemplateSourceBinding(bindingDraft.value, source, String(value || ""));
   closeBindingSelect(source);
 }
 
-function setMemoryReviewBindingInputNode(source: BuddyMemoryReviewInputSource, value: unknown) {
-  memoryReviewBindingDraft.value = setBuddyMemoryReviewTemplateSourceBinding(
-    memoryReviewBindingDraft.value,
-    source,
-    String(value || ""),
-  );
-  closeMemoryReviewBindingSelect(source);
-}
-
 function resetBindingToDefault() {
   bindingDraft.value = buildDefaultBuddyRunTemplateBinding();
   void loadBindingTemplate(bindingDraft.value.template_id);
-}
-
-function resetMemoryReviewBindingToDefault() {
-  memoryReviewBindingDraft.value = buildDefaultBuddyMemoryReviewTemplateBinding();
-  void loadMemoryReviewBindingTemplate(memoryReviewBindingDraft.value.template_id);
 }
 
 async function saveBinding() {
@@ -1495,31 +1198,6 @@ async function saveBinding() {
     setError(error, "common.failedToSave");
   } finally {
     isSavingBinding.value = false;
-  }
-}
-
-async function saveMemoryReviewBinding() {
-  if (!memoryReviewBindingValidation.value.valid || isSavingMemoryReviewBinding.value) {
-    return;
-  }
-  try {
-    isSavingMemoryReviewBinding.value = true;
-    memoryReviewBindingDraft.value = normalizeMemoryReviewBindingDraft(
-      acceptCommandResult(
-        await updateBuddyMemoryReviewTemplateBinding(
-          memoryReviewBindingDraft.value,
-          t("buddyPage.changeReasons.memoryReviewBinding"),
-        ),
-      ),
-    );
-    await refreshAuditTrail();
-    await refreshHomeFiles();
-    errorMessage.value = "";
-    ElMessage.success(t("buddyPage.saved"));
-  } catch (error) {
-    setError(error, "common.failedToSave");
-  } finally {
-    isSavingMemoryReviewBinding.value = false;
   }
 }
 

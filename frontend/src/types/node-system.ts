@@ -89,6 +89,36 @@ export type NodeUi = {
 
 export type InputBoundaryConfigType = "text" | "file" | "image" | "audio" | "video";
 
+export type InputValuePresentationOption = {
+  label: string;
+  value: string | number | boolean;
+  updates?: Record<string, unknown>;
+};
+
+export type InputValuePresentationVisibleWhen = {
+  field: string;
+  equals?: unknown;
+};
+
+export type InputValuePresentationProperty = {
+  key: string;
+  name: string;
+  valueType?: string;
+  default?: unknown;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+  options?: InputValuePresentationOption[];
+  visibleWhen?: InputValuePresentationVisibleWhen | null;
+};
+
+export type InputValuePresentation = {
+  control?: "text" | "textarea" | "json" | "object" | "number" | "boolean" | "select" | null;
+  default?: unknown;
+  options?: InputValuePresentationOption[];
+  properties?: InputValuePresentationProperty[];
+};
+
 export type InputNode = {
   kind: "input";
   name: string;
@@ -99,6 +129,7 @@ export type InputNode = {
   config: {
     value: unknown;
     boundaryType?: InputBoundaryConfigType;
+    valuePresentation?: InputValuePresentation;
   };
 };
 
@@ -232,6 +263,7 @@ export type ToolNode = {
     toolKey: string;
     dynamicStateInputs?: boolean;
     staticInputs?: Record<string, unknown>;
+    promotedInputFields?: string[];
     targetAgentNodeId?: string;
   };
 };

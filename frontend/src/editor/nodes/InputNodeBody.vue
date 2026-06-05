@@ -200,6 +200,120 @@
         {{ t("nodeCard.rawTextUploadHint") }}
       </div>
     </div>
+    <div
+      v-else-if="inputPresentationControl === 'select'"
+      class="node-card__surface node-card__presentation-control"
+      @pointerdown.stop
+      @click.stop
+    >
+      <label class="node-card__control-row">
+        <span class="node-card__control-label">{{ t("nodeCard.enterInputValue") }}</span>
+        <ToographSelect
+          class="node-card__input-presentation-select"
+          :model-value="inputPresentationSelectValue"
+          popper-class="toograph-select-popper"
+          remount-on-select
+          @update:model-value="(value) => emit('update-input-value', value)"
+        >
+          <ElOption
+            v-for="option in inputPresentationOptions"
+            :key="String(option.value)"
+            :label="option.label"
+            :value="option.value"
+          />
+        </ToographSelect>
+      </label>
+    </div>
+    <div
+      v-else-if="inputPresentationControl === 'number'"
+      class="node-card__surface node-card__presentation-control"
+      @pointerdown.stop
+      @click.stop
+    >
+      <label class="node-card__control-row">
+        <span class="node-card__control-label">{{ t("nodeCard.enterInputValue") }}</span>
+        <ElInputNumber
+          class="node-card__input-presentation-number"
+          :model-value="inputPresentationNumberValue"
+          controls-position="right"
+          @update:model-value="(value) => emit('update-input-value', Number(value ?? 0))"
+        />
+      </label>
+    </div>
+    <div
+      v-else-if="inputPresentationControl === 'boolean'"
+      class="node-card__surface node-card__presentation-control node-card__presentation-control--inline"
+      @pointerdown.stop
+      @click.stop
+    >
+      <span class="node-card__control-label">{{ t("nodeCard.enterInputValue") }}</span>
+      <ElSwitch
+        class="node-card__input-presentation-switch"
+        :model-value="Boolean(inputRawValue)"
+        :width="78"
+        inline-prompt
+        active-text="True"
+        inactive-text="False"
+        @update:model-value="(value) => emit('update-input-value', Boolean(value))"
+      />
+    </div>
+    <div
+      v-else-if="inputPresentationControl === 'object'"
+      class="node-card__surface node-card__presentation-control"
+      @pointerdown.stop
+      @click.stop
+    >
+      <div class="node-card__presentation-object-grid">
+        <label
+          v-for="property in inputPresentationObjectProperties"
+          :key="property.key"
+          class="node-card__presentation-object-field"
+        >
+          <span class="node-card__control-label">{{ property.name || property.key }}</span>
+          <ElInputNumber
+            v-if="isNumberPresentationProperty(property)"
+            class="node-card__input-presentation-number"
+            :model-value="inputPresentationObjectNumberValue(property)"
+            :min="property.min ?? undefined"
+            :max="property.max ?? undefined"
+            :step="property.step ?? 1"
+            controls-position="right"
+            @update:model-value="(value) => updateInputPresentationObjectProperty(property.key, Number(value ?? 0))"
+          />
+          <ToographSelect
+            v-else-if="hasPresentationPropertyOptions(property)"
+            class="node-card__input-presentation-select"
+            :model-value="String(inputPresentationObjectPropertyValue(property) ?? '')"
+            popper-class="toograph-select-popper"
+            remount-on-select
+            @update:model-value="(value) => updateInputPresentationObjectProperty(property.key, value)"
+          >
+            <ElOption
+              v-for="option in property.options ?? []"
+              :key="String(option.value)"
+              :label="option.label"
+              :value="option.value"
+            />
+          </ToographSelect>
+          <ElSwitch
+            v-else-if="isBooleanPresentationProperty(property)"
+            class="node-card__input-presentation-switch"
+            :model-value="Boolean(inputPresentationObjectPropertyValue(property))"
+            :width="64"
+            inline-prompt
+            active-text="On"
+            inactive-text="Off"
+            @update:model-value="(value) => updateInputPresentationObjectProperty(property.key, Boolean(value))"
+          />
+          <ElInput
+            v-else
+            class="node-card__input-presentation-text"
+            :model-value="String(inputPresentationObjectPropertyValue(property) ?? '')"
+            @update:model-value="(value) => updateInputPresentationObjectProperty(property.key, String(value ?? ''))"
+          />
+        </label>
+      </div>
+    </div>
     <textarea
       v-else-if="isInputValueEditable"
       class="node-card__surface node-card__surface-textarea"
@@ -222,12 +336,14 @@
 
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
-import { ElSegmented } from "element-plus";
+import { ElInput, ElInputNumber, ElOption, ElSegmented, ElSwitch } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import type { LocalFolderTreeEntry } from "@/api/localInputSources";
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import type { UploadedAssetEnvelope } from "./uploadedAssetModel";
+import type { InputValuePresentation, InputValuePresentationProperty } from "@/types/node-system";
 
 type InputBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "input" }>;
 
@@ -260,6 +376,9 @@ const props = defineProps<{
   showLegacyUploadedAssetHint: boolean;
   isInputValueEditable: boolean;
   inputValueText: string;
+  inputRawValue: unknown;
+  inputValueType: string;
+  inputValuePresentation: InputValuePresentation | null;
 }>();
 
 const emit = defineEmits<{
@@ -273,11 +392,111 @@ const emit = defineEmits<{
   (event: "asset-drop", dragEvent: DragEvent): void;
   (event: "clear-asset"): void;
   (event: "input-value", inputEvent: Event): void;
+  (event: "update-input-value", value: unknown): void;
 }>();
 
 const { t } = useI18n();
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 const selectedLocalFolderPaths = computed(() => new Set(props.localFolderSelected));
+const inputPresentationControl = computed(() => {
+  const control = props.inputValuePresentation?.control ?? null;
+  if (control === "select" || control === "number" || control === "boolean" || control === "object") {
+    return control;
+  }
+  const valueType = props.inputValueType.trim().toLowerCase();
+  if (valueType === "number" || valueType === "integer") {
+    return "number";
+  }
+  if (valueType === "boolean") {
+    return "boolean";
+  }
+  return null;
+});
+const inputPresentationOptions = computed(() => props.inputValuePresentation?.options ?? []);
+const inputPresentationSelectValue = computed(() => {
+  const value = props.inputRawValue;
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : "";
+});
+const inputPresentationNumberValue = computed(() => {
+  const numericValue = Number(props.inputRawValue);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+});
+const inputPresentationObjectValue = computed<Record<string, unknown>>(() => {
+  if (isRecord(props.inputRawValue)) {
+    return { ...props.inputRawValue };
+  }
+  if (isRecord(props.inputValuePresentation?.default)) {
+    return { ...props.inputValuePresentation.default };
+  }
+  return {};
+});
+const inputPresentationObjectProperties = computed(() =>
+  (props.inputValuePresentation?.properties ?? []).filter((property) => isPresentationObjectPropertyVisible(property)),
+);
+
+function isPresentationObjectPropertyVisible(property: InputValuePresentationProperty) {
+  const condition = property.visibleWhen;
+  if (!condition?.field) {
+    return true;
+  }
+  if (!Object.prototype.hasOwnProperty.call(inputPresentationObjectValue.value, condition.field)) {
+    return true;
+  }
+  return String(inputPresentationObjectValue.value[condition.field] ?? "") === String(condition.equals ?? "");
+}
+
+function inputPresentationObjectPropertyValue(property: InputValuePresentationProperty) {
+  if (Object.prototype.hasOwnProperty.call(inputPresentationObjectValue.value, property.key)) {
+    return inputPresentationObjectValue.value[property.key];
+  }
+  return defaultPresentationPropertyValue(property);
+}
+
+function inputPresentationObjectNumberValue(property: InputValuePresentationProperty) {
+  const numericValue = Number(inputPresentationObjectPropertyValue(property));
+  return Number.isFinite(numericValue) ? numericValue : Number(defaultPresentationPropertyValue(property) ?? 0);
+}
+
+function updateInputPresentationObjectProperty(propertyKey: string, value: unknown) {
+  emit("update-input-value", {
+    ...inputPresentationObjectValue.value,
+    [propertyKey]: value,
+  });
+}
+
+function hasPresentationPropertyOptions(property: InputValuePresentationProperty) {
+  return (property.options?.length ?? 0) > 0;
+}
+
+function isBooleanPresentationProperty(property: InputValuePresentationProperty) {
+  return property.valueType?.trim().toLowerCase() === "boolean";
+}
+
+function isNumberPresentationProperty(property: InputValuePresentationProperty) {
+  const valueType = property.valueType?.trim().toLowerCase() ?? "";
+  return valueType === "number" || valueType === "integer";
+}
+
+function defaultPresentationPropertyValue(property: InputValuePresentationProperty) {
+  if (Object.prototype.hasOwnProperty.call(property, "default")) {
+    return clonePresentationValue(property.default);
+  }
+  if (isBooleanPresentationProperty(property)) {
+    return false;
+  }
+  if (isNumberPresentationProperty(property)) {
+    return 0;
+  }
+  return "";
+}
+
+function clonePresentationValue(value: unknown): unknown {
+  return value === undefined ? undefined : structuredClone(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 function handleAssetUploadSurfaceClick(event: MouseEvent) {
   if (event.target instanceof HTMLInputElement) {
@@ -565,6 +784,40 @@ function openInputAssetPicker() {
 
 .node-card__input-select {
   min-height: 48px;
+}
+
+.node-card__presentation-control {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.node-card__presentation-control--inline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.node-card__input-presentation-select,
+.node-card__input-presentation-number,
+.node-card__input-presentation-text {
+  width: 100%;
+}
+
+.node-card__presentation-object-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.node-card__presentation-object-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.node-card__input-presentation-switch {
+  justify-self: start;
 }
 
 .node-card__input-meta {

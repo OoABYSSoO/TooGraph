@@ -192,6 +192,62 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertTrue(delete_response.json()["deleted"])
         self.assertEqual(sessions_after_delete_response.json(), [])
 
+    def test_append_chat_message_dispatches_scheduler_message_created_event(self) -> None:
+        captured_events: list[dict[str, object]] = []
+
+        def run_event_jobs(
+            event_name: str,
+            *,
+            event: dict[str, object],
+            background_tasks: object,
+            requested_by: str,
+        ) -> dict[str, object]:
+            captured_events.append(
+                {
+                    "event_name": event_name,
+                    "event": dict(event),
+                    "has_background_tasks": callable(getattr(background_tasks, "add_task", None)),
+                    "requested_by": requested_by,
+                }
+            )
+            return {"started_count": 0, "skipped_count": 0, "errors": []}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"),
+                patch("app.api.routes_buddy.scheduler_runner.run_event_scheduled_graph_jobs", run_event_jobs),
+            ):
+                with TestClient(app) as client:
+                    session = client.post("/api/buddy/sessions", json={}).json()
+                    response = client.post(
+                        f"/api/buddy/sessions/{session['session_id']}/messages",
+                        json={
+                            "message_id": "msg_event_route_1",
+                            "role": "user",
+                            "content": "把这条消息作为事件入库。",
+                            "client_order": 7,
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            captured_events,
+            [
+                {
+                    "event_name": "buddy.message.created",
+                    "event": {
+                        "session_id": session["session_id"],
+                        "message_id": "msg_event_route_1",
+                        "role": "user",
+                        "run_id": "",
+                        "include_in_context": True,
+                    },
+                    "has_background_tasks": True,
+                    "requested_by": "buddy_message_created",
+                }
+            ],
+        )
+
     def test_run_template_binding_default_save_and_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"), patch.object(

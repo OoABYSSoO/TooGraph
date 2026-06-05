@@ -159,11 +159,12 @@ Retrieval Query 图负责信息召回。
 
 ### Buddy Memory Review 图
 
-Buddy Memory Review 图负责从完成的可见 Buddy run 中整理长期记忆和低风险自配置候选。
+Buddy Memory Review 图负责从完成的可见 Buddy run 中整理长期记忆和低风险自配置候选。正式入口由 `buddy_review_source_selector` Tool 选择复盘来源：定时运行默认使用 `auto_unreviewed`，自动探测尚未复盘的 completed Buddy run；手动复盘可以把 selector 切到 `explicit` 并提供 source run。`source_run_id` 是 selector 输出，不是调度器通过空值触发的隐式输入。
 
 输入：
 
-- source_run_id。
+- review_source_selection_mode。
+- selected source_run_id。
 - completed run snapshot。
 - user_message。
 - public_response。
@@ -319,7 +320,7 @@ metadata = session_id, lineage_root_session_id, source_run_id
 - 当前 run 使用能力并产生可复用经验。
 - 上下文压缩发生且摘要有实质变化。
 - 普通对话累计约 8 到 10 个 user turns。
-- session idle/end 时做一次收束复盘。
+- scheduler 按 cadence 运行 `buddy_autonomous_review`，由 `buddy_review_source_selector` 自动选择尚未复盘的 completed Buddy run。
 - 用户在 Run Detail 手动触发复盘。
 
 不推荐触发完整复盘：

@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "buddy_review_source_selector",
+  "name": "Buddy Review Source Selector",
+  "description": "Selects an unreviewed Buddy run for background memory review and claims the review record for the current graph run.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "buddy_session_read"
+  ],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputPresentation": {
+    "mode": {
+      "mode": "static",
+      "control": "select",
+      "default": "auto_unreviewed",
+      "options": [
+        {
+          "label": "Auto: unreviewed Buddy run",
+          "value": "auto_unreviewed"
+        },
+        {
+          "label": "Explicit source run",
+          "value": "explicit"
+        }
+      ]
+    },
+    "source_run_id": {
+      "mode": "static",
+      "control": "text",
+      "default": ""
+    }
+  },
+  "inputSchema": [
+    {
+      "key": "mode",
+      "name": "Mode",
+      "valueType": "text",
+      "description": "Selection mode: auto_unreviewed scans completed Buddy runs; explicit uses source_run_id."
+    },
+    {
+      "key": "source_run_id",
+      "name": "Source Run ID",
+      "valueType": "text",
+      "description": "Optional explicit source run id when mode is explicit."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Selection status, usually succeeded or failed."
+    },
+    {
+      "key": "has_source_run",
+      "name": "Has Source Run",
+      "valueType": "boolean",
+      "description": "Whether a reviewable source run was selected."
+    },
+    {
+      "key": "selected_source_run_id",
+      "name": "Selected Source Run ID",
+      "valueType": "text",
+      "description": "The selected source Buddy run id, or empty when no candidate exists."
+    },
+    {
+      "key": "review_id",
+      "name": "Review ID",
+      "valueType": "text",
+      "description": "The background review record id claimed for this graph run."
+    },
+    {
+      "key": "selection_report",
+      "name": "Selection Report",
+      "valueType": "json",
+      "description": "Auditable details about candidate filtering and review claim creation."
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "Short human-readable selection summary."
+    }
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "Buddy 复盘来源选择器",
+      "description": "为后台记忆复盘选择尚未复盘的 Buddy 运行，并把复盘记录声明到当前图运行。"
+    },
+    "en-US": {
+      "name": "Buddy Review Source Selector",
+      "description": "Selects an unreviewed Buddy run for background memory review and claims the review record for the current graph run."
+    }
+  }
+}

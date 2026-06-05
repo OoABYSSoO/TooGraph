@@ -5,12 +5,13 @@ import type { TemplateRecord } from "@/types/node-system";
 import type { ScheduledGraphJob, ScheduledGraphJobRun } from "@/types/scheduler";
 
 import {
-  buildOfficialSchedulerEnableRecommendations,
   buildDefaultScheduledGraphJobDraft,
   buildScheduledGraphJobInputRows,
   buildScheduledGraphJobDraftFromJob,
   buildScheduledGraphJobPayload,
   buildSchedulerOverview,
+  buildScheduledGraphJobTriggerProfile,
+  canEditScheduledGraphJobTemplate,
   formatSchedule,
   sortScheduledGraphJobRuns,
   sortScheduledGraphJobs,
@@ -30,23 +31,10 @@ test("buildSchedulerOverview summarizes total, enabled, disabled, and official j
   ]);
 });
 
-test("buildOfficialSchedulerEnableRecommendations highlights official maintenance jobs by enabled state", () => {
-  const jobs = [
-    createJob("user_job", false, "user"),
-    createJob("official_embedding_maintenance", true, "official_seed"),
-  ];
-
-  assert.deepEqual(buildOfficialSchedulerEnableRecommendations(jobs), [
-    {
-      job_id: "official_embedding_maintenance",
-      title: "Embedding 维护",
-      description: "定期处理待生成的向量任务，让记忆和检索索引保持可召回。",
-      enabled: true,
-      template_id: "official_embedding_maintenance",
-      schedule: "每 1 小时",
-      action: "run",
-    },
-  ]);
+test("canEditScheduledGraphJobTemplate locks official jobs to their seeded template", () => {
+  assert.equal(canEditScheduledGraphJobTemplate(createJob("official_seed_job", false, "official_seed")), false);
+  assert.equal(canEditScheduledGraphJobTemplate(createJob("official_job", true, "official")), false);
+  assert.equal(canEditScheduledGraphJobTemplate(createJob("user_job", true, "user")), true);
 });
 
 test("formatSchedule renders common interval expressions", () => {
@@ -54,6 +42,37 @@ test("formatSchedule renders common interval expressions", () => {
   assert.equal(formatSchedule({ schedule_kind: "interval", schedule_expr: "PT1H" }), "每 1 小时");
   assert.equal(formatSchedule({ schedule_kind: "interval", schedule_expr: "30m" }), "每 30 分钟");
   assert.equal(formatSchedule({ schedule_kind: "manual", schedule_expr: "" }), "手动");
+  assert.equal(formatSchedule({ schedule_kind: "event", schedule_expr: "buddy.message.created" }), "事件：buddy.message.created");
+});
+
+test("buildScheduledGraphJobTriggerProfile explains official memory background tasks", () => {
+  const messageIngestion = {
+    ...createJob("official_buddy_message_retrieval_ingestion", false, "official_seed"),
+    schedule_kind: "event",
+    schedule_expr: "buddy.message.created",
+    metadata: { source: "official_seed", purpose: "buddy_message_retrieval_ingestion" },
+  };
+  const memoryReview = {
+    ...createJob("official_buddy_autonomous_review", false, "official_seed"),
+    metadata: { source: "official_seed", purpose: "buddy_autonomous_review" },
+  };
+  const embeddingMaintenance = {
+    ...createJob("official_embedding_maintenance", false, "official_seed"),
+    metadata: { source: "official_seed", purpose: "embedding_maintenance" },
+  };
+
+  assert.deepEqual(buildScheduledGraphJobTriggerProfile(messageIngestion), {
+    modeLabel: "事件触发",
+    description: "每条 Buddy 消息写入后触发，把原始消息投影为可检索材料并排队 embedding。",
+  });
+  assert.deepEqual(buildScheduledGraphJobTriggerProfile(memoryReview), {
+    modeLabel: "间隔触发",
+    description: "定时探测尚未复盘的 completed Buddy run，由复盘图内 selector 选择来源。",
+  });
+  assert.deepEqual(buildScheduledGraphJobTriggerProfile(embeddingMaintenance), {
+    modeLabel: "间隔触发",
+    description: "定期处理 pending embedding jobs，把已入库 chunk 的向量落盘。",
+  });
 });
 
 test("sortScheduledGraphJobs keeps enabled jobs first and then template order", () => {
@@ -182,6 +201,84 @@ test("buildScheduledGraphJobInputRows lists template input nodes with defaults a
   );
 });
 
+test("buildScheduledGraphJobInputRows preserves input value presentation metadata", () => {
+  const template = createInputTemplate();
+  template.state_schema.source_kind = {
+    name: "Source Kind",
+    description: "Source category.",
+    type: "text",
+    value: "buddy_messages",
+    color: "#d97706",
+  };
+  template.state_schema.limits = {
+    name: "Limits",
+    description: "Chunking limits.",
+    type: "json",
+    value: { max_chars: 700, max_turns_per_chunk: 2 },
+    color: "#10b981",
+  };
+  template.nodes.input_source_kind = {
+    kind: "input",
+    name: "Source Kind",
+    description: "Source category.",
+    ui: { position: { x: 0, y: 0 } },
+    reads: [],
+    writes: [{ state: "source_kind", mode: "replace" }],
+    config: {
+      value: "buddy_messages",
+      boundaryType: "text",
+      valuePresentation: {
+        control: "select",
+        default: "buddy_messages",
+        options: [
+          { label: "Chat history", value: "buddy_messages" },
+          { label: "Knowledge documents", value: "normalized_documents" },
+        ],
+      },
+    },
+  };
+  template.nodes.input_limits = {
+    kind: "input",
+    name: "Limits",
+    description: "Chunking limits.",
+    ui: { position: { x: 0, y: 0 } },
+    reads: [],
+    writes: [{ state: "limits", mode: "replace" }],
+    config: {
+      value: { max_chars: 700, max_turns_per_chunk: 2 },
+      boundaryType: "text",
+      valuePresentation: {
+        control: "object",
+        default: { max_chars: 700, max_turns_per_chunk: 2 },
+        properties: [
+          { key: "max_chars", name: "Max chars", valueType: "number", default: 700, min: 200, step: 100 },
+          { key: "max_turns_per_chunk", name: "Max turns", valueType: "number", default: 2, min: 1, step: 1 },
+        ],
+      },
+    },
+  };
+
+  const draft = buildDefaultScheduledGraphJobDraft("template_1", template);
+  const rows = buildScheduledGraphJobInputRows(template, draft);
+  const sourceKindRow = rows.find((row) => row.state_key === "source_kind");
+  const limitsRow = rows.find((row) => row.state_key === "limits");
+
+  assert.deepEqual(sourceKindRow?.presentation, {
+    control: "select",
+    default: "buddy_messages",
+    options: [
+      { label: "Chat history", value: "buddy_messages" },
+      { label: "Knowledge documents", value: "normalized_documents" },
+    ],
+  });
+  assert.deepEqual(limitsRow?.value, { max_chars: 700, max_turns_per_chunk: 2 });
+  assert.deepEqual(limitsRow?.presentation?.properties?.map((property) => property.key), ["max_chars", "max_turns_per_chunk"]);
+
+  draft.input_values.limits = { max_chars: 900, max_turns_per_chunk: 3 };
+  const payload = buildScheduledGraphJobPayload(draft);
+  assert.deepEqual(payload.input_bindings.limits, { max_chars: 900, max_turns_per_chunk: 3 });
+});
+
 test("buildScheduledGraphJobDraftFromJob converts interval expressions to human fields", () => {
   const draft = buildScheduledGraphJobDraftFromJob(
     {
@@ -207,6 +304,17 @@ test("buildScheduledGraphJobPayload converts human interval controls to schedule
   });
 
   assert.equal(payload.schedule_expr, "PT30M");
+});
+
+test("buildScheduledGraphJobPayload keeps event trigger names explicit", () => {
+  const payload = buildScheduledGraphJobPayload({
+    ...buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate()),
+    schedule_kind: "event",
+    schedule_expr: "buddy.message.created",
+  });
+
+  assert.equal(payload.schedule_kind, "event");
+  assert.equal(payload.schedule_expr, "buddy.message.created");
 });
 
 test("buildScheduledGraphJobPayload maps platform message outlet fields", () => {

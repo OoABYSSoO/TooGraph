@@ -343,6 +343,7 @@ class NodeSystemNodeUi(BaseModel):
 class NodeSystemInputConfig(BaseModel):
     value: Any = Field(default="")
     boundary_type: NodeSystemStateType = Field(default=NodeSystemStateType.TEXT, alias="boundaryType")
+    value_presentation: dict[str, Any] = Field(default_factory=dict, alias="valuePresentation")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 

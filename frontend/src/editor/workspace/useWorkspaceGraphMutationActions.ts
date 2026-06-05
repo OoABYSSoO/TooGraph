@@ -13,6 +13,7 @@ import {
   removeConditionRouteFromDocument,
   removeFlowEdgeFromDocument,
   removeNodeFromDocument,
+  promoteToolStaticInputToGraphInputInDocument,
   reorderNodePortStateInDocument,
   updateAgentBreakpointInDocument,
   updateAgentNodeConfigInDocument,
@@ -448,6 +449,27 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     );
   }
 
+  function promoteToolStaticInputForTab(tabId: string, nodeId: string, fieldKey: string) {
+    const document = input.documentsByTabId.value[tabId];
+    if (!document) {
+      return;
+    }
+
+    const result = promoteToolStaticInputToGraphInputInDocument(document, nodeId, fieldKey, {
+      toolDefinitions: input.toolDefinitions.value,
+    });
+    if (result.document === document) {
+      return;
+    }
+
+    input.markDocumentDirty(tabId, result.document);
+    input.focusNodeForTab(tabId, result.inputNodeId ?? nodeId);
+    input.setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: "Promoted tool card value to graph input.",
+    });
+  }
+
   function updateBatchConfigForTab(tabId: string, nodeId: string, patch: Partial<BatchNode["config"]>) {
     commitDocumentMutationForTab(
       tabId,
@@ -613,6 +635,7 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     updateNodeMetadataForTab,
     updateAgentConfigForTab,
     updateToolConfigForTab,
+    promoteToolStaticInputForTab,
     updateBatchConfigForTab,
     updateBatchWorkerForTab,
     toggleAgentBreakpointForTab,

@@ -1,5 +1,5 @@
 import { translate } from "../i18n/index.ts";
-import type { TemplateRecord } from "../types/node-system.ts";
+import type { InputValuePresentation, TemplateRecord } from "../types/node-system.ts";
 import type {
   ScheduledGraphJob,
   ScheduledGraphJobCreatePayload,
@@ -11,7 +11,7 @@ import type {
 
 export type ScheduledIntervalUnit = "minutes" | "hours" | "days";
 
-export type ScheduledInputDraftValue = string | boolean;
+export type ScheduledInputDraftValue = string | number | boolean | Record<string, unknown> | unknown[] | null;
 
 export type ScheduledGraphJobDraft = {
   name: string;
@@ -25,6 +25,7 @@ export type ScheduledGraphJobDraft = {
   input_values: Record<string, ScheduledInputDraftValue>;
   input_defaults: Record<string, unknown>;
   input_types: Record<string, string>;
+  input_presentations: Record<string, InputValuePresentation | null>;
   delivery_outlet: ScheduledMessageOutletKind;
   delivery_session_mode: ScheduledMessageOutletSessionMode;
   buddy_session_id: string;
@@ -44,6 +45,7 @@ export type ScheduledGraphJobInputRow = {
   type: string;
   value: ScheduledInputDraftValue;
   default_value: unknown;
+  presentation: InputValuePresentation | null;
   changed: boolean;
 };
 
@@ -53,14 +55,9 @@ export type SchedulerOverviewItem = {
   value: number;
 };
 
-export type OfficialSchedulerEnableRecommendation = {
-  job_id: string;
-  title: string;
+export type ScheduledGraphJobTriggerProfile = {
+  modeLabel: string;
   description: string;
-  enabled: boolean;
-  template_id: string;
-  schedule: string;
-  action: "enable" | "run";
 };
 
 export function buildSchedulerOverview(jobs: ScheduledGraphJob[]): SchedulerOverviewItem[] {
@@ -72,21 +69,12 @@ export function buildSchedulerOverview(jobs: ScheduledGraphJob[]): SchedulerOver
   ];
 }
 
-export function buildOfficialSchedulerEnableRecommendations(
-  jobs: ScheduledGraphJob[],
-): OfficialSchedulerEnableRecommendation[] {
-  return sortScheduledGraphJobs(jobs)
-    .filter((job) => job.metadata?.source === "official_seed" || job.metadata?.source === "official")
-    .sort((left, right) => Number(left.enabled) - Number(right.enabled) || left.job_id.localeCompare(right.job_id))
-    .map((job) => ({
-      job_id: job.job_id,
-      title: officialSchedulerJobTitle(job),
-      description: officialSchedulerJobDescription(job),
-      enabled: job.enabled,
-      template_id: job.template_id,
-      schedule: formatSchedule(job),
-      action: job.enabled ? "run" : "enable",
-    }));
+export function isOfficialScheduledGraphJob(job: ScheduledGraphJob): boolean {
+  return job.metadata?.source === "official_seed" || job.metadata?.source === "official";
+}
+
+export function canEditScheduledGraphJobTemplate(job: ScheduledGraphJob): boolean {
+  return !isOfficialScheduledGraphJob(job);
 }
 
 export function sortScheduledGraphJobs(jobs: ScheduledGraphJob[]): ScheduledGraphJob[] {
@@ -102,6 +90,9 @@ export function sortScheduledGraphJobs(jobs: ScheduledGraphJob[]): ScheduledGrap
 export function formatSchedule(job: Pick<ScheduledGraphJob, "schedule_kind" | "schedule_expr">): string {
   if (job.schedule_kind === "manual") {
     return translate("scheduler.manual");
+  }
+  if (job.schedule_kind === "event") {
+    return translate("scheduler.eventTrigger", { event: job.schedule_expr || translate("common.none") });
   }
   if (job.schedule_kind === "cron") {
     return job.schedule_expr || translate("common.none");
@@ -120,6 +111,23 @@ export function formatSchedule(job: Pick<ScheduledGraphJob, "schedule_kind" | "s
     return translate("scheduler.everyMinutes", { count: seconds / 60 });
   }
   return translate("scheduler.everySeconds", { count: seconds });
+}
+
+export function buildScheduledGraphJobTriggerProfile(job: Pick<ScheduledGraphJob, "schedule_kind" | "metadata">): ScheduledGraphJobTriggerProfile {
+  const modeLabel =
+    job.schedule_kind === "event"
+      ? translate("scheduler.eventTriggerMode")
+      : job.schedule_kind === "interval"
+        ? translate("scheduler.intervalTriggerMode")
+        : job.schedule_kind === "cron"
+          ? translate("scheduler.cronTriggerMode")
+          : translate("scheduler.manualTriggerMode");
+  const metadata = isRecord(job.metadata) ? job.metadata : {};
+  const purpose = stringValue(metadata.purpose);
+  return {
+    modeLabel,
+    description: officialScheduledGraphJobDescription(purpose),
+  };
 }
 
 export function normalizeJobRunStatus(status: string): string {
@@ -154,6 +162,7 @@ export function buildDefaultScheduledGraphJobDraft(
     input_values: inputState.values,
     input_defaults: inputState.defaults,
     input_types: inputState.types,
+    input_presentations: inputState.presentations,
     delivery_outlet: "none",
     delivery_session_mode: "existing_session",
     buddy_session_id: "",
@@ -187,6 +196,7 @@ export function buildScheduledGraphJobDraftFromJob(
     input_values: inputState.values,
     input_defaults: inputState.defaults,
     input_types: inputState.types,
+    input_presentations: inputState.presentations,
     delivery_outlet: target.kind === "message_outlet" ? outlet : "none",
     delivery_session_mode: sessionMode,
     buddy_session_id: stringValue(target.buddy_session_id || target.session_id),
@@ -207,7 +217,7 @@ export function buildScheduledGraphJobInputRows(
     return [];
   }
   return listTemplateInputFields(template).map((field) => {
-    const value = draft.input_values[field.state_key] ?? formatInputDraftValue(field.type, field.default_value);
+    const value = draft.input_values[field.state_key] ?? formatInputDraftValue(field.type, field.default_value, field.presentation);
     const parsedValue = parseInputDraftValue(field.type, value, field.label);
     return {
       node_id: field.node_id,
@@ -217,6 +227,7 @@ export function buildScheduledGraphJobInputRows(
       type: field.type,
       value,
       default_value: field.default_value,
+      presentation: field.presentation,
       changed: !deepEqual(parsedValue, field.default_value),
     };
   });
@@ -252,16 +263,18 @@ export function withTemplateInputDraft(
     input_values: inputState.values,
     input_defaults: inputState.defaults,
     input_types: inputState.types,
+    input_presentations: inputState.presentations,
   };
 }
 
 export function resetScheduledGraphJobInputValue(draft: ScheduledGraphJobDraft, stateKey: string): ScheduledGraphJobDraft {
   const type = draft.input_types[stateKey] || "text";
+  const presentation = draft.input_presentations?.[stateKey] ?? null;
   return {
     ...draft,
     input_values: {
       ...draft.input_values,
-      [stateKey]: formatInputDraftValue(type, draft.input_defaults[stateKey]),
+      [stateKey]: formatInputDraftValue(type, draft.input_defaults[stateKey], presentation),
     },
   };
 }
@@ -281,6 +294,19 @@ function buildScheduleExpression(draft: ScheduledGraphJobDraft, scheduleKind: st
     return `PT${amount}M`;
   }
   return draft.schedule_expr.trim();
+}
+
+function officialScheduledGraphJobDescription(purpose: string): string {
+  if (purpose === "buddy_message_retrieval_ingestion") {
+    return translate("scheduler.officialPurposeBuddyMessageIngestion");
+  }
+  if (purpose === "buddy_autonomous_review") {
+    return translate("scheduler.officialPurposeBuddyAutonomousReview");
+  }
+  if (purpose === "embedding_maintenance") {
+    return translate("scheduler.officialPurposeEmbeddingMaintenance");
+  }
+  return translate("scheduler.triggerProfileFallback");
 }
 
 function buildInputBindings(draft: ScheduledGraphJobDraft): Record<string, unknown> {
@@ -347,20 +373,6 @@ function buildMessageOutletTarget(draft: ScheduledGraphJobDraft): Record<string,
   return target;
 }
 
-function officialSchedulerJobTitle(job: ScheduledGraphJob): string {
-  if (job.job_id === "official_embedding_maintenance") {
-    return translate("scheduler.embeddingMaintenanceTask");
-  }
-  return job.name || job.job_id;
-}
-
-function officialSchedulerJobDescription(job: ScheduledGraphJob): string {
-  if (job.job_id === "official_embedding_maintenance") {
-    return translate("scheduler.embeddingMaintenanceDescription");
-  }
-  return translate("scheduler.officialMaintenanceDescriptionFallback");
-}
-
 function intervalSeconds(value: string): number | null {
   const normalized = value.trim();
   const shortMatch = normalized.match(/^(\d+)([smhd])$/i);
@@ -405,10 +417,14 @@ function listTemplateInputFields(template: TemplateRecord): Array<{
   description: string;
   type: string;
   default_value: unknown;
+  presentation: InputValuePresentation | null;
 }> {
   return Object.entries(template.nodes)
     .filter((entry) => entry[1].kind === "input")
     .map(([nodeId, node]) => {
+      if (node.kind !== "input") {
+        return null;
+      }
       const stateKey = node.writes[0]?.state || "";
       if (!stateKey) {
         return null;
@@ -424,6 +440,7 @@ function listTemplateInputFields(template: TemplateRecord): Array<{
         description: node.description || state.description || "",
         type: String(state.type || "text"),
         default_value: cloneValue(state.value),
+        presentation: cloneValue(node.config.valuePresentation ?? null),
       };
     })
     .filter((field): field is NonNullable<typeof field> => field !== null);
@@ -436,24 +453,34 @@ function buildInputDraftState(
   values: Record<string, ScheduledInputDraftValue>;
   defaults: Record<string, unknown>;
   types: Record<string, string>;
+  presentations: Record<string, InputValuePresentation | null>;
 } {
   const values: Record<string, ScheduledInputDraftValue> = {};
   const defaults: Record<string, unknown> = {};
   const types: Record<string, string> = {};
+  const presentations: Record<string, InputValuePresentation | null> = {};
   for (const field of template ? listTemplateInputFields(template) : []) {
     const nextValue = Object.prototype.hasOwnProperty.call(inputBindings, field.state_key)
       ? inputBindings[field.state_key]
       : field.default_value;
     defaults[field.state_key] = cloneValue(field.default_value);
     types[field.state_key] = field.type;
-    values[field.state_key] = formatInputDraftValue(field.type, nextValue);
+    presentations[field.state_key] = cloneValue(field.presentation);
+    values[field.state_key] = formatInputDraftValue(field.type, nextValue, field.presentation);
   }
-  return { values, defaults, types };
+  return { values, defaults, types, presentations };
 }
 
-function formatInputDraftValue(type: string, value: unknown): ScheduledInputDraftValue {
+function formatInputDraftValue(
+  type: string,
+  value: unknown,
+  presentation: InputValuePresentation | null = null,
+): ScheduledInputDraftValue {
   if (type === "boolean") {
     return Boolean(value);
+  }
+  if (presentation?.control === "object" && isRecord(value)) {
+    return cloneValue(value);
   }
   if (type === "json" || type === "capability" || type === "result_package") {
     return typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2);
@@ -476,6 +503,9 @@ function parseInputDraftValue(type: string, value: ScheduledInputDraftValue, lab
     return parsed;
   }
   if (type === "json" || type === "capability" || type === "result_package") {
+    if (typeof value !== "string") {
+      return cloneValue(value);
+    }
     try {
       return JSON.parse(String(value || "null")) as unknown;
     } catch {

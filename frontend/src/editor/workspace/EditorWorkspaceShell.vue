@@ -129,6 +129,7 @@
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-tool-config="updateToolConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @promote-tool-static-input="promoteToolStaticInputForTab(tab.tabId, $event.nodeId, $event.fieldKey)"
                 @update-batch-config="updateBatchConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-batch-worker="updateBatchWorkerForTab(tab.tabId, $event.nodeId, resolveBatchWorkerSelection($event.workerValue))"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
@@ -1803,6 +1804,7 @@ const {
   updateNodeMetadataForTab,
   updateAgentConfigForTab,
   updateToolConfigForTab,
+  promoteToolStaticInputForTab,
   updateBatchConfigForTab,
   updateBatchWorkerForTab,
   toggleAgentBreakpointForTab,

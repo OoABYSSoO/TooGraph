@@ -105,6 +105,8 @@ def enqueue_background_review_run(
     )
     graph_payload.setdefault("metadata", {})
     graph_payload["metadata"]["buddy_background_review_id"] = review_record["review_id"]
+    graph_payload["metadata"].setdefault("runtime_context", {})
+    graph_payload["metadata"]["runtime_context"]["buddy_background_review_id"] = review_record["review_id"]
     executed_graph = _build_runtime_graph_document(graph_payload, runtime_graph_id=runtime_graph_id)
     unsupported_reasons = get_langgraph_runtime_unsupported_reasons(executed_graph)
     if unsupported_reasons:
@@ -437,6 +439,7 @@ def build_background_review_graph_payload(
     }
     _apply_buddy_model_override(graph, buddy_model_ref)
     _apply_review_template_binding(graph, binding, _build_review_runtime_source_values(source_run))
+    _apply_background_review_source_selector(graph, str(source_run.get("run_id") or ""))
     for state_name, value in REVIEW_OUTPUT_DEFAULTS.items():
         _set_state_value_by_name(graph, state_name, value)
     return graph
@@ -484,6 +487,31 @@ def _apply_review_template_binding(graph: dict[str, Any], binding: dict[str, Any
             **state_schema[state_key],
             "value": deepcopy(value),
         }
+
+
+def _apply_background_review_source_selector(graph: dict[str, Any], source_run_id: str) -> None:
+    normalized_source_run_id = str(source_run_id or "").strip()
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), dict) else {}
+    selector_node = nodes.get("select_review_source")
+    if isinstance(selector_node, dict):
+        config = selector_node.get("config") if isinstance(selector_node.get("config"), dict) else {}
+        static_inputs = config.get("staticInputs") if isinstance(config.get("staticInputs"), dict) else {}
+        selector_node["config"] = {
+            **config,
+            "staticInputs": {
+                **static_inputs,
+                "source_run_id": normalized_source_run_id,
+            },
+        }
+    mode_input_node = nodes.get("input_review_source_selection_mode")
+    if isinstance(mode_input_node, dict):
+        config = mode_input_node.get("config") if isinstance(mode_input_node.get("config"), dict) else {}
+        mode_input_node["config"] = {
+            **config,
+            "value": "explicit",
+        }
+    _set_state_value_by_name(graph, "review_source_selection_mode", "explicit")
+    _set_state_value_by_name(graph, "source_run_id", normalized_source_run_id)
 
 
 def _build_review_runtime_source_values(source_run: dict[str, Any]) -> dict[str, Any]:

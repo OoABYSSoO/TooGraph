@@ -62,6 +62,24 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         self.assertEqual(config.boundary_type.value, "video")
         self.assertEqual(config.model_dump(by_alias=True)["boundaryType"], "video")
 
+    def test_input_config_preserves_value_presentation_metadata(self) -> None:
+        config = NodeSystemInputConfig.model_validate(
+            {
+                "value": "buddy_messages",
+                "boundaryType": "text",
+                "valuePresentation": {
+                    "control": "select",
+                    "options": [
+                        {"label": "Chat history", "value": "buddy_messages"},
+                        {"label": "Knowledge documents", "value": "normalized_documents"},
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(config.value_presentation["control"], "select")
+        self.assertEqual(config.model_dump(by_alias=True)["valuePresentation"]["options"][1]["value"], "normalized_documents")
+
     def test_agent_config_preserves_suspended_free_writes(self) -> None:
         config = NodeSystemAgentConfig.model_validate(
             {

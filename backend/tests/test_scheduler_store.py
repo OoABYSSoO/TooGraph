@@ -71,6 +71,39 @@ class SchedulerStoreTests(unittest.TestCase):
         self.assertTrue(enabled["enabled"])
         self.assertEqual(due, [])
 
+    def test_event_job_is_matched_by_event_name_and_never_due_by_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "name": "Buddy message ingestion",
+                        "template_id": "buddy_message_retrieval_ingestion",
+                        "input_bindings": {"session_id": "{{event.session_id}}"},
+                        "schedule_kind": "event",
+                        "schedule_expr": "buddy.message.created",
+                        "enabled": True,
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+                event_jobs = store.list_event_scheduled_graph_jobs("buddy.message.created")
+                unrelated_event_jobs = store.list_event_scheduled_graph_jobs("buddy.run.completed")
+                due = store.list_due_scheduled_graph_jobs(now="2026-05-27T01:00:00Z")
+
+        self.assertEqual(job["schedule_kind"], "event")
+        self.assertEqual(job["schedule_expr"], "buddy.message.created")
+        self.assertEqual(job["next_run_at"], "")
+        self.assertEqual(job["input_bindings"], {"session_id": "{{event.session_id}}"})
+        self.assertEqual([item["job_id"] for item in event_jobs], [job["job_id"]])
+        self.assertEqual(unrelated_event_jobs, [])
+        self.assertEqual(due, [])
+
     def test_update_job_edits_schedule_template_bindings_and_delivery_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
@@ -133,6 +166,52 @@ class SchedulerStoreTests(unittest.TestCase):
         self.assertEqual(updated["updated_at"], "2026-05-27T02:00:00Z")
         self.assertEqual(updated["delivery_target"]["kind"], "message_outlet")
         self.assertEqual(updated["delivery_target"]["outlet"], "buddy")
+
+    def test_update_official_job_preserves_seeded_template_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+
+            def load_template(template_id: str) -> dict[str, object]:
+                return {"template_id": template_id, "label": template_id, "status": "active"}
+
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch("app.scheduler.store.load_template_record", load_template),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "job_id": "official_embedding_maintenance",
+                        "name": "官方 Embedding 维护",
+                        "template_id": "embedding_maintenance",
+                        "input_bindings": {"job_limit": 50},
+                        "schedule_kind": "interval",
+                        "schedule_expr": "PT1H",
+                        "enabled": False,
+                        "metadata": {"source": "official_seed"},
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+
+                updated = store.update_scheduled_graph_job(
+                    job["job_id"],
+                    {
+                        "template_id": "user_changed_template",
+                        "input_bindings": {"job_limit": 20},
+                        "schedule_kind": "interval",
+                        "schedule_expr": "PT2H",
+                        "enabled": True,
+                    },
+                    now="2026-05-27T01:00:00Z",
+                )
+
+        self.assertEqual(updated["template_id"], "embedding_maintenance")
+        self.assertEqual(updated["input_bindings"], {"job_limit": 20})
+        self.assertEqual(updated["schedule_expr"], "PT2H")
+        self.assertTrue(updated["enabled"])
 
     def test_message_outlet_delivery_target_is_supported_delivery_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -257,6 +336,50 @@ class SchedulerStoreTests(unittest.TestCase):
         self.assertEqual(reloaded["metadata"]["scheduler_retry_pending"]["parent_job_run_id"], first_run["job_run_id"])
         self.assertEqual(reloaded["metadata"]["scheduler_retry_pending"]["resume_next_run_at"], "2026-05-27T12:00:00Z")
         self.assertEqual(not_due, [])
+        self.assertEqual([item["job_id"] for item in due], [job["job_id"]])
+        self.assertEqual(store.resolve_due_trigger_reason(due[0]), "retry")
+
+    def test_failed_event_job_run_schedules_auditable_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "name": "Buddy message ingestion",
+                        "template_id": "buddy_message_retrieval_ingestion",
+                        "schedule_kind": "event",
+                        "schedule_expr": "buddy.message.created",
+                        "retry_policy": {"max_attempts": 2, "delay_seconds": 120},
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+                first_run = store.record_scheduled_graph_job_run(
+                    job["job_id"],
+                    run_id="run_event_1",
+                    trigger_reason="event",
+                    status="running",
+                    started_at="2026-05-27T01:00:00Z",
+                    now="2026-05-27T01:00:00Z",
+                    metadata={"scheduled_graph_event": {"name": "buddy.message.created"}},
+                )
+                failed_run = store.update_scheduled_graph_job_run(
+                    first_run["job_run_id"],
+                    status="failed",
+                    error="event ingestion failed",
+                    completed_at="2026-05-27T01:00:30Z",
+                )
+                reloaded = store.load_scheduled_graph_job(job["job_id"])
+                due = store.list_due_scheduled_graph_jobs(now="2026-05-27T01:02:30Z")
+
+        self.assertEqual(failed_run["metadata"]["retry_decision"]["action"], "scheduled")
+        self.assertEqual(reloaded["next_run_at"], "2026-05-27T01:02:30Z")
+        self.assertEqual(reloaded["metadata"]["scheduler_retry_pending"]["parent_job_run_id"], first_run["job_run_id"])
         self.assertEqual([item["job_id"] for item in due], [job["job_id"]])
         self.assertEqual(store.resolve_due_trigger_reason(due[0]), "retry")
 

@@ -21,68 +21,13 @@
   <a href="#快速开始">快速开始</a>
   · <a href="#核心能力">核心能力</a>
   · <a href="#模型-provider">模型 Provider</a>
-  · <a href="#actions-与知识库">Actions</a>
-  · <a href="docs/README.md">长期路线</a>
   · <a href="#图模板">图模板</a>
-  · <a href="#未来方向">Roadmap</a>
+  · <a href="#未来方向">未来方向</a>
 </p>
 
 TooGraph 是一个面向 Agent 工作流的可视化编排与运行工作台。它把 graph、state、节点、数据流、顺序流、条件分支、运行记录和人工确认统一到一套可保存、可校验、可运行的 `node_system` 协议里。
 
 项目当前由 Vue 前端、FastAPI 后端和 LangGraph 运行时组成，适合用来搭建、调试和观察基于状态流转的 Agent graph。
-
-## 当前仓库状态
-
-- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、Element Plus、vue-i18n。
-- 后端：FastAPI、Pydantic、LangGraph、SQLite FTS、JSON 文件存储。
-- 图协议：`node_system` 描述节点、状态、边、运行配置和画布布局；`state_schema` 是节点读写状态的统一来源。
-- 启动方式：仓库根目录使用 `npm start`，实际执行 `node scripts/start.mjs`，构建前端后由 FastAPI 在单个端口同时服务 UI 和 API。
-- 本地数据：graph、preset、run、settings、Action state、checkpoint、retrieval documents/chunks 和 embedding jobs 写入 `backend/data/`。
-- 主要页面：Home、Editor、Runs、Run Detail、Settings、Model Providers、Actions、Templates、Presets、Buddy。
-
-## 核心能力
-
-### 可视化编辑器
-
-- 支持 `input`、`agent`、`condition`、`output`、`subgraph` 五类核心节点。
-- 通过 `state_schema` 连接节点输入和输出，区分数据流、顺序流和条件分支。
-- `condition` 节点支持 true / false / exhausted 分支和循环上限配置。
-- 支持画布拖拽、节点选择、连线、边删除确认、节点端口编辑、右下角缩略图、线条显示模式和运行态高亮。
-- 支持从空画布、节点输出端口、流程端口和文件拖入创建节点。
-- 支持多图页签、保存状态提示、未保存关闭确认、模板创建、已有图打开和运行记录恢复编辑。
-- 支持编辑器内 State 面板和 Human Review 面板；图进入人工确认暂停时，画布保持可查看但不可编辑。
-- 支持多语言界面：简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch。
-
-### 运行与观察
-
-- 支持保存、校验、运行 graph。
-- LangGraph runtime 会把可执行 graph 编译为后端运行计划，并记录状态快照、节点状态、输出预览、artifacts、warnings 和 errors。
-- 支持 checkpoint、pause snapshot、completed snapshot，以及从可恢复快照继续运行。
-- 支持断点暂停后的 Human Review 输入，继续运行前可以填写当前需要人工补充的 state。
-- 支持 SSE/EventSource 运行事件流，Editor 可以实时更新 Run Activity 和 Output 节点预览。
-- Runs 首页支持状态筛选、搜索、分页、断点结果和最终结果切换。
-- Run Detail 页面展示运行概览、节点过程、循环信息、state、artifacts、输出预览和恢复编辑入口。
-- 后端提供 LangGraph Python 源码导出和 Python 源码导入接口。
-
-### 模型 Provider
-
-TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界面里配置本地模型网关、私有 OpenAI-compatible 网关或云端 Provider，并选择默认文本模型；这些配置写入本机设置目录，不进入 Git。
-
-本地或私有网关的常规流程：
-
-1. 启动你要使用的 OpenAI-compatible gateway。
-2. 打开 TooGraph 的 Model Providers 页面。
-3. 配置 `local` / LM Studio Provider 的 base URL、API key 和模型列表；当前本地默认 base URL 是 `http://127.0.0.1:1234/v1`。
-4. 保存后，编辑器和运行时会从已保存的 Provider 配置读取模型入口。
-
-模型运行只读取 Model Providers 页面保存的 Provider 配置和默认模型选择。启动环境变量不会配置模型入口。
-
-### 核心思想
-
-- 图整体才是 Agent；单个 LLM 节点只做一次模型运行，并且最多使用一个显式能力来源。
-- LLM 节点可以显式选择一个 Action，存储在 `config.actionKey` 单值字段中；动态 `capability` state 是单个互斥对象，`kind` 为 `action`、`subgraph`、`tool` 或 `none`。
-- 手动复用图仍通过 Subgraph 节点完成；动态 `capability.kind=subgraph` 主要服务于 Buddy 主循环这类模板内能力选择。
-- 后端使用统一 retrieval substrate：`source_chunker` 负责切片，`retrieval_ingestion_writer` 负责写入 retrieval documents/chunks 和排队 embedding jobs，`retrieval_query_context_loader` 负责查询召回。
 
 ## 快速开始
 
@@ -175,6 +120,59 @@ npm.cmd start
 ```bash
 ./scripts/start.sh
 ```
+
+## 当前仓库状态
+
+- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、Element Plus、vue-i18n。
+- 后端：FastAPI、Pydantic、LangGraph、SQLite FTS、JSON 文件存储。
+- 图协议：`node_system` 描述节点、状态、边、运行配置和画布布局；`state_schema` 是节点读写状态的统一来源。
+- 启动方式：仓库根目录使用 `npm start`，实际执行 `node scripts/start.mjs`，构建前端后由 FastAPI 在单个端口同时服务 UI 和 API。
+- 本地数据：graph、preset、run、settings、Action state、checkpoint、retrieval documents/chunks 和 embedding jobs 写入 `backend/data/`。
+- 主要页面：Home、Editor、Runs、Run Detail、Settings、Model Providers、Actions、Templates、Presets、Buddy。
+
+## 核心能力
+
+### 可视化编辑器
+
+- 支持 `input`、`agent`、`condition`、`output`、`subgraph` 五类核心节点。
+- 通过 `state_schema` 连接节点输入和输出，区分数据流、顺序流和条件分支。
+- `condition` 节点支持 true / false / exhausted 分支和循环上限配置。
+- 支持画布拖拽、节点选择、连线、边删除确认、节点端口编辑、右下角缩略图、线条显示模式和运行态高亮。
+- 支持从空画布、节点输出端口、流程端口和文件拖入创建节点。
+- 支持多图页签、保存状态提示、未保存关闭确认、模板创建、已有图打开和运行记录恢复编辑。
+- 支持编辑器内 State 面板和 Human Review 面板；图进入人工确认暂停时，画布保持可查看但不可编辑。
+- 支持多语言界面：简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch。
+
+### 运行与观察
+
+- 支持保存、校验、运行 graph。
+- LangGraph runtime 会把可执行 graph 编译为后端运行计划，并记录状态快照、节点状态、输出预览、artifacts、warnings 和 errors。
+- 支持 checkpoint、pause snapshot、completed snapshot，以及从可恢复快照继续运行。
+- 支持断点暂停后的 Human Review 输入，继续运行前可以填写当前需要人工补充的 state。
+- 支持 SSE/EventSource 运行事件流，Editor 可以实时更新 Run Activity 和 Output 节点预览。
+- Runs 首页支持状态筛选、搜索、分页、断点结果和最终结果切换。
+- Run Detail 页面展示运行概览、节点过程、循环信息、state、artifacts、输出预览和恢复编辑入口。
+- 后端提供 LangGraph Python 源码导出和 Python 源码导入接口。
+
+### 模型 Provider
+
+TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界面里配置本地模型网关、私有 OpenAI-compatible 网关或云端 Provider，并选择默认文本模型；这些配置写入本机设置目录，不进入 Git。
+
+本地或私有网关的常规流程：
+
+1. 启动你要使用的 OpenAI-compatible gateway。
+2. 打开 TooGraph 的 Model Providers 页面。
+3. 配置 `local` / LM Studio Provider 的 base URL、API key 和模型列表；当前本地默认 base URL 是 `http://127.0.0.1:1234/v1`。
+4. 保存后，编辑器和运行时会从已保存的 Provider 配置读取模型入口。
+
+模型运行只读取 Model Providers 页面保存的 Provider 配置和默认模型选择。启动环境变量不会配置模型入口。
+
+### 核心思想
+
+- 图整体才是 Agent；单个 LLM 节点只做一次模型运行，并且最多使用一个显式能力来源。
+- LLM 节点可以显式选择一个 Action，存储在 `config.actionKey` 单值字段中；动态 `capability` state 是单个互斥对象，`kind` 为 `action`、`subgraph`、`tool` 或 `none`。
+- 手动复用图仍通过 Subgraph 节点完成；动态 `capability.kind=subgraph` 主要服务于 Buddy 主循环这类模板内能力选择。
+- 后端使用统一 retrieval substrate：`source_chunker` 负责切片，`retrieval_ingestion_writer` 负责写入 retrieval documents/chunks 和排队 embedding jobs，`retrieval_query_context_loader` 负责查询召回。
 
 ### 配置模型入口
 
