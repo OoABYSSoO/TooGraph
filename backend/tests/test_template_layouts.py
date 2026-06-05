@@ -119,6 +119,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "game_creative_factory",
                 "job_application_interview_coach",
                 "knowledge_document_chunking_demo",
+                "knowledge_folder_retrieval_ingestion",
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
@@ -139,6 +140,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_message_retrieval_ingestion",
                 "embedding_maintenance",
                 "knowledge_document_chunking_demo",
+                "knowledge_folder_retrieval_ingestion",
                 "toograph_page_operation_workflow",
             ],
         )
@@ -857,6 +859,188 @@ class TemplateLayoutTests(unittest.TestCase):
                     if key not in {"template_id", "label", "description", "default_graph_name", "source"}
                 },
                 "graph_id": "test_buddy_message_retrieval_ingestion",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_knowledge_folder_retrieval_ingestion_template_normalizes_folder_before_chunking(self) -> None:
+        template = load_template_record("knowledge_folder_retrieval_ingestion")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(
+            template["metadata"]["requiredTools"],
+            ["knowledge_folder_normalizer", "source_chunker", "retrieval_ingestion_writer"],
+        )
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            ["input_knowledge_folder"],
+        )
+        self.assertIn("knowledge_folder", states)
+        self.assertIn("source_package", states)
+        self.assertIn("normalization_report", states)
+        self.assertIn("chunks", states)
+        self.assertIn("ingestion_report", states)
+        self.assertIn("indexed_chunks", states)
+        self.assertIn("embedding_jobs", states)
+        self.assertNotIn("source_kind", states)
+        self.assertNotIn("strategy", states)
+        self.assertNotIn("limits", states)
+        self.assertNotIn("embedding_model_refs", states)
+
+        input_node = nodes["input_knowledge_folder"]
+        self.assertEqual(input_node["kind"], "input")
+        self.assertEqual(input_node["config"]["boundaryType"], "file")
+        self.assertEqual(
+            input_node["config"]["value"],
+            {"kind": "local_folder", "root": "knowledge/action_policy", "selection_mode": "all", "selected": []},
+        )
+
+        normalizer_node = nodes["normalize_knowledge_folder"]
+        self.assertEqual(normalizer_node["kind"], "tool")
+        self.assertEqual(normalizer_node["config"]["toolKey"], "knowledge_folder_normalizer")
+        self.assertEqual(
+            normalizer_node["config"]["staticInputs"],
+            {
+                "collection": "knowledge_action_policy",
+                "max_files": 10000,
+                "include_binary_text": False,
+                "metadata": {
+                    "template_id": "knowledge_folder_retrieval_ingestion",
+                    "role": "knowledge_folder_retrieval_ingestion",
+                },
+            },
+        )
+        self.assertEqual(
+            _read_contracts(normalizer_node["reads"]),
+            [
+                {
+                    "state": "knowledge_folder",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "knowledge_folder_normalizer",
+                        "fieldKey": "folder",
+                        "managed": True,
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            normalizer_node["writes"],
+            [
+                {"state": "source_package", "mode": "replace"},
+                {"state": "normalization_report", "mode": "replace"},
+            ],
+        )
+
+        chunker_node = nodes["chunk_source_material"]
+        self.assertEqual(chunker_node["config"]["toolKey"], "source_chunker")
+        self.assertEqual(
+            chunker_node["config"]["staticInputs"],
+            {
+                "source_kind": "normalized_documents",
+                "strategy": "document_section_window",
+                "limits": {"max_chars": 1800, "overlap_chars": 200},
+            },
+        )
+        self.assertEqual(
+            _read_contracts(chunker_node["reads"]),
+            [
+                {
+                    "state": "source_package",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "source_chunker",
+                        "fieldKey": "source",
+                        "managed": True,
+                    },
+                }
+            ],
+        )
+
+        writer_node = nodes["write_retrieval_ingestion"]
+        self.assertEqual(writer_node["config"]["toolKey"], "retrieval_ingestion_writer")
+        self.assertEqual(writer_node["config"]["staticInputs"]["source_kind"], "knowledge_document")
+        self.assertEqual(writer_node["config"]["staticInputs"]["embedding_model_refs"], "")
+        self.assertEqual(writer_node["config"]["staticInputs"]["scope"], {"collection": "knowledge_action_policy"})
+        self.assertEqual(
+            _read_contracts(writer_node["reads"]),
+            [
+                {
+                    "state": "source_package",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_ingestion_writer",
+                        "fieldKey": "source",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "chunks",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_ingestion_writer",
+                        "fieldKey": "chunks",
+                        "managed": True,
+                    },
+                },
+            ],
+        )
+        self.assertEqual(
+            template["edges"],
+            [
+                {"source": "input_knowledge_folder", "target": "normalize_knowledge_folder"},
+                {"source": "normalize_knowledge_folder", "target": "chunk_source_material"},
+                {"source": "chunk_source_material", "target": "write_retrieval_ingestion"},
+                {"source": "write_retrieval_ingestion", "target": "output_ingestion_report"},
+            ],
+        )
+        self.assertEqual(
+            template["metadata"]["outputContract"],
+            [
+                {
+                    "state": "normalization_report",
+                    "role": "source_normalization_report",
+                    "label": "Knowledge folder source normalization",
+                },
+                {
+                    "state": "ingestion_report",
+                    "role": "retrieval_ingestion_report",
+                    "label": "Knowledge folder retrieval ingestion",
+                },
+                {
+                    "state": "indexed_chunks",
+                    "role": "retrieval_chunks",
+                    "label": "Indexed knowledge folder chunks",
+                },
+                {
+                    "state": "embedding_jobs",
+                    "role": "embedding_jobs",
+                    "label": "Queued knowledge folder embedding jobs",
+                },
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_knowledge_folder_retrieval_ingestion",
                 "name": template["default_graph_name"],
             }
         )

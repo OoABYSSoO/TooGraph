@@ -1,0 +1,395 @@
+{
+  "template_id": "knowledge_folder_retrieval_ingestion",
+  "label": "知识库文件夹检索入库",
+  "description": "读取 Input 节点传入的本地知识库文件夹选择包，规范化为文档来源，生成确定性文档切片，写入统一 retrieval_documents / retrieval_chunks，并按入库写入器卡片中的 embedding_model_refs 排队 embedding_jobs。",
+  "default_graph_name": "知识库文件夹检索入库",
+  "state_schema": {
+    "knowledge_folder": {
+      "name": "Knowledge Folder",
+      "description": "Input 节点输出的 local_folder 选择包。selection_mode=all 表示处理整个文件夹；selection_mode=selected 表示只处理 selected 中列出的文件。",
+      "type": "file",
+      "value": {
+        "kind": "local_folder",
+        "root": "knowledge/action_policy",
+        "selection_mode": "all",
+        "selected": []
+      },
+      "color": "#0f766e",
+      "binding": null
+    },
+    "source_package": {
+      "name": "Source Package",
+      "description": "由知识库文件夹规范化器生成的 normalized_documents 来源包，可直接传给 source_chunker。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "knowledge_folder_normalizer",
+        "nodeId": "normalize_knowledge_folder",
+        "fieldKey": "source_package",
+        "managed": true
+      }
+    },
+    "normalization_report": {
+      "name": "Normalization Report",
+      "description": "知识库文件夹规范化器返回的读取、跳过和选择模式摘要。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "knowledge_folder_normalizer",
+        "nodeId": "normalize_knowledge_folder",
+        "fieldKey": "report",
+        "managed": true
+      }
+    },
+    "chunks": {
+      "name": "Chunks",
+      "description": "由 source_chunker 生成的知识库文档切片候选。",
+      "type": "json",
+      "value": [],
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "source_chunker",
+        "nodeId": "chunk_source_material",
+        "fieldKey": "chunks",
+        "managed": true
+      }
+    },
+    "ingestion_report": {
+      "name": "Ingestion Report",
+      "description": "检索入库写入器返回的入库报告。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "ingestion_report",
+        "managed": true
+      }
+    },
+    "indexed_chunks": {
+      "name": "Indexed Chunks",
+      "description": "已写入统一 retrieval_chunks 的知识库切片记录。",
+      "type": "json",
+      "value": [],
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "indexed_chunks",
+        "managed": true
+      }
+    },
+    "embedding_jobs": {
+      "name": "Embedding Jobs",
+      "description": "入库写入器按 embedding_model_refs 排队的 embedding_jobs；实际向量生成由 embedding_job_processor 处理。",
+      "type": "json",
+      "value": [],
+      "color": "#d97706",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "retrieval_ingestion_writer",
+        "nodeId": "write_retrieval_ingestion",
+        "fieldKey": "embedding_jobs",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_knowledge_folder": {
+      "kind": "input",
+      "name": "Knowledge Folder",
+      "description": "选择需要入库的本地知识库文件夹；整个文件夹用 selection_mode=all，勾选文件用 selection_mode=selected。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 260
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "knowledge_folder",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "local_folder",
+          "root": "knowledge/action_policy",
+          "selection_mode": "all",
+          "selected": []
+        },
+        "boundaryType": "file"
+      }
+    },
+    "normalize_knowledge_folder": {
+      "kind": "tool",
+      "name": "Normalize Knowledge Folder",
+      "description": "读取本地文件夹选择包，并整理成 source_chunker 可直接使用的 normalized_documents 来源包。",
+      "ui": {
+        "position": {
+          "x": 600,
+          "y": 260
+        },
+        "collapsed": false,
+        "size": {
+          "width": 480,
+          "height": 360
+        }
+      },
+      "reads": [
+        {
+          "state": "knowledge_folder",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "knowledge_folder_normalizer",
+            "fieldKey": "folder",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "source_package",
+          "mode": "replace"
+        },
+        {
+          "state": "normalization_report",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "knowledge_folder_normalizer",
+        "staticInputs": {
+          "collection": "knowledge_action_policy",
+          "max_files": 10000,
+          "include_binary_text": false,
+          "metadata": {
+            "template_id": "knowledge_folder_retrieval_ingestion",
+            "role": "knowledge_folder_retrieval_ingestion"
+          }
+        }
+      }
+    },
+    "chunk_source_material": {
+      "kind": "tool",
+      "name": "Chunk Knowledge Documents",
+      "description": "把 normalized_documents 按文档段落窗口切成确定性的检索切片候选。",
+      "ui": {
+        "position": {
+          "x": 1160,
+          "y": 260
+        },
+        "collapsed": false,
+        "size": {
+          "width": 480,
+          "height": 380
+        }
+      },
+      "reads": [
+        {
+          "state": "source_package",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "source_chunker",
+            "fieldKey": "source",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "chunks",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "source_chunker",
+        "staticInputs": {
+          "source_kind": "normalized_documents",
+          "strategy": "document_section_window",
+          "limits": {
+            "max_chars": 1800,
+            "overlap_chars": 200
+          }
+        }
+      }
+    },
+    "write_retrieval_ingestion": {
+      "kind": "tool",
+      "name": "Write Knowledge Retrieval Ingestion",
+      "description": "写入统一检索表，并按卡片中的 embedding_model_refs 选择排队 embedding_jobs；留空时使用系统默认 embedding 模型策略。",
+      "ui": {
+        "position": {
+          "x": 1720,
+          "y": 240
+        },
+        "collapsed": false,
+        "size": {
+          "width": 500,
+          "height": 420
+        }
+      },
+      "reads": [
+        {
+          "state": "source_package",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "retrieval_ingestion_writer",
+            "fieldKey": "source",
+            "managed": true
+          }
+        },
+        {
+          "state": "chunks",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "retrieval_ingestion_writer",
+            "fieldKey": "chunks",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "ingestion_report",
+          "mode": "replace"
+        },
+        {
+          "state": "indexed_chunks",
+          "mode": "replace"
+        },
+        {
+          "state": "embedding_jobs",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "retrieval_ingestion_writer",
+        "staticInputs": {
+          "source_kind": "knowledge_document",
+          "embedding_model_refs": "",
+          "scope": {
+            "collection": "knowledge_action_policy"
+          },
+          "metadata": {
+            "template_id": "knowledge_folder_retrieval_ingestion",
+            "role": "knowledge_folder_retrieval_ingestion"
+          }
+        }
+      }
+    },
+    "output_ingestion_report": {
+      "kind": "output",
+      "name": "Ingestion Report",
+      "description": "查看检索入库数量、写入切片和 embedding job 排队情况。",
+      "ui": {
+        "position": {
+          "x": 2280,
+          "y": 320
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "ingestion_report",
+          "required": true,
+          "binding": null
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_knowledge_folder",
+      "target": "normalize_knowledge_folder"
+    },
+    {
+      "source": "normalize_knowledge_folder",
+      "target": "chunk_source_material"
+    },
+    {
+      "source": "chunk_source_material",
+      "target": "write_retrieval_ingestion"
+    },
+    {
+      "source": "write_retrieval_ingestion",
+      "target": "output_ingestion_report"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "origin": "embedding",
+    "role": "knowledge_folder_retrieval_ingestion",
+    "capabilityDiscoverableDefault": false,
+    "requiredTools": [
+      "knowledge_folder_normalizer",
+      "source_chunker",
+      "retrieval_ingestion_writer"
+    ],
+    "permissions": [
+      "local_file_read"
+    ],
+    "outputContract": [
+      {
+        "state": "normalization_report",
+        "role": "source_normalization_report",
+        "label": "Knowledge folder source normalization"
+      },
+      {
+        "state": "ingestion_report",
+        "role": "retrieval_ingestion_report",
+        "label": "Knowledge folder retrieval ingestion"
+      },
+      {
+        "state": "indexed_chunks",
+        "role": "retrieval_chunks",
+        "label": "Indexed knowledge folder chunks"
+      },
+      {
+        "state": "embedding_jobs",
+        "role": "embedding_jobs",
+        "label": "Queued knowledge folder embedding jobs"
+      }
+    ]
+  }
+}
