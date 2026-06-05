@@ -183,9 +183,11 @@
         :input-asset-accept="inputAssetAccept"
         :input-asset-label="inputAssetLabel"
         :local-folder-root="localFolderValue.root"
-        :local-folder-entries="localFolderEntries"
+        :local-folder-entries="localFolderPreviewEntries"
         :local-folder-selected="localFolderValue.selected"
+        :local-folder-selection-mode="localFolderValue.selection_mode"
         :local-folder-summary="localFolderSummary"
+        :local-folder-hidden-entry-count="localFolderHiddenEntryCount"
         :local-folder-loading="localFolderLoading"
         :local-folder-error="localFolderError"
         :show-local-folder-input="showLocalFolderInput"
@@ -662,9 +664,10 @@ import {
 } from "./conditionRuleEditorModel";
 import {
   formatLocalFolderSelectionSummary,
-  listSelectableLocalFolderFilePaths,
+  listLocalFolderPreviewEntries,
   parseLocalFolderInputValue,
   replaceLocalFolderSelection,
+  selectEntireLocalFolder,
   toggleLocalFolderSelection,
   updateLocalFolderRoot,
 } from "./localFolderInputModel";
@@ -1050,9 +1053,14 @@ const localFolderError = ref("");
 const loadedLocalFolderRoot = ref("");
 const localFolderSummary = computed(() =>
   formatLocalFolderSelectionSummary({
+    selectionMode: localFolderValue.value.selection_mode,
     selected: localFolderValue.value.selected,
     entries: localFolderEntries.value,
   }),
+);
+const localFolderPreviewEntries = computed(() => listLocalFolderPreviewEntries(localFolderEntries.value, 5));
+const localFolderHiddenEntryCount = computed(() =>
+  Math.max(0, localFolderEntries.value.length - localFolderPreviewEntries.value.length),
 );
 const inputAssetAccept = computed(() => resolveUploadedAssetInputAccept(inputAssetType.value));
 const inputStateKey = computed(() =>
@@ -2287,9 +2295,7 @@ function selectAllLocalFolderFiles() {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  emitInputValuePatch(
-    replaceLocalFolderSelection(localFolderValue.value, listSelectableLocalFolderFilePaths(localFolderEntries.value)),
-  );
+  emitInputValuePatch(selectEntireLocalFolder(localFolderValue.value));
 }
 
 function clearLocalFolderSelection() {

@@ -291,6 +291,43 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn("This file was not selected.", prompt)
         self.assertNotIn(str(folder), prompt)
 
+    def test_auto_prompt_summarizes_entire_local_folder_without_expanding_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            folder = workspace / "policy_library"
+            folder.mkdir()
+            (folder / "A.md").write_text("Policy document A body should stay out of the prompt.", encoding="utf-8")
+            (folder / "B.md").write_text("Policy document B body should stay out of the prompt.", encoding="utf-8")
+
+            with patch.dict(os.environ, {"TOOGRAPH_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
+                prompt = build_auto_prompt(
+                    ["answer"],
+                    {
+                        "knowledge_folder": {
+                            "kind": "local_folder",
+                            "root": str(folder),
+                            "selection_mode": "all",
+                            "selected": [],
+                        }
+                    },
+                    {},
+                    state_schema={
+                        "knowledge_folder": NodeSystemStateDefinition(
+                            name="Knowledge folder",
+                            type=NodeSystemStateType.FILE,
+                        ),
+                        "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                    },
+                )
+
+        self.assertIn("local_folder_selection: all", prompt)
+        self.assertIn("visible_files: 2", prompt)
+        self.assertIn("A.md", prompt)
+        self.assertIn("B.md", prompt)
+        self.assertNotIn("Policy document A body should stay out of the prompt.", prompt)
+        self.assertNotIn("Policy document B body should stay out of the prompt.", prompt)
+        self.assertNotIn(str(folder), prompt)
+
     def test_auto_prompt_budgets_large_file_state_text_and_keeps_omission_marker(self) -> None:
         large_artifact = create_uploaded_capability_artifact(
             file_name="large-context.md",

@@ -17,7 +17,7 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /<ElSegmented[\s\S]*class="node-card__input-boundary-toggle"[\s\S]*:model-value="inputBoundarySelection"[\s\S]*:options="inputTypeOptions"[\s\S]*@update:model-value="emit\('update:boundary-selection', \$event\)"/);
   assert.doesNotMatch(componentSource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
   assert.match(componentSource, /<slot name="primary-output" \/>/);
-  assert.doesNotMatch(componentSource, /ToographSelect/);
+  assert.match(componentSource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
   assert.doesNotMatch(componentSource, /showKnowledgeBaseInput/);
   assert.doesNotMatch(componentSource, /update:knowledge-base/);
   assert.doesNotMatch(componentSource, /<ElSelect/);
@@ -25,6 +25,8 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /:value="localFolderRoot"[\s\S]*@input="emit\('local-folder-root-input',/);
   assert.match(componentSource, /@click\.stop="emit\('local-folder-refresh'\)"/);
   assert.match(componentSource, /v-for="entry in localFolderEntries"[\s\S]*@change="emit\('local-folder-selection-toggle', entry\.path,/);
+  assert.match(componentSource, /:checked="localFolderSelectionMode === 'selected' && selectedLocalFolderPaths\.has\(entry\.path\)"/);
+  assert.match(componentSource, /v-else-if="localFolderHiddenEntryCount > 0"[\s\S]*class="node-card__local-folder-hidden"/);
   assert.match(componentSource, /@click\.stop="emit\('local-folder-select-all'\)"/);
   assert.match(componentSource, /@click\.stop="emit\('local-folder-clear'\)"/);
   assert.match(componentSource, /<label[\s\S]*class="node-card__asset-dropzone"[\s\S]*@click\.stop="handleAssetUploadSurfaceClick"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"/);

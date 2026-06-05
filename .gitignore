@@ -101,6 +101,11 @@ scripts/lm_core.py
 # Local outputs
 backend/data/outputs/
 
+# User knowledge bases
+/knowledge/*
+!/knowledge/TooGraph-official/
+!/knowledge/TooGraph-official/**
+
 # Claude Code / Dev tools
 .claude/
 .worktrees/

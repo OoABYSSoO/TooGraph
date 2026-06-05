@@ -32,7 +32,7 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
       currentType: "text",
       currentValue: "hello",
     }),
-    { kind: "local_folder", root: "", selected: [] },
+    { kind: "local_folder", root: "", selection_mode: "all", selected: [] },
   );
   assert.equal(
     resolveNextInputValueForBoundaryType({
@@ -68,6 +68,9 @@ test("isSwitchableInputBoundaryType exposes the manual input picker types", () =
 });
 
 test("resolveInputBoundarySelection shows local folder envelopes as folder mode", () => {
-  assert.equal(resolveInputBoundarySelection("file", { kind: "local_folder", root: "buddy_home", selected: [] }), "folder");
+  assert.equal(
+    resolveInputBoundarySelection("file", { kind: "local_folder", root: "buddy_home", selection_mode: "all", selected: [] }),
+    "folder",
+  );
   assert.equal(resolveInputBoundarySelection("file", "uploads/document.md"), "file");
 });

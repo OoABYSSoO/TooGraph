@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "knowledge_folder_normalizer",
+  "name": "Knowledge Folder Normalizer",
+  "description": "把 Input 节点传入的本地知识库文件夹选择包整理成 source_chunker 可直接使用的 normalized_documents 来源包；只读取和规范化原始材料，不切片、不写入检索库、不排队 embedding。",
+  "version": "0.1.0",
+  "timeoutSeconds": 60,
+  "permissions": [
+    "local_file_read"
+  ],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 60
+  },
+  "inputPresentation": {
+    "folder": {
+      "mode": "state"
+    },
+    "collection": {
+      "mode": "static",
+      "control": "text",
+      "default": "knowledge_document"
+    },
+    "max_files": {
+      "mode": "static",
+      "control": "number",
+      "default": 10000
+    },
+    "include_binary_text": {
+      "mode": "static",
+      "control": "boolean",
+      "default": false
+    },
+    "metadata": {
+      "mode": "static",
+      "control": "object",
+      "default": {}
+    }
+  },
+  "inputSchema": [
+    {
+      "key": "folder",
+      "name": "Folder",
+      "valueType": "json",
+      "description": "Input 节点输出的 local_folder 选择包。selection_mode=all 时处理整个文件夹；selection_mode=selected 时只处理 selected 中列出的文件。"
+    },
+    {
+      "key": "collection",
+      "name": "Collection",
+      "valueType": "text",
+      "description": "本批知识库文档的集合标识，会写入 source package 的 scope 和 metadata。"
+    },
+    {
+      "key": "max_files",
+      "name": "Max Files",
+      "valueType": "number",
+      "description": "本次最多读取多少个文本文件；超过后返回失败，避免误把巨大目录一次性塞入图运行。"
+    },
+    {
+      "key": "include_binary_text",
+      "name": "Include Binary Text",
+      "valueType": "boolean",
+      "description": "默认跳过非文本文件；开启后会用 UTF-8 replacement 方式读取。"
+    },
+    {
+      "key": "metadata",
+      "name": "Metadata",
+      "valueType": "json",
+      "description": "追加到 source package 和每个 normalized document 的元数据。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "source_package",
+      "name": "Source Package",
+      "valueType": "json",
+      "description": "可连接到 source_chunker 的 source 输入。source_kind 固定为 normalized_documents。"
+    },
+    {
+      "key": "report",
+      "name": "Report",
+      "valueType": "json",
+      "description": "本次读取、跳过和选择模式的摘要。"
+    }
+  ],
+  "localized": {
+    "zh-CN": {
+      "name": "知识库文件夹规范化器",
+      "description": "把 Input 节点传入的本地知识库文件夹选择包整理成 source_chunker 可直接使用的 normalized_documents 来源包；只读取和规范化原始材料，不切片、不写入检索库、不排队 embedding。"
+    },
+    "en-US": {
+      "name": "Knowledge Folder Normalizer",
+      "description": "Turns a local folder selection package from an Input node into normalized_documents for source_chunker without chunking, writing retrieval storage, or queueing embeddings."
+    }
+  }
+}

@@ -3,6 +3,7 @@ import type { LocalFolderTreeEntry } from "@/api/localInputSources";
 export type LocalFolderInputValue = {
   kind: "local_folder";
   root: string;
+  selection_mode: "all" | "selected";
   selected: string[];
 };
 
@@ -10,6 +11,7 @@ export function createDefaultLocalFolderInputValue(): LocalFolderInputValue {
   return {
     kind: "local_folder",
     root: "",
+    selection_mode: "all",
     selected: [],
   };
 }
@@ -19,10 +21,19 @@ export function parseLocalFolderInputValue(value: unknown): LocalFolderInputValu
   if (!isRecord(parsed) || parsed.kind !== "local_folder") {
     return createDefaultLocalFolderInputValue();
   }
+  const selected = normalizeSelectedPaths(parsed.selected);
+  const selectionMode = parsed.selection_mode === "selected" || parsed.selectionMode === "selected"
+    ? "selected"
+    : parsed.selection_mode === "all" || parsed.selectionMode === "all"
+      ? "all"
+      : selected.length > 0
+        ? "selected"
+        : "all";
   return {
     kind: "local_folder",
     root: typeof parsed.root === "string" ? parsed.root : "",
-    selected: normalizeSelectedPaths(parsed.selected),
+    selection_mode: selectionMode,
+    selected: selectionMode === "all" ? [] : selected,
   };
 }
 
@@ -35,7 +46,17 @@ export function updateLocalFolderRoot(value: LocalFolderInputValue, root: string
   return {
     kind: "local_folder",
     root,
-    selected: value.root === root ? value.selected : [],
+    selection_mode: value.root === root ? value.selection_mode : "all",
+    selected: value.root === root && value.selection_mode === "selected" ? value.selected : [],
+  };
+}
+
+export function selectEntireLocalFolder(value: LocalFolderInputValue): LocalFolderInputValue {
+  return {
+    kind: "local_folder",
+    root: value.root,
+    selection_mode: "all",
+    selected: [],
   };
 }
 
@@ -52,15 +73,18 @@ export function toggleLocalFolderSelection(
   return {
     kind: "local_folder",
     root: value.root,
+    selection_mode: "selected",
     selected: selected ? [...selectedPaths, normalizedPath] : selectedPaths,
   };
 }
 
 export function replaceLocalFolderSelection(value: LocalFolderInputValue, selected: string[]): LocalFolderInputValue {
+  const normalizedSelected = normalizeSelectedPaths(selected);
   return {
     kind: "local_folder",
     root: value.root,
-    selected: normalizeSelectedPaths(selected),
+    selection_mode: "selected",
+    selected: normalizedSelected,
   };
 }
 
@@ -69,14 +93,24 @@ export function listSelectableLocalFolderFilePaths(entries: LocalFolderTreeEntry
 }
 
 export function formatLocalFolderSelectionSummary(input: {
+  selectionMode: "all" | "selected";
   selected: string[];
   entries: LocalFolderTreeEntry[];
 }) {
+  if (input.selectionMode === "all") {
+    const visibleFiles = input.entries.filter((entry) => entry.type === "file");
+    const totalVisibleBytes = visibleFiles.reduce((sum, entry) => sum + entry.size, 0);
+    return `Entire folder selected, ${visibleFiles.length} visible ${visibleFiles.length === 1 ? "file" : "files"}, ${formatBytes(totalVisibleBytes)} visible`;
+  }
   const selected = new Set(input.selected);
   const totalBytes = input.entries
     .filter((entry) => entry.type === "file" && selected.has(entry.path))
     .reduce((sum, entry) => sum + entry.size, 0);
   return `${selected.size} ${selected.size === 1 ? "file" : "files"} selected, ${formatBytes(totalBytes)}`;
+}
+
+export function listLocalFolderPreviewEntries(entries: LocalFolderTreeEntry[], limit = 5): LocalFolderTreeEntry[] {
+  return entries.slice(0, Math.max(0, limit));
 }
 
 export function formatBytes(bytes: number) {

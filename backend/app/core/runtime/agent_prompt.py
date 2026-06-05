@@ -6,7 +6,7 @@ from typing import Any
 
 from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
-from app.core.storage.local_input_sources import read_local_input_file_metadata, read_local_input_text_for_prompt
+from app.core.storage.local_input_sources import list_local_folder, read_local_input_file_metadata, read_local_input_text_for_prompt
 from app.core.storage.capability_artifact_store import read_capability_artifact_file_metadata, read_capability_artifact_text_for_prompt
 from app.core.storage.context_assembly_store import (
     expand_context_assembly_ref,
@@ -274,13 +274,14 @@ def collect_local_input_prompt_references(
         if not _is_file_reference_prompt_state(definition):
             continue
         for reference in _collect_file_state_references(value):
-            if reference.get("source") != "local_input":
+            if reference.get("source") not in {"local_input", "local_input_folder"}:
                 continue
             references.append(
                 {
                     "state_key": str(state_key),
                     "root": str(reference.get("root") or ""),
                     "relative_path": str(reference.get("relative_path") or reference.get("name") or ""),
+                    "selection_mode": str(reference.get("selection_mode") or "selected"),
                 }
             )
     return references
@@ -657,6 +658,9 @@ def format_file_state_prompt_lines(
         if index > 0:
             lines.append("")
         reference_source = reference.get("source", "capability_artifact")
+        if reference_source == "local_input_folder":
+            lines.extend(_format_local_folder_reference_prompt_lines(reference))
+            continue
         local_path = reference["local_path"]
         requested_name = reference.get("name", "")
         requested_content_type = reference.get("content_type", "")
@@ -1311,8 +1315,22 @@ def _append_file_record(record: dict[str, Any], references: list[dict[str, str]]
 
 def _append_local_folder_references(record: dict[str, Any], references: list[dict[str, str]]) -> None:
     root = _first_non_empty_string(record, ("root", "path"))
+    if not root:
+        return
     selected = record.get("selected")
-    if not root or not isinstance(selected, list):
+    selection_mode = str(record.get("selection_mode") or record.get("selectionMode") or "").strip().lower()
+    if selection_mode == "all" or (selection_mode == "" and not selected):
+        references.append(
+            {
+                "source": "local_input_folder",
+                "root": root,
+                "selection_mode": "all",
+                "local_path": root.rstrip("/\\") + "/",
+                "name": "selected local folder",
+            }
+        )
+        return
+    if not isinstance(selected, list):
         return
     for item in selected:
         if not isinstance(item, str) or not item.strip():
@@ -1322,11 +1340,44 @@ def _append_local_folder_references(record: dict[str, Any], references: list[dic
             {
                 "source": "local_input",
                 "root": root,
+                "selection_mode": "selected",
                 "relative_path": relative_path,
                 "local_path": f"{root.rstrip('/')}/{relative_path}",
                 "name": relative_path,
             }
         )
+
+
+def _format_local_folder_reference_prompt_lines(reference: dict[str, str]) -> list[str]:
+    try:
+        folder = list_local_folder(str(reference.get("root") or ""))
+        entries = [entry for entry in folder.get("entries", []) if isinstance(entry, dict)]
+        file_entries = [entry for entry in entries if entry.get("type") == "file"]
+        visible_entries = file_entries[:5]
+        total_bytes = sum(int(entry.get("size") or 0) for entry in file_entries)
+        lines = [
+            "  local_folder_selection: all",
+            f"  visible_files: {len(file_entries)}",
+            f"  visible_bytes: {total_bytes}",
+            "  folder_rule: entire local folder selected; file contents are not injected into this LLM prompt",
+        ]
+        if visible_entries:
+            lines.append("  visible_preview:")
+            for entry in visible_entries:
+                relative_path = str(entry.get("path") or entry.get("name") or "").strip()
+                content_type = str(entry.get("content_type") or "application/octet-stream").strip()
+                size = int(entry.get("size") or 0)
+                lines.append(f"    - {relative_path} ({content_type}, {size} B)")
+        hidden_count = max(0, len(file_entries) - len(visible_entries))
+        if hidden_count:
+            lines.append(f"  visible_omitted: {hidden_count} more files not shown")
+        return lines
+    except Exception:
+        return [
+            "  local_folder_selection: all",
+            "  folder_rule: entire local folder selected; file contents are not injected into this LLM prompt",
+            "  folder_error: local folder could not be listed",
+        ]
 
 
 def _parse_file_state_json(value: str) -> Any | None:

@@ -57,7 +57,7 @@
           <button
             type="button"
             class="node-card__local-folder-link"
-            :disabled="localFolderSelected.length === 0"
+            :disabled="localFolderSelectionMode !== 'all' && localFolderSelected.length === 0"
             @pointerdown.stop
             @click.stop="emit('local-folder-clear')"
           >
@@ -82,7 +82,7 @@
             v-if="entry.type === 'file'"
             class="node-card__local-folder-checkbox"
             type="checkbox"
-            :checked="selectedLocalFolderPaths.has(entry.path)"
+            :checked="localFolderSelectionMode === 'selected' && selectedLocalFolderPaths.has(entry.path)"
             @change="emit('local-folder-selection-toggle', entry.path, ($event.target as HTMLInputElement).checked)"
           />
           <span v-else class="node-card__local-folder-directory-spacer" />
@@ -95,6 +95,9 @@
         </label>
         <div v-if="!localFolderLoading && localFolderEntries.length === 0" class="node-card__input-meta">
           {{ localFolderRoot.trim() ? t("nodeCard.localFolderEmpty") : t("nodeCard.localFolderNeedsPath") }}
+        </div>
+        <div v-else-if="localFolderHiddenEntryCount > 0" class="node-card__local-folder-hidden">
+          {{ t("nodeCard.localFolderHiddenCount", { count: localFolderHiddenEntryCount }) }}
         </div>
       </div>
     </div>
@@ -368,7 +371,9 @@ const props = defineProps<{
   localFolderRoot: string;
   localFolderEntries: LocalFolderTreeEntry[];
   localFolderSelected: string[];
+  localFolderSelectionMode: "all" | "selected";
   localFolderSummary: string;
+  localFolderHiddenEntryCount: number;
   localFolderLoading: boolean;
   localFolderError: string;
   showLocalFolderInput: boolean;
@@ -656,6 +661,15 @@ function openInputAssetPicker() {
 
 .node-card__local-folder-entry:last-child {
   border-bottom: none;
+}
+
+.node-card__local-folder-hidden {
+  overflow: hidden;
+  padding: 8px 10px;
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-card__local-folder-entry--directory {
