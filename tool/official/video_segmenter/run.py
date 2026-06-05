@@ -184,6 +184,7 @@ def _run_media_command(command: list[str], *, timeout_seconds: int) -> str | Non
     try:
         completed = subprocess.run(
             command,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=timeout_seconds,

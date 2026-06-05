@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -139,7 +138,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
             ):
                 database.initialize_storage()
                 run_store.save_run(run)
-                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                with database.get_connection() as connection:
                     event_types = [
                         row[0]
                         for row in connection.execute(

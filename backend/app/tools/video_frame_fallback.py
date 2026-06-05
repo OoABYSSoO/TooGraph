@@ -202,7 +202,14 @@ def _probe_video_duration_with_ffprobe(video_path: Path, *, ffprobe: str) -> flo
         str(video_path),
     ]
     try:
-        completed = subprocess.run(command, text=True, capture_output=True, timeout=10, check=False)
+        completed = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
     except OSError:
         return None
     if completed.returncode != 0:
@@ -223,7 +230,14 @@ def _probe_video_duration_with_ffmpeg(video_path: Path, *, ffmpeg: str) -> float
         str(video_path),
     ]
     try:
-        completed = subprocess.run(command, text=True, capture_output=True, timeout=10, check=False)
+        completed = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
     except OSError:
         return None
     return _parse_ffmpeg_duration(f"{completed.stderr}\n{completed.stdout}")
@@ -267,7 +281,14 @@ def _build_frame_attachment(
 
 def _run_media_command(command: list[str]) -> None:
     try:
-        completed = subprocess.run(command, text=True, capture_output=True, timeout=30, check=False)
+        completed = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
     except FileNotFoundError as exc:
         raise RuntimeError("ffmpeg is required for video frame fallback.") from exc
     except subprocess.TimeoutExpired as exc:

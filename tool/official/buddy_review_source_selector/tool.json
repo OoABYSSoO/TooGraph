@@ -1,8 +1,8 @@
 {
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_review_source_selector",
-  "name": "Buddy Review Source Selector",
-  "description": "Selects an unreviewed Buddy run for background memory review and claims the review record for the current graph run.",
+  "name": "Buddy 复盘来源选择器",
+  "description": "为后台记忆复盘选择尚未复盘的 Buddy 运行，并把复盘记录声明到当前图运行。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
@@ -20,11 +20,11 @@
       "default": "auto_unreviewed",
       "options": [
         {
-          "label": "Auto: unreviewed Buddy run",
+          "label": "自动选择未复盘运行",
           "value": "auto_unreviewed"
         },
         {
-          "label": "Explicit source run",
+          "label": "指定来源运行",
           "value": "explicit"
         }
       ]
@@ -38,53 +38,53 @@
   "inputSchema": [
     {
       "key": "mode",
-      "name": "Mode",
+      "name": "模式",
       "valueType": "text",
-      "description": "Selection mode: auto_unreviewed scans completed Buddy runs; explicit uses source_run_id."
+      "description": "选择模式：auto_unreviewed 会扫描已完成但未复盘的 Buddy 运行；explicit 使用 source_run_id 指定来源。"
     },
     {
       "key": "source_run_id",
-      "name": "Source Run ID",
+      "name": "来源 Run ID",
       "valueType": "text",
-      "description": "Optional explicit source run id when mode is explicit."
+      "description": "当模式为 explicit 时使用的可选来源运行 ID。"
     }
   ],
   "outputSchema": [
     {
       "key": "status",
-      "name": "Status",
+      "name": "状态",
       "valueType": "text",
-      "description": "Selection status, usually succeeded or failed."
+      "description": "本次来源选择状态，通常为 succeeded 或 failed。"
     },
     {
       "key": "has_source_run",
-      "name": "Has Source Run",
+      "name": "是否选中来源运行",
       "valueType": "boolean",
-      "description": "Whether a reviewable source run was selected."
+      "description": "是否已经选中一个可复盘的来源运行。"
     },
     {
       "key": "selected_source_run_id",
-      "name": "Selected Source Run ID",
+      "name": "已选来源 Run ID",
       "valueType": "text",
-      "description": "The selected source Buddy run id, or empty when no candidate exists."
+      "description": "已选中的 Buddy 来源运行 ID；没有候选时为空。"
     },
     {
       "key": "review_id",
-      "name": "Review ID",
+      "name": "复盘记录 ID",
       "valueType": "text",
-      "description": "The background review record id claimed for this graph run."
+      "description": "当前图运行声明到的后台复盘记录 ID。"
     },
     {
       "key": "selection_report",
-      "name": "Selection Report",
+      "name": "选择报告",
       "valueType": "json",
-      "description": "Auditable details about candidate filtering and review claim creation."
+      "description": "候选过滤和复盘声明创建过程的可审计明细。"
     },
     {
       "key": "result",
-      "name": "Result",
+      "name": "结果",
       "valueType": "markdown",
-      "description": "Short human-readable selection summary."
+      "description": "面向用户阅读的简短来源选择摘要。"
     }
   ],
   "localized": {

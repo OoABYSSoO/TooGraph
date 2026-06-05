@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
-import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -155,8 +154,7 @@ class GraphRunDbStorePermissionAuditTests(unittest.TestCase):
         with _temporary_run_database():
             save_run_state(run_state)
             loaded = load_run_state("run_secret_runtime_logs")
-            with sqlite3.connect(database.DB_PATH) as connection:
-                connection.row_factory = sqlite3.Row
+            with database.get_connection() as connection:
                 graph_run = connection.execute(
                     "SELECT metadata_json, detail_json, final_result FROM graph_runs WHERE run_id = ?",
                     ("run_secret_runtime_logs",),

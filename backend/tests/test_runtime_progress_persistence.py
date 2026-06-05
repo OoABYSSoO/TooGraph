@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import sys
 import tempfile
 import time
@@ -104,7 +103,7 @@ class RuntimeProgressPersistenceTests(unittest.TestCase):
                     started_perf=time.perf_counter(),
                     publish_run_event_func=lambda *_args, **_kwargs: None,
                 )
-                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                with database.get_connection() as connection:
                     run_row = connection.execute(
                         "SELECT status, current_node_id FROM graph_runs WHERE run_id = ?",
                         ("run-progress-db",),
@@ -118,7 +117,7 @@ class RuntimeProgressPersistenceTests(unittest.TestCase):
                         ("run-progress-db",),
                     ).fetchone()
 
-        self.assertEqual(run_row, ("running", "agent"))
+        self.assertEqual(tuple(run_row), ("running", "agent"))
         self.assertEqual(execution_row[0:4], (0, "agent", "agent", 0))
         self.assertEqual(execution_row[4], '["slow"]')
         self.assertEqual(execution_row[5], "[]")
@@ -158,7 +157,7 @@ class RuntimeProgressPersistenceTests(unittest.TestCase):
                     started_perf=time.perf_counter(),
                     publish_run_event_func=lambda *_args, **_kwargs: None,
                 )
-                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                with database.get_connection() as connection:
                     row = connection.execute(
                         """
                         SELECT capability_kind, capability_key, status
@@ -168,7 +167,7 @@ class RuntimeProgressPersistenceTests(unittest.TestCase):
                         ("invoke-search",),
                     ).fetchone()
 
-        self.assertEqual(row, ("capability", "web_search", "completed"))
+        self.assertEqual(tuple(row), ("capability", "web_search", "completed"))
 
 
 if __name__ == "__main__":

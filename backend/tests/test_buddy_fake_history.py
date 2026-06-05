@@ -58,7 +58,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
                 self.assertEqual(message["metadata"]["synthetic_batch_id"], "test_batch")
                 self.assertEqual(message["metadata"]["synthetic"], True)
 
-    def test_seed_fake_history_uses_buddy_store_and_projects_messages_to_retrieval(self) -> None:
+    def test_seed_fake_history_uses_buddy_store_without_hidden_retrieval_projection(self) -> None:
         result = seed_fake_history(
             FakeHistoryOptions(
                 batch_id="write_test",
@@ -71,7 +71,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
 
         self.assertEqual(result["session_count"], 2)
         self.assertEqual(result["message_count"], 4)
-        self.assertEqual(result["retrieval_chunk_count"], 4)
+        self.assertEqual(result["retrieval_chunk_count"], 0)
         self.assertEqual(result["embedding_job_count"], 0)
 
         sessions = store.list_chat_sessions(include_deleted=True)
@@ -88,7 +88,7 @@ class BuddyFakeHistoryTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertEqual(buddy_messages, 4)
-        self.assertEqual(retrieval_chunks, 4)
+        self.assertEqual(retrieval_chunks, 0)
         self.assertEqual(embedding_jobs, 0)
 
 

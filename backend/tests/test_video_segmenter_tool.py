@@ -222,6 +222,7 @@ def _probe_duration(path: Path) -> float:
             "default=nw=1:nk=1",
             str(path),
         ],
+        stdin=subprocess.DEVNULL,
         text=True,
         capture_output=True,
         check=True,

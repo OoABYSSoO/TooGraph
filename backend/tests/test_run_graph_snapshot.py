@@ -22,7 +22,12 @@ class RunGraphSnapshotTests(unittest.TestCase):
                 "buddy_autonomous_loop",
                 "buddy_autonomous_review",
                 "buddy_context_compaction",
+                "buddy_memory_recall",
+                "buddy_message_chunking_demo",
+                "buddy_message_retrieval_ingestion",
                 "embedding_maintenance",
+                "knowledge_document_chunking_demo",
+                "knowledge_folder_retrieval_ingestion",
                 "toograph_page_operation_workflow",
             ],
         )

@@ -93,7 +93,14 @@ def install_imageio_ffmpeg(
         IMAGEIO_FFMPEG_REQUIREMENT,
     ]
     try:
-        completed = run_func(command, text=True, capture_output=True, timeout=300, check=False)
+        completed = run_func(
+            command,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=300,
+            check=False,
+        )
     except OSError as exc:
         raise RuntimeError(f"Private ffmpeg runtime install failed: {exc}") from exc
     if completed.returncode != 0:
@@ -188,7 +195,14 @@ def _import_imageio_ffmpeg(target_dir: Path) -> Any | None:
 
 def _is_valid_executable(command: str, *, run_func: RunFunc) -> bool:
     try:
-        completed = run_func([command, "-version"], text=True, capture_output=True, timeout=5, check=False)
+        completed = run_func(
+            [command, "-version"],
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
     except (OSError, subprocess.SubprocessError):
         return False
     return int(getattr(completed, "returncode", 1)) == 0

@@ -47,8 +47,9 @@ class FfmpegResolverTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             runtime_root = Path(temp_dir)
             platform_dir = runtime_root / "ffmpeg" / "test-platform"
-            ffmpeg = platform_dir / "ffmpeg"
-            ffprobe = platform_dir / "ffprobe"
+            executable_suffix = ".exe" if sys.platform == "win32" else ""
+            ffmpeg = platform_dir / f"ffmpeg{executable_suffix}"
+            ffprobe = platform_dir / f"ffprobe{executable_suffix}"
             platform_dir.mkdir(parents=True)
             ffmpeg.write_text("#!/bin/sh\n", encoding="utf-8")
             ffprobe.write_text("#!/bin/sh\n", encoding="utf-8")

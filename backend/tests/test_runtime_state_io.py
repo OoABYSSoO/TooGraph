@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -308,7 +307,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 database.initialize_storage()
                 run_store.save_run(state)
                 loaded = run_store.load_run("run-state-db")
-                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                with database.get_connection() as connection:
                     row = connection.execute(
                         """
                         SELECT state_key, previous_value_json, value_json

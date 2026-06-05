@@ -1016,13 +1016,14 @@ class ModelRequestLogTests(unittest.TestCase):
                         now=now + timedelta(milliseconds=5),
                     )
 
-                    rows = database.get_connection().execute(
-                        """
-                        SELECT queue_entry_id, status
-                        FROM provider_rate_wait_queue
-                        ORDER BY enqueued_at ASC
-                        """
-                    ).fetchall()
+                    with database.get_connection() as connection:
+                        rows = connection.execute(
+                            """
+                            SELECT queue_entry_id, status
+                            FROM provider_rate_wait_queue
+                            ORDER BY enqueued_at ASC
+                            """
+                        ).fetchall()
 
         self.assertEqual(first["kind"], "provider_rate_wait_queue_entry")
         self.assertEqual(first["status"], "waiting")
@@ -1070,13 +1071,14 @@ class ModelRequestLogTests(unittest.TestCase):
                         now=now + timedelta(seconds=2),
                     )
 
-                    rows = database.get_connection().execute(
-                        """
-                        SELECT queue_entry_id, status
-                        FROM provider_rate_wait_queue
-                        ORDER BY enqueued_at ASC
-                        """
-                    ).fetchall()
+                    with database.get_connection() as connection:
+                        rows = connection.execute(
+                            """
+                            SELECT queue_entry_id, status
+                            FROM provider_rate_wait_queue
+                            ORDER BY enqueued_at ASC
+                            """
+                        ).fetchall()
 
         self.assertEqual(first["status"], "waiting")
         self.assertEqual(second_turn["status"], "acquired")

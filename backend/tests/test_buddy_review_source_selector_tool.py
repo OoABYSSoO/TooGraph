@@ -60,8 +60,9 @@ class BuddyReviewSourceSelectorToolTests(unittest.TestCase):
         definition = catalog.get("buddy_review_source_selector")
 
         self.assertIsNotNone(definition)
-        self.assertEqual(definition.name, "Buddy Review Source Selector")
-        self.assertIn("unreviewed Buddy run", definition.description)
+        self.assertEqual(definition.name, "Buddy 复盘来源选择器")
+        self.assertIn("Buddy", definition.description)
+        self.assertIn("unreviewed Buddy run", definition.localized["en-US"].description)
         self.assertIn("buddy_review_source_selector", get_tool_registry(include_disabled=True).keys())
 
     def test_selector_auto_detects_oldest_unreviewed_completed_buddy_run_and_claims_review(self) -> None:

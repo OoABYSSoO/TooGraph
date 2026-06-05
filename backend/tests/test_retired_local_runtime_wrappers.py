@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import contextlib
+import importlib.util
+import io
 import subprocess
 import sys
 import unittest
@@ -12,12 +15,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 class RetiredLocalRuntimeWrapperTests(unittest.TestCase):
     def _run_python_script(self, relative_path: str) -> subprocess.CompletedProcess[str]:
         script_path = REPO_ROOT / relative_path
-        return subprocess.run(
+        spec = importlib.util.spec_from_file_location(script_path.stem, script_path)
+        if spec is None or spec.loader is None:
+            raise AssertionError(f"Could not load script: {relative_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            returncode = int(module.main())
+        return subprocess.CompletedProcess(
             [sys.executable, str(script_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-            check=False,
+            returncode,
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
         )
 
     def _read_script_text(self, relative_path: str) -> str:

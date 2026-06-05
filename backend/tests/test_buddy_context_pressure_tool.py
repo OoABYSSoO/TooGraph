@@ -49,7 +49,8 @@ class BuddyContextPressureToolTests(unittest.TestCase):
 
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Context Pressure Check")
-        self.assertIn("deterministic", definition.description)
+        self.assertIn("Buddy LLM", definition.description)
+        self.assertIn("session history compaction", definition.localized["en-US"].description)
         self.assertFalse(definition.dynamic_state_inputs)
         self.assertEqual(definition.input_schema, [])
         self.assertEqual([field.key for field in definition.output_schema], ["needs_context_compaction"])
