@@ -11,7 +11,11 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.storage.local_input_sources import list_local_folder, read_local_input_text_for_prompt
+from app.core.storage.local_input_sources import (
+    list_local_directory_entries,
+    list_local_folder,
+    read_local_input_text_for_prompt,
+)
 from app.main import app
 
 
@@ -83,6 +87,49 @@ class LocalInputSourcesTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["kind"], "local_folder_tree")
         self.assertEqual([entry["path"] for entry in payload["entries"]], ["README.md"])
+
+    def test_list_local_directory_entries_returns_only_current_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            source = workspace / "policy"
+            nested = source / "2025"
+            nested.mkdir(parents=True)
+            (source / "README.md").write_text("root", encoding="utf-8")
+            (nested / "deep.md").write_text("nested", encoding="utf-8")
+
+            listing = list_local_directory_entries(str(source), read_roots=[workspace])
+
+        self.assertEqual(listing["kind"], "local_directory_entries")
+        self.assertEqual(listing["path"], str(source))
+        self.assertEqual(listing["parent"], str(workspace))
+        self.assertGreaterEqual(len(listing["breadcrumbs"]), 2)
+        self.assertEqual(listing["breadcrumbs"][0]["path"], str(workspace))
+        self.assertEqual(listing["breadcrumbs"][-1]["path"], str(source))
+        entries = {entry["name"]: entry for entry in listing["entries"]}
+        self.assertEqual(set(entries), {"2025", "README.md"})
+        self.assertEqual(entries["2025"]["kind"], "directory")
+        self.assertEqual(entries["2025"]["path"], str(nested))
+        self.assertEqual(entries["2025"]["relative_path"], "2025")
+        self.assertEqual(entries["README.md"]["kind"], "file")
+        self.assertNotIn("deep.md", entries)
+
+    def test_local_directory_entries_route_uses_same_read_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            source = workspace / "context"
+            source.mkdir()
+            (source / "README.md").write_text("hello", encoding="utf-8")
+
+            with patch.dict(os.environ, {"TOOGRAPH_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
+                response = TestClient(app).get(
+                    "/api/local-input-sources/entries",
+                    params={"path": str(source)},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["kind"], "local_directory_entries")
+        self.assertEqual([entry["name"] for entry in payload["entries"]], ["README.md"])
 
 
 if __name__ == "__main__":

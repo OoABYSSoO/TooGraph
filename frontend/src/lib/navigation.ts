@@ -11,6 +11,7 @@ export type NavigationIconKey =
   | "Cpu"
   | "DocumentChecked"
   | "EditPen"
+  | "FolderOpened"
   | "House"
   | "Memo"
   | "MessageBox"
@@ -35,6 +36,8 @@ export const PRIMARY_NAVIGATION_ITEMS: PrimaryNavigationItem[] = [
   navigationItem("/", "home", "nav.home", "House"),
   navigationItem("/editor", "editor", "nav.editor", "EditPen"),
   navigationItem("/library", "graphLibrary", "nav.graphLibrary", "Collection", "library"),
+  navigationItem("/knowledge", "knowledge", "nav.knowledge", "CollectionTag"),
+  navigationItem("/workspace", "localFiles", "nav.localFiles", "FolderOpened", "localFiles", "developer"),
   {
     ...navigationItem("/buddy", "buddy", "nav.buddy", "ChatDotRound"),
     affordanceZone: "buddy-page",

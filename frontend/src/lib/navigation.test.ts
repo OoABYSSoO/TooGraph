@@ -8,10 +8,11 @@ test("navigation marks only unfinished pages as developer-only", () => {
     .filter((item) => item.visibility === "developer")
     .map((item) => item.path);
 
-  assert.deepEqual(developerPaths, ["/evidence"]);
+  assert.deepEqual(developerPaths, ["/workspace", "/evidence"]);
   assert.equal(PRIMARY_NAVIGATION_ITEMS.find((item) => item.path === "/actions")?.visibility, "stable");
   assert.equal(PRIMARY_NAVIGATION_ITEMS.find((item) => item.path === "/tools")?.visibility, "stable");
   assert.equal(PRIMARY_NAVIGATION_ITEMS.find((item) => item.path === "/model-logs")?.visibility, "stable");
+  assert.equal(PRIMARY_NAVIGATION_ITEMS.find((item) => item.path === "/workspace")?.visibility, "developer");
 });
 
 test("navigation orders stable product surfaces by primary workflow", () => {
@@ -21,6 +22,7 @@ test("navigation orders stable product surfaces by primary workflow", () => {
       ["/", "House"],
       ["/editor", "EditPen"],
       ["/library", "Collection"],
+      ["/knowledge", "CollectionTag"],
       ["/buddy", "ChatDotRound"],
       ["/runs", "Clock"],
       ["/scheduler", "Calendar"],
@@ -46,12 +48,14 @@ test("navigation hides developer pages until developer mode is enabled", () => {
     buildVisibleNavigationItems(true)
       .filter((item) => item.visibility === "developer")
       .map((item) => item.path),
-    ["/evidence"],
+    ["/workspace", "/evidence"],
   );
 });
 
 test("developer path matching applies to developer pages and their children", () => {
   assert.equal(isDeveloperNavigationPath("/evidence/run_123"), true);
+  assert.equal(isDeveloperNavigationPath("/workspace"), true);
+  assert.equal(isDeveloperNavigationPath("/workspace/root"), true);
   assert.equal(isDeveloperNavigationPath("/model-logs"), false);
   assert.equal(isDeveloperNavigationPath("/actions"), false);
 });

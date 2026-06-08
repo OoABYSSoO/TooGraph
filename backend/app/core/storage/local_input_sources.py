@@ -58,6 +58,61 @@ def list_local_folder(path: str, *, read_roots: Iterable[str | Path] | None = No
     }
 
 
+def list_local_directory_entries(path: str, *, read_roots: Iterable[str | Path] | None = None) -> dict[str, Any]:
+    root = resolve_local_input_root(path, read_roots=read_roots)
+    if not root.is_dir():
+        raise ValueError(f"Local input path is not a folder: {path}")
+
+    entries: list[dict[str, Any]] = []
+    for entry_path in sorted(root.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+        if entry_path.is_dir():
+            if _should_skip_directory(entry_path, read_roots=read_roots):
+                continue
+            entries.append(_build_browser_directory_entry(root, entry_path))
+        elif entry_path.is_file():
+            if is_denied_local_input_path(entry_path, read_roots=read_roots):
+                continue
+            entries.append(_build_browser_file_entry(root, entry_path))
+
+    return {
+        "kind": "local_directory_entries",
+        "path": str(root),
+        "parent": _parent_path_for_browser(root, read_roots=read_roots),
+        "breadcrumbs": _breadcrumbs_for_browser(root, read_roots=read_roots),
+        "entries": entries,
+        "denied": False,
+        "truncated": False,
+    }
+
+
+def list_local_picker_directory_entries(path: str | None = None) -> dict[str, Any]:
+    raw_path = str(path or "").strip()
+    root = Path(raw_path).expanduser().resolve() if raw_path else Path.home().resolve()
+    if not root.is_dir():
+        raise ValueError(f"Local picker path is not a folder: {path}")
+    if root.name in SKIPPED_DIRECTORY_NAMES or is_denied_local_picker_path(root):
+        raise ValueError("Local picker path is denied by the read policy.")
+
+    entries: list[dict[str, Any]] = []
+    for entry_path in sorted(root.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+        if entry_path.name in SKIPPED_DIRECTORY_NAMES or is_denied_local_picker_path(entry_path):
+            continue
+        if entry_path.is_dir():
+            entries.append(_build_browser_directory_entry(root, entry_path))
+        elif entry_path.is_file():
+            entries.append(_build_browser_file_entry(root, entry_path))
+
+    return {
+        "kind": "local_directory_entries",
+        "path": str(root),
+        "parent": _parent_path_for_picker(root),
+        "breadcrumbs": _breadcrumbs_for_picker(root),
+        "entries": entries,
+        "denied": False,
+        "truncated": False,
+    }
+
+
 def read_local_input_file_metadata(
     root: str,
     relative_path: str,
@@ -135,6 +190,14 @@ def is_denied_local_input_path(path: Path, *, read_roots: Iterable[str | Path] |
         return True
     if any(part in SKIPPED_DIRECTORY_NAMES for part in _parts_inside_read_root(resolved, read_roots=read_roots)):
         return True
+    for denied_root in _denied_roots():
+        if _is_relative_to(resolved, denied_root):
+            return True
+    return False
+
+
+def is_denied_local_picker_path(path: Path) -> bool:
+    resolved = path.resolve()
     for denied_root in _denied_roots():
         if _is_relative_to(resolved, denied_root):
             return True
@@ -235,6 +298,93 @@ def _build_file_entry(root: Path, path: Path) -> dict[str, Any]:
         "content_type": content_type,
         "text_like": is_text_like_local_input(path.name, content_type),
     }
+
+
+def _build_browser_directory_entry(root: Path, path: Path) -> dict[str, Any]:
+    stat = path.stat()
+    return {
+        "name": path.name,
+        "path": str(path),
+        "relative_path": path.relative_to(root).as_posix(),
+        "kind": "directory",
+        "type": "directory",
+        "size": None,
+        "modified_at": _format_timestamp(stat.st_mtime),
+        "content_type": "inode/directory",
+        "text_like": False,
+        "selectable": True,
+    }
+
+
+def _build_browser_file_entry(root: Path, path: Path) -> dict[str, Any]:
+    stat = path.stat()
+    content_type = content_type_for_path(path)
+    return {
+        "name": path.name,
+        "path": str(path),
+        "relative_path": path.relative_to(root).as_posix(),
+        "kind": "file",
+        "type": "file",
+        "size": stat.st_size,
+        "modified_at": _format_timestamp(stat.st_mtime),
+        "content_type": content_type,
+        "text_like": is_text_like_local_input(path.name, content_type),
+        "selectable": True,
+    }
+
+
+def _parent_path_for_browser(path: Path, *, read_roots: Iterable[str | Path] | None) -> str:
+    parent = path.parent.resolve()
+    if parent == path:
+        return ""
+    if not _is_under_any_read_root(parent, read_roots=read_roots):
+        return ""
+    if is_denied_local_input_path(parent, read_roots=read_roots):
+        return ""
+    return str(parent)
+
+
+def _breadcrumbs_for_browser(path: Path, *, read_roots: Iterable[str | Path] | None) -> list[dict[str, str]]:
+    resolved = path.resolve()
+    for read_root in _read_roots(read_roots):
+        root = read_root.resolve()
+        try:
+            relative = resolved.relative_to(root)
+        except ValueError:
+            continue
+        breadcrumbs = [{"label": root.name or str(root), "path": str(root)}]
+        current = root
+        for part in relative.parts:
+            if part in {"", "."}:
+                continue
+            current = current / part
+            breadcrumbs.append({"label": current.name or str(current), "path": str(current)})
+        return breadcrumbs
+    return [{"label": resolved.name or str(resolved), "path": str(resolved)}]
+
+
+def _parent_path_for_picker(path: Path) -> str:
+    parent = path.parent.resolve()
+    if parent == path:
+        return ""
+    if parent.name in SKIPPED_DIRECTORY_NAMES or is_denied_local_picker_path(parent):
+        return ""
+    return str(parent)
+
+
+def _breadcrumbs_for_picker(path: Path) -> list[dict[str, str]]:
+    resolved = path.resolve()
+    breadcrumbs: list[dict[str, str]] = []
+    current: Path | None = None
+    for part in resolved.parts:
+        if current is None:
+            current = Path(part)
+        else:
+            current = current / part
+        if current.name in SKIPPED_DIRECTORY_NAMES or is_denied_local_picker_path(current):
+            continue
+        breadcrumbs.append({"label": current.name or str(current), "path": str(current)})
+    return breadcrumbs or [{"label": resolved.name or str(resolved), "path": str(resolved)}]
 
 
 def _should_skip_directory(path: Path, *, read_roots: Iterable[str | Path] | None) -> bool:

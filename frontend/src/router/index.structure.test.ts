@@ -21,7 +21,8 @@ test("router redirects developer-only pages when developer mode is disabled", ()
 test("router exposes first-class management pages for presets and actions", () => {
   assert.doesNotMatch(routerSource, /import \w+Page from "@\/pages\//);
   assert.match(routerSource, /const GraphLibraryPage = \(\) => import\("@\/pages\/GraphLibraryPage\.vue"\);/);
-  assert.doesNotMatch(routerSource, /KnowledgePage/);
+  assert.match(routerSource, /const KnowledgePage = \(\) => import\("@\/pages\/KnowledgePage\.vue"\);/);
+  assert.match(routerSource, /const LocalFilesPage = \(\) => import\("@\/pages\/LocalFilesPage\.vue"\);/);
   assert.match(routerSource, /const SchedulerPage = \(\) => import\("@\/pages\/SchedulerPage\.vue"\);/);
   assert.match(routerSource, /const PresetsPage = \(\) => import\("@\/pages\/PresetsPage\.vue"\);/);
   assert.match(routerSource, /const ActionsPage = \(\) => import\("@\/pages\/ActionsPage\.vue"\);/);
@@ -32,7 +33,8 @@ test("router exposes first-class management pages for presets and actions", () =
   assert.match(routerSource, /const MessagePlatformsPage = \(\) => import\("@\/pages\/MessagePlatformsPage\.vue"\);/);
   assert.match(routerSource, /const BuddyPage = \(\) => import\("@\/pages\/BuddyPage\.vue"\);/);
   assert.match(routerSource, /\{ path: "\/library", component: GraphLibraryPage \}/);
-  assert.doesNotMatch(routerSource, /path: "\/knowledge"/);
+  assert.match(routerSource, /\{ path: "\/knowledge", component: KnowledgePage \}/);
+  assert.match(routerSource, /\{ path: "\/workspace", component: LocalFilesPage \}/);
   assert.match(routerSource, /\{ path: "\/scheduler", component: SchedulerPage \}/);
   assert.match(routerSource, /\{ path: "\/buddy", component: BuddyPage \}/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
@@ -49,6 +51,8 @@ test("router lazy-loads page components to keep the production entry chunk small
     "EditorPage",
     "SchedulerPage",
     "GraphLibraryPage",
+    "LocalFilesPage",
+    "KnowledgePage",
     "HomePage",
     "BuddyPage",
     "ModelLogsPage",

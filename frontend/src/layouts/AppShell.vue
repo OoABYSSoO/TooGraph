@@ -74,6 +74,7 @@ import {
   Memo,
   MessageBox,
   Operation,
+  FolderOpened,
   Setting,
   TrendCharts,
 } from "@element-plus/icons-vue";
@@ -100,6 +101,7 @@ const navigationIconComponents: Record<NavigationIconKey, Component> = {
   Cpu,
   DocumentChecked,
   EditPen,
+  FolderOpened,
   House,
   Memo,
   MessageBox,
