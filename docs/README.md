@@ -230,7 +230,7 @@ npm start
 
 已完成：
 
-- 旧知识库链路已经删除：不再保留 `/api/knowledge`、`backend/app/knowledge/loader.py`、`backend/app/core/runtime/knowledge_retrieval.py`、`knowledge_bases` / `knowledge_documents` / `knowledge_chunks` / `knowledge_chunk_embeddings` 等旧表，也不保留旧知识库页面。
+- 旧知识库链路已经删除：不再保留 `backend/app/knowledge/loader.py`、`backend/app/core/runtime/knowledge_retrieval.py`、`knowledge_bases` / `knowledge_documents` / `knowledge_chunks` / `knowledge_chunk_embeddings` 等旧表，也不保留旧知识库页面语义；新的 `/api/knowledge` 只管理受管本地资料集 manifest，并通过图模板接入统一 retrieval / embedding substrate。
 - 当前统一检索底座使用 `retrieval_documents`、`retrieval_chunks`、`retrieval_chunks_fts`、`embedding_models`、`embedding_vectors`、`embedding_jobs` 和 hybrid audit 表。
 - `source_chunker` 只负责确定性切片，不写库、不排 embedding job。
 - `retrieval_ingestion_writer` 负责把切片候选写入 `retrieval_documents` / `retrieval_chunks`，并按选定 embedding model refs 排队 `embedding_jobs`。

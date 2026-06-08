@@ -25,6 +25,9 @@ SETTINGS_DATA_DIR = DATA_DIR / "settings"
 ACTION_STATE_DATA_DIR = DATA_DIR / "actions"
 DB_PATH = DATA_DIR / "toograph.db"
 _SCHEMA_LOCK = threading.RLock()
+_SCHEMA_INITIALIZED_DB_PATH: Path | None = None
+SQLITE_TIMEOUT_SECONDS = 30.0
+SQLITE_BUSY_TIMEOUT_MS = 30_000
 _BUDDY_MESSAGES_FTS_MARKER_KEY = "schema.buddy_messages_fts"
 _BUDDY_MESSAGES_FTS_MARKER_VALUE = '{"version":2,"triggers":"dual_fts"}'
 _BUDDY_MESSAGES_FTS_TRIGGER_NAMES = {
@@ -42,23 +45,34 @@ class ManagedConnection(sqlite3.Connection):
 
 
 def get_connection() -> sqlite3.Connection:
+    global _SCHEMA_INITIALIZED_DB_PATH
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH, factory=ManagedConnection)
+    connection = _connect_database()
     connection.row_factory = sqlite3.Row
     with _SCHEMA_LOCK:
-        ensure_schema(connection)
+        if _SCHEMA_INITIALIZED_DB_PATH != DB_PATH:
+            ensure_schema(connection)
+            _SCHEMA_INITIALIZED_DB_PATH = DB_PATH
     return connection
 
 
 def initialize_storage() -> None:
+    global _SCHEMA_INITIALIZED_DB_PATH
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH, factory=ManagedConnection)
+    connection = _connect_database()
     connection.row_factory = sqlite3.Row
     try:
         with _SCHEMA_LOCK:
             ensure_schema(connection)
+            _SCHEMA_INITIALIZED_DB_PATH = DB_PATH
     finally:
         connection.close()
+
+
+def _connect_database() -> sqlite3.Connection:
+    connection = sqlite3.connect(DB_PATH, timeout=SQLITE_TIMEOUT_SECONDS, factory=ManagedConnection)
+    connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+    return connection
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:
@@ -70,6 +84,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_context_assembly_schema(connection)
     _ensure_retrieval_schema(connection)
     _ensure_embedding_schema(connection)
+    _ensure_local_workspace_schema(connection)
     _drop_platform_memory_schema(connection)
     _ensure_memory_schema(connection)
     connection.commit()
@@ -1147,6 +1162,29 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_embedding_vectors_content_hash
             ON embedding_vectors(content_hash);
 
+        CREATE TABLE IF NOT EXISTS knowledge_indexing_operations (
+            operation_id TEXT PRIMARY KEY,
+            collection_id TEXT NOT NULL,
+            source_root TEXT NOT NULL DEFAULT '',
+            template_id TEXT NOT NULL DEFAULT '',
+            ingestion_run_id TEXT NOT NULL DEFAULT '',
+            embedding_run_ids_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'created',
+            stage TEXT NOT NULL DEFAULT 'created',
+            last_error_type TEXT NOT NULL DEFAULT '',
+            last_error TEXT NOT NULL DEFAULT '',
+            next_retry_at TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_knowledge_indexing_operations_collection
+            ON knowledge_indexing_operations(collection_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_knowledge_indexing_operations_status
+            ON knowledge_indexing_operations(status, next_retry_at);
+
         CREATE TABLE IF NOT EXISTS embedding_jobs (
             job_id TEXT PRIMARY KEY,
             source_kind TEXT NOT NULL,
@@ -1155,8 +1193,13 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
             embedding_model_id TEXT NOT NULL,
             content_hash TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending',
+            operation_id TEXT NOT NULL DEFAULT '',
+            priority INTEGER NOT NULL DEFAULT 100,
             attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_error_type TEXT NOT NULL DEFAULT '',
             last_error TEXT NOT NULL DEFAULT '',
+            next_retry_at TEXT NOT NULL DEFAULT '',
+            lease_expires_at TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at TEXT NOT NULL DEFAULT '',
@@ -1206,10 +1249,49 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
             ON retrieval_results(chunk_id);
         """
     )
+    _ensure_column(connection, "embedding_jobs", "operation_id", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "embedding_jobs", "priority", "INTEGER NOT NULL DEFAULT 100")
+    _ensure_column(connection, "embedding_jobs", "last_error_type", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "embedding_jobs", "next_retry_at", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "embedding_jobs", "lease_expires_at", "TEXT NOT NULL DEFAULT ''")
+    connection.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_embedding_jobs_operation_status
+            ON embedding_jobs(operation_id, status, priority, created_at);
+        CREATE INDEX IF NOT EXISTS idx_embedding_jobs_retry_wait
+            ON embedding_jobs(status, next_retry_at);
+        CREATE INDEX IF NOT EXISTS idx_embedding_jobs_lease
+            ON embedding_jobs(status, lease_expires_at);
+        """
+    )
     _ensure_column(connection, "retrieval_queries", "reranker_model_ref", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(connection, "retrieval_queries", "ranking_metadata_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(connection, "retrieval_results", "base_score", "REAL NOT NULL DEFAULT 0")
     _ensure_column(connection, "retrieval_results", "rerank_score", "REAL NOT NULL DEFAULT 0")
+
+
+def _ensure_local_workspace_schema(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS local_workspaces (
+            workspace_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            root_path TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_opened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_workspaces_last_opened
+            ON local_workspaces(last_opened_at DESC);
+
+        CREATE TABLE IF NOT EXISTS local_workspace_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
 
 
 def _ensure_memory_schema(connection: sqlite3.Connection) -> None:

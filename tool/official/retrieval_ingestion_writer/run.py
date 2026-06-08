@@ -27,6 +27,7 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
         source_documents = _source_documents_by_id(source)
         scope = _coerce_dict(inputs.get("scope"))
         base_metadata = _coerce_dict(inputs.get("metadata"))
+        operation_id = _as_text(inputs.get("operation_id"))
         explicit_embedding_model_refs = _normalize_model_refs(inputs.get("embedding_model_refs"))
         embedding_model_refs = explicit_embedding_model_refs or _default_embedding_model_refs()
         sync_mode = _normalize_sync_mode(inputs.get("sync_mode"))
@@ -79,7 +80,14 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
             indexed_chunks.extend(_public_chunk(chunk) for chunk in indexed)
             for model_ref in embedding_model_refs:
                 try:
-                    embedding_jobs.extend(queue_embedding_job(source_kind, source_id, model_ref))
+                    embedding_jobs.extend(
+                        queue_embedding_job(
+                            source_kind,
+                            source_id,
+                            model_ref,
+                            operation_id=operation_id,
+                        )
+                    )
                 except Exception as exc:
                     warnings.append(
                         {
@@ -112,6 +120,7 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
                 "document_count": len(documents),
                 "chunk_count": len(indexed_chunks),
                 "embedding_model_refs": embedding_model_refs,
+                "operation_id": operation_id,
                 "embedding_job_count": len(embedding_jobs),
                 **prune_report,
                 "warnings": warnings,
@@ -221,6 +230,7 @@ def _public_job(job: dict[str, Any]) -> dict[str, Any]:
     return {
         "job_id": _as_text(job.get("job_id")),
         "status": _as_text(job.get("status")),
+        "operation_id": _as_text(job.get("operation_id")),
         "source_kind": _as_text(job.get("source_kind")),
         "source_id": _as_text(job.get("source_id")),
         "chunk_id": _as_text(job.get("chunk_id")),

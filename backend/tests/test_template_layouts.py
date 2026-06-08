@@ -112,14 +112,14 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_autonomous_review",
                 "buddy_context_compaction",
                 "buddy_memory_recall",
-                "buddy_message_chunking_demo",
                 "buddy_message_retrieval_ingestion",
                 "ecommerce_review_mining_agent",
                 "embedding_maintenance",
                 "game_creative_factory",
                 "job_application_interview_coach",
-                "knowledge_document_chunking_demo",
+                "knowledge_embedding_drain",
                 "knowledge_folder_retrieval_ingestion",
+                "knowledge_retrieval_qa",
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
@@ -136,11 +136,11 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_autonomous_review",
                 "buddy_context_compaction",
                 "buddy_memory_recall",
-                "buddy_message_chunking_demo",
                 "buddy_message_retrieval_ingestion",
                 "embedding_maintenance",
-                "knowledge_document_chunking_demo",
+                "knowledge_embedding_drain",
                 "knowledge_folder_retrieval_ingestion",
+                "knowledge_retrieval_qa",
                 "toograph_page_operation_workflow",
             ],
         )
@@ -300,8 +300,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIs(embedding_template["capabilityDiscoverable"], False)
         self.assertEqual(
             sorted(node_id for node_id, node in embedding_template["nodes"].items() if node["kind"] == "input"),
-            ["input_limit", "input_model_ref"],
+            ["input_limit", "input_model_ref", "input_retry_failed"],
         )
+        self.assertEqual(embedding_template["state_schema"]["retry_failed"]["type"], "boolean")
+        self.assertEqual(embedding_template["nodes"]["input_retry_failed"]["config"]["value"], False)
         self.assertEqual(embedding_template["nodes"]["process_embedding_jobs"]["kind"], "tool")
         self.assertEqual(
             embedding_template["nodes"]["process_embedding_jobs"]["config"]["toolKey"],
@@ -332,6 +334,17 @@ class TemplateLayoutTests(unittest.TestCase):
                         "managed": True,
                     },
                 },
+                {
+                    "state": "retry_failed",
+                    "required": False,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "retry_failed",
+                        "managed": True,
+                    },
+                },
             ],
         )
         self.assertEqual(
@@ -346,19 +359,8 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertIn({"source": "input_model_ref", "target": "process_embedding_jobs"}, embedding_template["edges"])
         self.assertIn({"source": "input_limit", "target": "process_embedding_jobs"}, embedding_template["edges"])
+        self.assertIn({"source": "input_retry_failed", "target": "process_embedding_jobs"}, embedding_template["edges"])
         self.assertIn({"source": "process_embedding_jobs", "target": "output_embedding_report"}, embedding_template["edges"])
-
-        buddy_message_chunk_template = templates["buddy_message_chunking_demo"]
-        self.assertEqual(buddy_message_chunk_template["source"], "official")
-        self.assertEqual(buddy_message_chunk_template["metadata"]["role"], "buddy_message_chunking_demo")
-        self.assertEqual(buddy_message_chunk_template["metadata"]["requiredTools"], ["source_chunker", "retrieval_ingestion_writer"])
-        self.assertIs(buddy_message_chunk_template["capabilityDiscoverable"], False)
-
-        knowledge_chunk_template = templates["knowledge_document_chunking_demo"]
-        self.assertEqual(knowledge_chunk_template["source"], "official")
-        self.assertEqual(knowledge_chunk_template["metadata"]["role"], "knowledge_document_chunking_demo")
-        self.assertEqual(knowledge_chunk_template["metadata"]["requiredTools"], ["source_chunker", "retrieval_ingestion_writer"])
-        self.assertIs(knowledge_chunk_template["capabilityDiscoverable"], False)
 
         page_operation_template = templates["toograph_page_operation_workflow"]
         self.assertEqual(page_operation_template["source"], "official")
@@ -555,172 +557,6 @@ class TemplateLayoutTests(unittest.TestCase):
                         with self.subTest(graph=graph_path, left=left_id, right=right_id):
                             self.assertFalse(_rects_overlap(rects[left_id], rects[right_id]))
 
-    def test_source_chunker_demo_templates_show_tool_bindings(self) -> None:
-        expectations = {
-            "buddy_message_chunking_demo": {
-                "static_inputs": {
-                    "source_kind": "buddy_messages",
-                    "strategy": "conversation_turn_window",
-                    "limits": {"max_chars": 700, "max_turns_per_chunk": 2, "overlap_messages": 0},
-                },
-                "source_state": "message_source",
-                "source_input_node": "input_message_source",
-                "writer_source_kind": "buddy_message",
-                "output_contract_label": "Buddy message chunk candidates",
-            },
-            "knowledge_document_chunking_demo": {
-                "static_inputs": {
-                    "source_kind": "normalized_documents",
-                    "strategy": "document_section_window",
-                    "limits": {"max_chars": 600, "overlap_chars": 80},
-                },
-                "source_state": "document_source",
-                "source_input_node": "input_document_source",
-                "writer_source_kind": "knowledge_document",
-                "output_contract_label": "Knowledge document chunk candidates",
-            },
-        }
-        for template_id, expected in expectations.items():
-            with self.subTest(template_id=template_id):
-                template = load_template_record(template_id)
-                states = template["state_schema"]
-                nodes = template["nodes"]
-                tool_node = nodes["chunk_source_material"]
-                writer_node = nodes["write_retrieval_ingestion"]
-
-                self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
-                self.assertEqual(template["metadata"]["requiredTools"], ["source_chunker", "retrieval_ingestion_writer"])
-                self.assertNotIn("source_kind", states)
-                self.assertNotIn("strategy", states)
-                self.assertNotIn("limits", states)
-                self.assertNotIn("chunker_status", states)
-                self.assertNotIn("chunk_count", states)
-                self.assertNotIn("chunk_report", states)
-                self.assertNotIn("chunk_error", states)
-                self.assertNotIn("input_source_kind", nodes)
-                self.assertNotIn("input_strategy", nodes)
-                self.assertNotIn("input_limits", nodes)
-                self.assertNotIn("output_report", nodes)
-                self.assertEqual(
-                    sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
-                    [expected["source_input_node"]],
-                )
-                self.assertEqual(tool_node["kind"], "tool")
-                self.assertEqual(tool_node["config"]["toolKey"], "source_chunker")
-                self.assertEqual(tool_node["config"]["staticInputs"], expected["static_inputs"])
-                self.assertEqual(
-                    _read_contracts(tool_node["reads"]),
-                    [
-                        {
-                            "state": expected["source_state"],
-                            "required": True,
-                            "binding": {
-                                "kind": "tool_input",
-                                "actionKey": "",
-                                "toolKey": "source_chunker",
-                                "fieldKey": "source",
-                                "managed": True,
-                            },
-                        },
-                    ],
-                )
-                self.assertEqual(
-                    tool_node["writes"],
-                    [{"state": "chunks", "mode": "replace"}],
-                )
-                self.assertEqual(states["chunks"]["binding"]["fieldKey"], "chunks")
-                self.assertEqual(states["ingestion_report"]["binding"]["toolKey"], "retrieval_ingestion_writer")
-                self.assertEqual(states["indexed_chunks"]["binding"]["fieldKey"], "indexed_chunks")
-                self.assertEqual(states["embedding_jobs"]["binding"]["fieldKey"], "embedding_jobs")
-                self.assertEqual(writer_node["kind"], "tool")
-                self.assertEqual(writer_node["config"]["toolKey"], "retrieval_ingestion_writer")
-                self.assertEqual(writer_node["config"]["staticInputs"]["source_kind"], expected["writer_source_kind"])
-                self.assertEqual(
-                    _read_contracts(writer_node["reads"]),
-                    [
-                        {
-                            "state": expected["source_state"],
-                            "required": True,
-                            "binding": {
-                                "kind": "tool_input",
-                                "actionKey": "",
-                                "toolKey": "retrieval_ingestion_writer",
-                                "fieldKey": "source",
-                                "managed": True,
-                            },
-                        },
-                        {
-                            "state": "chunks",
-                            "required": True,
-                            "binding": {
-                                "kind": "tool_input",
-                                "actionKey": "",
-                                "toolKey": "retrieval_ingestion_writer",
-                                "fieldKey": "chunks",
-                                "managed": True,
-                            },
-                        },
-                    ],
-                )
-                self.assertEqual(
-                    writer_node["writes"],
-                    [
-                        {"state": "ingestion_report", "mode": "replace"},
-                        {"state": "indexed_chunks", "mode": "replace"},
-                        {"state": "embedding_jobs", "mode": "replace"},
-                    ],
-                )
-                self.assertEqual(
-                    template["edges"],
-                    [
-                        {"source": expected["source_input_node"], "target": "chunk_source_material"},
-                        {"source": "chunk_source_material", "target": "write_retrieval_ingestion"},
-                        {"source": "chunk_source_material", "target": "output_chunks"},
-                        {"source": "write_retrieval_ingestion", "target": "output_ingestion_report"},
-                    ],
-                )
-                self.assertIn({"source": "chunk_source_material", "target": "output_chunks"}, template["edges"])
-                self.assertEqual(
-                    template["metadata"]["outputContract"],
-                    [
-                        {
-                            "state": "chunks",
-                            "role": "chunk_candidates",
-                            "label": expected.get("output_contract_label"),
-                        },
-                        {
-                            "state": "ingestion_report",
-                            "role": "retrieval_ingestion_report",
-                            "label": expected.get("output_contract_label").replace("chunk candidates", "retrieval ingestion"),
-                        },
-                        {
-                            "state": "indexed_chunks",
-                            "role": "retrieval_chunks",
-                            "label": "Indexed retrieval chunks",
-                        },
-                        {
-                            "state": "embedding_jobs",
-                            "role": "embedding_jobs",
-                            "label": "Queued embedding jobs",
-                        },
-                    ],
-                )
-
-                graph = NodeSystemGraphPayload.model_validate(
-                    {
-                        **{
-                            key: value
-                            for key, value in template.items()
-                            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
-                        },
-                        "graph_id": f"test_{template_id}",
-                        "name": template["default_graph_name"],
-                    }
-                )
-                validation = validate_graph(graph)
-                self.assertEqual([issue.model_dump() for issue in validation.issues], [])
-                self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
-
     def test_buddy_message_retrieval_ingestion_template_loads_messages_before_chunking(self) -> None:
         template = load_template_record("buddy_message_retrieval_ingestion")
         states = template["state_schema"]
@@ -794,6 +630,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(writer_node["config"]["toolKey"], "retrieval_ingestion_writer")
         self.assertEqual(writer_node["config"]["staticInputs"]["source_kind"], "buddy_message")
         self.assertEqual(writer_node["config"]["staticInputs"]["embedding_model_refs"], "")
+        self.assertEqual(writer_node["config"]["staticInputs"]["operation_id"], "")
         self.assertEqual(
             _read_contracts(writer_node["reads"]),
             [
@@ -970,6 +807,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(writer_node["config"]["toolKey"], "retrieval_ingestion_writer")
         self.assertEqual(writer_node["config"]["staticInputs"]["source_kind"], "knowledge_document")
         self.assertEqual(writer_node["config"]["staticInputs"]["embedding_model_refs"], "")
+        self.assertEqual(writer_node["config"]["staticInputs"]["operation_id"], "")
         self.assertEqual(writer_node["config"]["staticInputs"]["sync_mode"], "sync_scope")
         self.assertEqual(writer_node["config"]["staticInputs"]["scope"], {"collection": "knowledge_action_policy"})
         self.assertEqual(
@@ -1042,6 +880,419 @@ class TemplateLayoutTests(unittest.TestCase):
                     if key not in {"template_id", "label", "description", "default_graph_name", "source"}
                 },
                 "graph_id": "test_knowledge_folder_retrieval_ingestion",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_knowledge_embedding_drain_template_processes_scoped_embedding_jobs(self) -> None:
+        template = load_template_record("knowledge_embedding_drain")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["role"], "knowledge_embedding_drain")
+        self.assertEqual(metadata["requiredTools"], ["embedding_job_processor"])
+        self.assertIs(metadata["capabilityDiscoverableDefault"], False)
+        self.assertIs(template["capabilityDiscoverable"], False)
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            [
+                "input_collection_id",
+                "input_job_limit",
+                "input_model_ref",
+                "input_operation_id",
+                "input_time_budget_seconds",
+            ],
+        )
+        self.assertEqual(states["collection_id"]["type"], "text")
+        self.assertEqual(states["operation_id"]["type"], "text")
+        self.assertEqual(states["model_ref"]["type"], "text")
+        self.assertEqual(states["model_ref"]["value"], "")
+        self.assertEqual(states["job_limit"]["type"], "number")
+        self.assertEqual(states["job_limit"]["value"], 250)
+        self.assertEqual(states["time_budget_seconds"]["type"], "number")
+        self.assertEqual(states["time_budget_seconds"]["value"], 300)
+        for state_key in [
+            "processor_status",
+            "processed_count",
+            "completed_count",
+            "failed_count",
+            "retry_wait_count",
+            "blocked_count",
+            "remaining_count",
+            "processor_report",
+        ]:
+            self.assertIn(state_key, states)
+        self.assertEqual(states["failed_count"]["type"], "number")
+        self.assertEqual(states["failed_count"]["binding"]["fieldKey"], "failed_count")
+        self.assertEqual(states["processor_report"]["type"], "json")
+        self.assertEqual(states["processor_report"]["binding"]["fieldKey"], "processed_jobs")
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            [
+                "output_processor_status",
+                "output_processor_report",
+                "output_processed_count",
+                "output_completed_count",
+                "output_failed_count",
+                "output_retry_wait_count",
+                "output_blocked_count",
+                "output_remaining_count",
+            ],
+        )
+
+        processor_node = nodes["process_scoped_embedding_jobs"]
+        self.assertEqual(processor_node["kind"], "tool")
+        self.assertEqual(processor_node["config"]["toolKey"], "embedding_job_processor")
+        self.assertEqual(
+            processor_node["config"]["staticInputs"],
+            {
+                "retry_failed": False,
+                "include_retry_wait": True,
+                "source_kind": "",
+                "source_id": "",
+            },
+        )
+        self.assertEqual(
+            _read_contracts(processor_node["reads"]),
+            [
+                {
+                    "state": "collection_id",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "collection_id",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "operation_id",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "operation_id",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "model_ref",
+                    "required": False,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "model_ref",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "job_limit",
+                    "required": False,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "limit",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "time_budget_seconds",
+                    "required": False,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "embedding_job_processor",
+                        "fieldKey": "time_budget_seconds",
+                        "managed": True,
+                    },
+                },
+            ],
+        )
+        self.assertEqual(
+            processor_node["writes"],
+            [
+                {"state": "processor_status", "mode": "replace"},
+                {"state": "processed_count", "mode": "replace"},
+                {"state": "completed_count", "mode": "replace"},
+                {"state": "failed_count", "mode": "replace"},
+                {"state": "retry_wait_count", "mode": "replace"},
+                {"state": "blocked_count", "mode": "replace"},
+                {"state": "remaining_count", "mode": "replace"},
+                {"state": "processor_report", "mode": "replace"},
+            ],
+        )
+        self.assertEqual(
+            template["edges"],
+            [
+                {"source": "input_collection_id", "target": "process_scoped_embedding_jobs"},
+                {"source": "input_operation_id", "target": "process_scoped_embedding_jobs"},
+                {"source": "input_model_ref", "target": "process_scoped_embedding_jobs"},
+                {"source": "input_job_limit", "target": "process_scoped_embedding_jobs"},
+                {"source": "input_time_budget_seconds", "target": "process_scoped_embedding_jobs"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_processor_status"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_processor_report"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_processed_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_completed_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_failed_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_retry_wait_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_blocked_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_remaining_count"},
+            ],
+        )
+        self.assertEqual(
+            metadata["outputContract"],
+            [
+                {
+                    "state": "processor_status",
+                    "role": "status",
+                    "label": "Knowledge embedding drain status",
+                },
+                {
+                    "state": "processor_report",
+                    "role": "audit",
+                    "label": "Knowledge embedding drain audit",
+                },
+                {
+                    "state": "processed_count",
+                    "role": "metric",
+                    "label": "Processed scoped embedding jobs",
+                },
+                {
+                    "state": "completed_count",
+                    "role": "metric",
+                    "label": "Completed scoped embedding jobs",
+                },
+                {
+                    "state": "failed_count",
+                    "role": "metric",
+                    "label": "Failed scoped embedding jobs",
+                },
+                {
+                    "state": "retry_wait_count",
+                    "role": "metric",
+                    "label": "Scoped embedding jobs waiting for retry",
+                },
+                {
+                    "state": "blocked_count",
+                    "role": "metric",
+                    "label": "Blocked scoped embedding jobs",
+                },
+                {
+                    "state": "remaining_count",
+                    "role": "metric",
+                    "label": "Remaining scoped embedding jobs",
+                },
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_knowledge_embedding_drain",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_knowledge_retrieval_qa_template_returns_context_ready_outputs(self) -> None:
+        template = load_template_record("knowledge_retrieval_qa")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["origin"], "embedding")
+        self.assertEqual(metadata["role"], "knowledge_retrieval_qa")
+        self.assertEqual(metadata["requiredTools"], ["retrieval_query_context_loader"])
+        self.assertEqual(metadata["permissions"], [])
+        self.assertIs(metadata["capabilityDiscoverableDefault"], True)
+        self.assertEqual(metadata["capability"]["granularity"], "workflow")
+        self.assertIn("knowledge_retrieval_qa", metadata["capability"]["covers"])
+        self.assertIn("knowledge_answer", metadata["capability"]["produces"])
+        self.assertIn("source_citations", metadata["capability"]["produces"])
+
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            ["input_collection_id", "input_user_question"],
+        )
+        self.assertEqual(
+            nodes["input_collection_id"]["config"].get("valuePresentation"),
+            {"control": "knowledge_base_select"},
+        )
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            [
+                "output_knowledge_answer",
+                "output_evidence_digest",
+                "output_source_citations",
+                "output_coverage_note",
+                "output_coverage_level",
+                "output_missing_evidence",
+            ],
+        )
+        for state_key in [
+            "user_question",
+            "collection_id",
+            "retrieval_query",
+            "retrieval_filters",
+            "retrieval_context_package",
+            "ranked_chunks",
+            "ranking_report",
+            "knowledge_answer",
+            "evidence_digest",
+            "source_citations",
+            "coverage_level",
+            "coverage_note",
+            "missing_evidence",
+        ]:
+            self.assertIn(state_key, states)
+        self.assertNotIn("answer_package", states)
+        self.assertEqual(states["user_question"]["type"], "text")
+        self.assertEqual(states["collection_id"]["type"], "text")
+        self.assertEqual(states["retrieval_query"]["type"], "text")
+        self.assertEqual(states["retrieval_filters"]["type"], "json")
+        self.assertEqual(states["retrieval_context_package"]["type"], "json")
+        self.assertEqual(states["ranked_chunks"]["type"], "json")
+        self.assertEqual(states["ranking_report"]["type"], "json")
+        self.assertEqual(states["knowledge_answer"]["type"], "markdown")
+        self.assertEqual(states["evidence_digest"]["type"], "markdown")
+        self.assertEqual(states["source_citations"]["type"], "markdown")
+        self.assertEqual(states["coverage_level"]["type"], "text")
+        self.assertEqual(states["coverage_note"]["type"], "markdown")
+        self.assertEqual(states["missing_evidence"]["type"], "markdown")
+
+        plan_node = nodes["plan_knowledge_retrieval"]
+        self.assertEqual(plan_node["kind"], "agent")
+        self.assertEqual(
+            _read_contracts(plan_node["reads"]),
+            [
+                {"state": "user_question", "required": True},
+                {"state": "collection_id", "required": True},
+            ],
+        )
+        self.assertEqual(
+            plan_node["writes"],
+            [
+                {"state": "retrieval_query", "mode": "replace"},
+                {"state": "retrieval_filters", "mode": "replace"},
+            ],
+        )
+        self.assertIn("collection_id", plan_node["config"]["taskInstruction"])
+        self.assertIn("metadata_filter", plan_node["config"]["taskInstruction"])
+
+        retrieval_node = nodes["load_knowledge_context"]
+        self.assertEqual(retrieval_node["kind"], "tool")
+        self.assertEqual(retrieval_node["config"]["toolKey"], "retrieval_query_context_loader")
+        self.assertEqual(
+            retrieval_node["config"]["staticInputs"],
+            {
+                "embedding_model_ref": "",
+                "reranker_model_ref": "",
+                "limits": {"limit": 8, "max_chars": 8000},
+            },
+        )
+        self.assertEqual(
+            _read_contracts(retrieval_node["reads"]),
+            [
+                {
+                    "state": "retrieval_query",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_query_context_loader",
+                        "fieldKey": "query",
+                        "managed": True,
+                    },
+                },
+                {
+                    "state": "retrieval_filters",
+                    "required": True,
+                    "binding": {
+                        "kind": "tool_input",
+                        "actionKey": "",
+                        "toolKey": "retrieval_query_context_loader",
+                        "fieldKey": "filters",
+                        "managed": True,
+                    },
+                },
+            ],
+        )
+        self.assertEqual(
+            retrieval_node["writes"],
+            [
+                {"state": "retrieval_context_package", "mode": "replace"},
+                {"state": "ranked_chunks", "mode": "replace"},
+                {"state": "ranking_report", "mode": "replace"},
+            ],
+        )
+
+        answer_node = nodes["answer_from_knowledge_context"]
+        self.assertEqual(answer_node["kind"], "agent")
+        self.assertIn("Do not write answer_package", answer_node["config"]["taskInstruction"])
+        self.assertIn("knowledge_answer", answer_node["config"]["taskInstruction"])
+        self.assertIn("source_citations", answer_node["config"]["taskInstruction"])
+        self.assertEqual(
+            answer_node["writes"],
+            [
+                {"state": "knowledge_answer", "mode": "replace"},
+                {"state": "evidence_digest", "mode": "replace"},
+                {"state": "source_citations", "mode": "replace"},
+                {"state": "coverage_level", "mode": "replace"},
+                {"state": "coverage_note", "mode": "replace"},
+                {"state": "missing_evidence", "mode": "replace"},
+            ],
+        )
+        self.assertEqual(
+            template["edges"],
+            [
+                {"source": "input_user_question", "target": "plan_knowledge_retrieval"},
+                {"source": "input_collection_id", "target": "plan_knowledge_retrieval"},
+                {"source": "plan_knowledge_retrieval", "target": "load_knowledge_context"},
+                {"source": "load_knowledge_context", "target": "answer_from_knowledge_context"},
+                {"source": "answer_from_knowledge_context", "target": "output_knowledge_answer"},
+                {"source": "answer_from_knowledge_context", "target": "output_evidence_digest"},
+                {"source": "answer_from_knowledge_context", "target": "output_source_citations"},
+                {"source": "answer_from_knowledge_context", "target": "output_coverage_level"},
+                {"source": "answer_from_knowledge_context", "target": "output_coverage_note"},
+                {"source": "answer_from_knowledge_context", "target": "output_missing_evidence"},
+            ],
+        )
+        self.assertEqual(
+            metadata["outputContract"],
+            [
+                {"state": "knowledge_answer", "role": "knowledge_answer", "label": "Knowledge answer"},
+                {"state": "evidence_digest", "role": "evidence_digest", "label": "Evidence digest"},
+                {"state": "source_citations", "role": "source_citations", "label": "Source citations"},
+                {"state": "coverage_level", "role": "coverage_level", "label": "Coverage level"},
+                {"state": "coverage_note", "role": "coverage_note", "label": "Coverage note"},
+                {"state": "missing_evidence", "role": "missing_evidence", "label": "Missing evidence"},
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_knowledge_retrieval_qa",
                 "name": template["default_graph_name"],
             }
         )

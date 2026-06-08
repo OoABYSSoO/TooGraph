@@ -2,27 +2,69 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "embedding_job_processor",
   "name": "Embedding Job Processor",
-  "description": "处理待执行的 embedding jobs，通过已注册的真实 embedding provider 生成向量。",
+  "description": "Processes pending embedding jobs through registered embedding providers.",
   "version": "0.1.0",
-  "timeoutSeconds": 60,
+  "timeoutSeconds": 360,
   "permissions": [],
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",
-    "timeoutSeconds": 60
+    "timeoutSeconds": 360
   },
   "inputSchema": [
     {
       "key": "model_ref",
       "name": "Model Ref",
       "valueType": "text",
-      "description": "可选的 embedding model id 或 provider:model 过滤条件。"
+      "description": "Optional embedding model id or provider/model filter."
     },
     {
       "key": "limit",
       "name": "Limit",
       "valueType": "number",
-      "description": "本次最多处理的 pending jobs 数量。"
+      "description": "Maximum pending jobs to process in this run."
+    },
+    {
+      "key": "retry_failed",
+      "name": "Retry Failed Jobs",
+      "valueType": "boolean",
+      "description": "Reset failed embedding jobs to pending before processing."
+    },
+    {
+      "key": "collection_id",
+      "name": "Collection",
+      "valueType": "text",
+      "description": "Optional retrieval collection scope."
+    },
+    {
+      "key": "operation_id",
+      "name": "Operation",
+      "valueType": "text",
+      "description": "Optional knowledge indexing operation scope."
+    },
+    {
+      "key": "source_kind",
+      "name": "Source Kind",
+      "valueType": "text",
+      "description": "Optional retrieval source kind scope."
+    },
+    {
+      "key": "source_id",
+      "name": "Source ID",
+      "valueType": "text",
+      "description": "Optional retrieval source id scope."
+    },
+    {
+      "key": "time_budget_seconds",
+      "name": "Time Budget Seconds",
+      "valueType": "number",
+      "description": "Optional maximum processing time for this drain run."
+    },
+    {
+      "key": "include_retry_wait",
+      "name": "Include Retry Wait",
+      "valueType": "boolean",
+      "description": "Allow due retry-wait jobs to resume in this scoped drain."
     }
   ],
   "outputSchema": [
@@ -30,37 +72,73 @@
       "key": "status",
       "name": "Status",
       "valueType": "text",
-      "description": "处理状态。"
+      "description": "Processing status."
     },
     {
       "key": "processed_count",
       "name": "Processed Count",
       "valueType": "number",
-      "description": "本次检查的 pending jobs 数量。"
+      "description": "Number of embedding jobs processed in this run."
     },
     {
       "key": "completed_count",
       "name": "Completed Count",
       "valueType": "number",
-      "description": "本次完成的 jobs 数量。"
+      "description": "Number of jobs completed in this run."
     },
     {
       "key": "failed_count",
       "name": "Failed Count",
       "valueType": "number",
-      "description": "本次标记为失败的 jobs 数量。"
+      "description": "Number of jobs marked failed in this run."
+    },
+    {
+      "key": "retry_wait_count",
+      "name": "Retry Wait Count",
+      "valueType": "number",
+      "description": "Number of jobs moved to retry-wait in this run."
+    },
+    {
+      "key": "blocked_count",
+      "name": "Blocked Count",
+      "valueType": "number",
+      "description": "Number of jobs blocked by non-retryable errors in this run."
+    },
+    {
+      "key": "retried_failed_count",
+      "name": "Retried Failed Count",
+      "valueType": "number",
+      "description": "Number of failed jobs reset to pending in this run."
+    },
+    {
+      "key": "reset_blocked_dimension_mismatch_count",
+      "name": "Reset Dimension Mismatch Count",
+      "valueType": "number",
+      "description": "Number of blocked dimension-mismatch jobs reset after a default model dimension probe."
+    },
+    {
+      "key": "remaining_count",
+      "name": "Remaining Count",
+      "valueType": "number",
+      "description": "Number of eligible jobs still remaining in the same scope."
+    },
+    {
+      "key": "scope",
+      "name": "Scope",
+      "valueType": "json",
+      "description": "Effective drain scope."
     },
     {
       "key": "processed_jobs",
       "name": "Processed Jobs",
       "valueType": "json",
-      "description": "逐 job 的处理审计记录。"
+      "description": "Audit records for each processed job."
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "Embedding 任务处理器",
-      "description": "处理待执行的 embedding jobs，通过已注册的真实 embedding provider 生成向量。"
+      "description": "通过已注册的 embedding provider 处理待执行的 embedding jobs。"
     },
     "en-US": {
       "name": "Embedding Job Processor",

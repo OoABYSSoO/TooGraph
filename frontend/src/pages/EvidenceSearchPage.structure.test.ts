@@ -60,5 +60,9 @@ test("EvidenceSearchPage exposes embedding maintenance as an auditable graph run
   assert.match(componentSource, /runGraph\(graph\)/);
   assert.match(componentSource, /buildEmbeddingMaintenanceGraph/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.embeddingMaintenance\.runNow"/);
+  assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.embeddingMaintenance\.retryFailed"/);
+  assert.match(componentSource, /runEmbeddingMaintenance\(\{ retryFailed: true \}\)/);
+  assert.match(componentSource, /noEmbeddingModelConfigured/);
+  assert.match(componentSource, /evidenceSearch\.embeddingKeywordOnlyNotice/);
   assert.match(componentSource, /runDetailPath\(embeddingMaintenanceRunId\)/);
 });

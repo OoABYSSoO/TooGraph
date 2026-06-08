@@ -128,6 +128,62 @@ class StorageDatabaseTests(unittest.TestCase):
 
         self.assertEqual(count, 1)
 
+    def test_storage_includes_knowledge_indexing_operations_and_embedding_recovery_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+                with closing(sqlite3.connect(database.DB_PATH)) as connection:
+                    table_names = {
+                        row[0]
+                        for row in connection.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table'"
+                        ).fetchall()
+                    }
+                    operation_columns = {
+                        row[1]
+                        for row in connection.execute(
+                            "PRAGMA table_info(knowledge_indexing_operations)"
+                        ).fetchall()
+                    }
+                    embedding_job_columns = {
+                        row[1]
+                        for row in connection.execute("PRAGMA table_info(embedding_jobs)").fetchall()
+                    }
+
+        self.assertIn("knowledge_indexing_operations", table_names)
+        self.assertIn("operation_id", operation_columns)
+        self.assertIn("collection_id", operation_columns)
+        self.assertIn("status", operation_columns)
+        self.assertIn("stage", operation_columns)
+        self.assertIn("last_error_type", operation_columns)
+        self.assertIn("next_retry_at", operation_columns)
+        self.assertIn("operation_id", embedding_job_columns)
+        self.assertIn("priority", embedding_job_columns)
+        self.assertIn("last_error_type", embedding_job_columns)
+        self.assertIn("next_retry_at", embedding_job_columns)
+        self.assertIn("lease_expires_at", embedding_job_columns)
+
+    def test_get_connection_initializes_schema_once_per_database_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch("app.core.storage.database.ensure_schema") as ensure_schema,
+            ):
+                first = database.get_connection()
+                first.close()
+                second = database.get_connection()
+                second.close()
+
+        self.assertEqual(ensure_schema.call_count, 1)
+
     def test_content_blobs_are_deduplicated_by_hash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"

@@ -58,6 +58,7 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
         self.assertIn("retrieval_documents", definition.localized["en-US"].description)
         self.assertEqual(definition.input_presentation["chunks"].mode, "state")
         self.assertEqual(definition.input_presentation["source_kind"].mode, "static")
+        self.assertEqual(definition.input_presentation["operation_id"].mode, "static")
         self.assertIn("retrieval_ingestion_writer", get_tool_registry(include_disabled=True).keys())
 
     def test_tool_writes_retrieval_rows_and_queues_embedding_jobs(self) -> None:
@@ -91,6 +92,7 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
                 ],
                 "embedding_model_refs": [model["embedding_model_id"]],
                 "scope": {"workspace": "test"},
+                "operation_id": "kop_embedding_design",
             }
         )
 
@@ -99,8 +101,10 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
         self.assertEqual(report["document_count"], 1)
         self.assertEqual(report["chunk_count"], 1)
         self.assertEqual(report["embedding_job_count"], 1)
+        self.assertEqual(report["operation_id"], "kop_embedding_design")
         self.assertEqual(result["indexed_chunks"][0]["chunk_id"], "chunk_embedding_design_1")
         self.assertEqual(result["embedding_jobs"][0]["chunk_id"], "chunk_embedding_design_1")
+        self.assertEqual(result["embedding_jobs"][0]["operation_id"], "kop_embedding_design")
 
         with closing(sqlite3.connect(database.DB_PATH)) as connection:
             document_row = connection.execute(
@@ -111,13 +115,13 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
                 "SELECT source_kind, source_id, content FROM retrieval_chunks WHERE chunk_id = ?",
                 ("chunk_embedding_design_1",),
             ).fetchone()
-            job_count = connection.execute("SELECT COUNT(*) FROM embedding_jobs").fetchone()[0]
+            job_row = connection.execute("SELECT operation_id FROM embedding_jobs").fetchone()
 
         self.assertEqual(document_row, ("knowledge_document", "doc_embedding_design", "Embedding Design"))
         self.assertEqual(chunk_row[0], "knowledge_document")
         self.assertEqual(chunk_row[1], "doc_embedding_design")
         self.assertIn("semantic memory", chunk_row[2])
-        self.assertEqual(job_count, 1)
+        self.assertEqual(job_row[0], "kop_embedding_design")
 
     def test_sync_scope_prunes_documents_chunks_indexes_jobs_and_vectors_missing_from_current_run(self) -> None:
         from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector

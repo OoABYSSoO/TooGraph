@@ -7,6 +7,7 @@ export const EMBEDDING_MAINTENANCE_TEMPLATE_ID = "embedding_maintenance";
 export type EmbeddingMaintenanceGraphInput = {
   modelRef: string;
   jobLimit: number;
+  retryFailed: boolean;
 };
 
 export function buildEmbeddingMaintenanceGraph(
@@ -19,6 +20,7 @@ export function buildEmbeddingMaintenanceGraph(
 
   writeRequiredInputValue(graph, "input_model_ref", normalizedModelRef);
   writeRequiredInputValue(graph, "input_limit", normalizedJobLimit);
+  writeRequiredInputValue(graph, "input_retry_failed", Boolean(input.retryFailed));
 
   graph.metadata = {
     ...graph.metadata,
@@ -27,6 +29,7 @@ export function buildEmbeddingMaintenanceGraph(
     embedding_maintenance: true,
     embedding_model_ref: normalizedModelRef,
     embedding_job_limit: normalizedJobLimit,
+    embedding_retry_failed: Boolean(input.retryFailed),
   };
   return graph;
 }

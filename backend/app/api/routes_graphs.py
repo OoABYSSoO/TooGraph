@@ -31,7 +31,9 @@ from app.core.storage.graph_store import (
     restore_graph_revision,
     save_graph_with_revision,
 )
+from app.core.storage.knowledge_store import DEFAULT_TEMPLATE_ID, mark_knowledge_ingestion_run_completed
 from app.core.storage.run_store import save_run
+from app.scheduler import runner as scheduler_runner
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +251,7 @@ def _run_graph_worker(
         cancellation_token.request(str(metadata.get("cancellation_reason") or "Run cancellation requested."))
     try:
         execute_node_system_graph_langgraph(graph, run_state, persist_progress=True)
+        _trigger_knowledge_ingestion_completed_if_needed(run_state)
         _sync_improvement_candidate_validation_run(run_state)
     except Exception as exc:  # pragma: no cover - defensive runtime path
         logger.exception("Graph run %s failed: %s", run_state.get("run_id"), exc)
@@ -263,6 +266,37 @@ def _run_graph_worker(
         )
     finally:
         unregister_run_cancellation_token(run_id)
+
+
+def _trigger_knowledge_ingestion_completed_if_needed(run_state: dict[str, Any]) -> None:
+    if str(run_state.get("status") or "") != "completed":
+        return
+    metadata = run_state.get("metadata") if isinstance(run_state.get("metadata"), dict) else {}
+    collection_id = _compact_text(metadata.get("knowledge_collection_id"))
+    operation_id = _compact_text(metadata.get("knowledge_operation_id"))
+    run_id = _compact_text(run_state.get("run_id"))
+    if not collection_id or not operation_id or not run_id:
+        return
+    template_id = _compact_text(metadata.get("template_id")) or DEFAULT_TEMPLATE_ID
+    try:
+        base = mark_knowledge_ingestion_run_completed(
+            collection_id,
+            run_id=run_id,
+            operation_id=operation_id,
+            template_id=template_id,
+        )
+        scheduler_runner.run_event_scheduled_graph_jobs_inline(
+            "knowledge.ingestion.completed",
+            event={
+                "collection_id": base["collection_id"],
+                "operation_id": operation_id,
+                "run_id": run_id,
+                "template_id": str(base.get("template_id") or template_id),
+            },
+            requested_by="knowledge_ingestion_completed",
+        )
+    except Exception as exc:  # pragma: no cover - defensive completion hook
+        logger.exception("Failed to trigger knowledge ingestion completion for run %s: %s", run_id, exc)
 
 
 def _sync_improvement_candidate_validation_run(run_state: dict[str, Any]) -> None:

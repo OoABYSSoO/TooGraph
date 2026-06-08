@@ -280,10 +280,22 @@
                 data-virtual-affordance-role="button"
                 data-virtual-affordance-zone="evidenceSearch.memory"
                 data-virtual-affordance-actions="click"
-                @click="runEmbeddingMaintenance"
+                @click="runEmbeddingMaintenance()"
               >
                 <ElIcon aria-hidden="true"><Refresh /></ElIcon>
                 <span>{{ t("evidenceSearch.runEmbeddingMaintenance") }}</span>
+              </ElButton>
+              <ElButton
+                :loading="embeddingMaintenanceLoading"
+                data-virtual-affordance-id="evidenceSearch.embeddingMaintenance.retryFailed"
+                :data-virtual-affordance-label="t('evidenceSearch.retryFailedEmbeddings')"
+                data-virtual-affordance-role="button"
+                data-virtual-affordance-zone="evidenceSearch.memory"
+                data-virtual-affordance-actions="click"
+                @click="runEmbeddingMaintenance({ retryFailed: true })"
+              >
+                <ElIcon aria-hidden="true"><Refresh /></ElIcon>
+                <span>{{ t("evidenceSearch.retryFailedEmbeddings") }}</span>
               </ElButton>
             </div>
           </div>
@@ -342,6 +354,12 @@
 
           <article v-if="memoryError" class="evidence-search-page__notice">
             {{ t("evidenceSearch.searchFailed", { error: memoryError }) }}
+          </article>
+          <article
+            v-if="noEmbeddingModelConfigured"
+            class="evidence-search-page__notice evidence-search-page__notice--keyword-only"
+          >
+            {{ t("evidenceSearch.embeddingKeywordOnlyNotice") }}
           </article>
           <article
             v-if="formatRetrievalRankingReport(memoryResult?.report?.ranking_reports)"
@@ -471,6 +489,9 @@ const sessionRows = computed(() => sessionResult.value?.sessions ?? []);
 const runContextMatches = computed(() => runContextResult.value?.matches ?? []);
 const memoryRows = computed(() => memoryResult.value?.memories ?? []);
 const embeddingModelOptions = computed(() => memoryResult.value?.embedding_models ?? []);
+const noEmbeddingModelConfigured = computed(
+  () => Boolean(memoryResult.value) && embeddingModelOptions.value.length === 0,
+);
 
 onMounted(() => {
   void runMemorySearch();
@@ -533,20 +554,26 @@ async function runMemorySearch() {
   }
 }
 
-async function runEmbeddingMaintenance() {
+async function runEmbeddingMaintenance(options: { retryFailed?: boolean } = {}) {
   if (embeddingMaintenanceLoading.value) {
     return;
   }
+  const retryFailed = Boolean(options.retryFailed);
   embeddingMaintenanceLoading.value = true;
   try {
     const template = await fetchTemplate(EMBEDDING_MAINTENANCE_TEMPLATE_ID);
     const graph = buildEmbeddingMaintenanceGraph(template, {
       modelRef: memoryEmbeddingModelRef.value || sessionEmbeddingModelRef.value,
       jobLimit: 50,
+      retryFailed,
     });
     const response = await runGraph(graph);
     embeddingMaintenanceRunId.value = response.run_id;
-    ElMessage.success(t("evidenceSearch.embeddingMaintenanceQueued", { runId: response.run_id }));
+    ElMessage.success(
+      t(retryFailed ? "evidenceSearch.embeddingRetryQueued" : "evidenceSearch.embeddingMaintenanceQueued", {
+        runId: response.run_id,
+      }),
+    );
   } catch (error) {
     ElMessage.error(t("evidenceSearch.embeddingMaintenanceFailed", { error: formatError(error) }));
   } finally {
@@ -821,6 +848,12 @@ function formatError(error: unknown) {
 .evidence-search-page__notice {
   border-color: rgba(180, 83, 9, 0.22);
   color: rgb(146, 64, 14);
+}
+
+.evidence-search-page__notice--keyword-only {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.7);
+  color: rgb(30, 64, 175);
 }
 
 .evidence-search-page__empty p {

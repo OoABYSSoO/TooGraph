@@ -263,6 +263,7 @@
         "staticInputs": {
           "source_kind": "buddy_message",
           "embedding_model_refs": "",
+          "operation_id": "",
           "sync_mode": "upsert",
           "scope": {
             "collection": "buddy_history"

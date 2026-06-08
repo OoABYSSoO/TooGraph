@@ -16,6 +16,13 @@ def embedding_job_processor(payload: dict[str, Any] | None) -> dict[str, Any]:
         return process_pending_embedding_jobs(
             model_ref=_text(inputs.get("model_ref")),
             limit=_int(inputs.get("limit"), default=50),
+            retry_failed=_bool(inputs.get("retry_failed")),
+            collection_id=_text(inputs.get("collection_id")),
+            operation_id=_text(inputs.get("operation_id")),
+            source_kind=_text(inputs.get("source_kind")),
+            source_id=_text(inputs.get("source_id")),
+            time_budget_seconds=_int(inputs.get("time_budget_seconds"), default=0),
+            include_retry_wait=_bool(inputs.get("include_retry_wait")),
         )
     except Exception as exc:
         return {
@@ -25,6 +32,17 @@ def embedding_job_processor(payload: dict[str, Any] | None) -> dict[str, Any]:
             "processed_count": 0,
             "completed_count": 0,
             "failed_count": 0,
+            "retry_wait_count": 0,
+            "blocked_count": 0,
+            "retried_failed_count": 0,
+            "reset_blocked_dimension_mismatch_count": 0,
+            "remaining_count": 0,
+            "scope": {
+                "collection_id": _text(inputs.get("collection_id")),
+                "operation_id": _text(inputs.get("operation_id")),
+                "source_kind": _text(inputs.get("source_kind")),
+                "source_id": _text(inputs.get("source_id")),
+            },
             "processed_jobs": [],
         }
 
@@ -45,6 +63,14 @@ def _int(value: Any, *, default: int) -> int:
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def main() -> None:

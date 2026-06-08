@@ -40,6 +40,14 @@ SCHEDULED_GRAPH_PERMISSION_POLICY = {
 }
 
 
+class _InlineBackgroundTasks:
+    def __init__(self) -> None:
+        self.tasks: list[tuple[Any, tuple[Any, ...], dict[str, Any]]] = []
+
+    def add_task(self, func: Any, *args: Any, **kwargs: Any) -> None:
+        self.tasks.append((func, args, kwargs))
+
+
 def start_scheduled_graph_job_run(
     job_id: str,
     *,
@@ -192,6 +200,24 @@ def run_event_scheduled_graph_jobs(
         "skipped_count": len(errors),
         "errors": errors,
     }
+
+
+def run_event_scheduled_graph_jobs_inline(
+    event_name: str,
+    *,
+    event: dict[str, Any] | None = None,
+    requested_by: str = "scheduler_event",
+) -> dict[str, Any]:
+    background_tasks = _InlineBackgroundTasks()
+    result = run_event_scheduled_graph_jobs(
+        event_name,
+        event=event,
+        background_tasks=background_tasks,  # type: ignore[arg-type]
+        requested_by=requested_by,
+    )
+    for func, args, kwargs in background_tasks.tasks:
+        func(*args, **kwargs)
+    return result
 
 
 def build_scheduled_graph_document(

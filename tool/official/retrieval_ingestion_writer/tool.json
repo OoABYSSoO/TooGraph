@@ -74,6 +74,11 @@
       "mode": "static",
       "control": "object",
       "default": {}
+    },
+    "operation_id": {
+      "mode": "static",
+      "control": "text",
+      "default": ""
     }
   },
   "inputSchema": [
@@ -118,6 +123,12 @@
       "name": "Metadata",
       "valueType": "json",
       "description": "追加到 retrieval_documents 和 retrieval_chunks 的入库元数据。"
+    },
+    {
+      "key": "operation_id",
+      "name": "Operation ID",
+      "valueType": "text",
+      "description": "可选知识库入库 operation id；排队 embedding_jobs 时写入，用于后续 scoped drain 和恢复操作。"
     }
   ],
   "outputSchema": [

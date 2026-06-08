@@ -72,6 +72,32 @@ OFFICIAL_SCHEDULED_GRAPH_JOBS: tuple[dict[str, Any], ...] = (
             "recommended_interval": "every_20_minutes",
         },
     },
+    {
+        "job_id": "official_knowledge_embedding_drain",
+        "name": "知识库 Embedding 入库",
+        "template_id": "knowledge_embedding_drain",
+        "input_bindings": {
+            "collection_id": "{{event.collection_id}}",
+            "operation_id": "{{event.operation_id}}",
+            "model_ref": "",
+            "job_limit": 250,
+            "time_budget_seconds": 300,
+        },
+        "schedule_kind": "event",
+        "schedule_expr": "knowledge.ingestion.completed",
+        "enabled": True,
+        "retry_policy": {
+            "max_attempts": 3,
+            "delay_seconds": 300,
+            "backoff_multiplier": 2,
+        },
+        "metadata": {
+            "source": "official_seed",
+            "required_default": True,
+            "purpose": "knowledge_embedding_drain",
+            "recommended_trigger": "knowledge.ingestion.completed",
+        },
+    },
 )
 
 DEPRECATED_OFFICIAL_SCHEDULED_GRAPH_JOB_IDS: tuple[str, ...] = (

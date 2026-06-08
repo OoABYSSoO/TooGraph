@@ -27,8 +27,9 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 jobs = {job["job_id"]: job for job in store.list_scheduled_graph_jobs(include_disabled=True)}
                 due = store.list_due_scheduled_graph_jobs(now="2026-05-27T00:00:00Z")
                 event_jobs = store.list_event_scheduled_graph_jobs("buddy.message.created")
+                knowledge_event_jobs = store.list_event_scheduled_graph_jobs("knowledge.ingestion.completed")
 
-        self.assertEqual(result["created_count"], 3)
+        self.assertEqual(result["created_count"], 4)
         self.assertEqual(result["existing_count"], 0)
         self.assertEqual(result["removed_count"], 0)
         self.assertEqual(
@@ -37,6 +38,7 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 "official_buddy_message_retrieval_ingestion",
                 "official_buddy_autonomous_review",
                 "official_embedding_maintenance",
+                "official_knowledge_embedding_drain",
             },
         )
         message_ingestion = jobs["official_buddy_message_retrieval_ingestion"]
@@ -65,8 +67,35 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
             {"max_attempts": 3, "delay_seconds": 300, "backoff_multiplier": 2.0},
         )
         self.assertEqual(embedding["input_bindings"], {"model_ref": "", "job_limit": 50})
+        knowledge_embedding = jobs["official_knowledge_embedding_drain"]
+        self.assertEqual(knowledge_embedding["template_id"], "knowledge_embedding_drain")
+        self.assertEqual(knowledge_embedding["schedule_kind"], "event")
+        self.assertEqual(knowledge_embedding["schedule_expr"], "knowledge.ingestion.completed")
+        self.assertTrue(knowledge_embedding["enabled"])
+        self.assertEqual(
+            knowledge_embedding["input_bindings"],
+            {
+                "collection_id": "{{event.collection_id}}",
+                "operation_id": "{{event.operation_id}}",
+                "model_ref": "",
+                "job_limit": 250,
+                "time_budget_seconds": 300,
+            },
+        )
+        self.assertEqual(
+            knowledge_embedding["retry_policy"],
+            {"max_attempts": 3, "delay_seconds": 300, "backoff_multiplier": 2.0},
+        )
+        self.assertEqual(knowledge_embedding["metadata"]["source"], "official_seed")
+        self.assertEqual(knowledge_embedding["metadata"]["required_default"], True)
+        self.assertEqual(knowledge_embedding["metadata"]["purpose"], "knowledge_embedding_drain")
+        self.assertEqual(
+            knowledge_embedding["metadata"]["recommended_trigger"],
+            "knowledge.ingestion.completed",
+        )
         self.assertEqual(due, [])
         self.assertEqual([job["job_id"] for job in event_jobs], ["official_buddy_message_retrieval_ingestion"])
+        self.assertEqual([job["job_id"] for job in knowledge_event_jobs], ["official_knowledge_embedding_drain"])
 
     def test_seed_official_jobs_enables_existing_required_defaults_without_user_disable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -93,12 +122,12 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 jobs = store.list_scheduled_graph_jobs(include_disabled=True)
                 embedding = store.load_scheduled_graph_job("official_embedding_maintenance")
 
-        self.assertEqual(first["created_count"], 3)
+        self.assertEqual(first["created_count"], 4)
         self.assertEqual(second["created_count"], 0)
-        self.assertEqual(second["existing_count"], 3)
+        self.assertEqual(second["existing_count"], 4)
         self.assertEqual(second["updated_count"], 1)
         self.assertEqual(second["removed_count"], 0)
-        self.assertEqual(len(jobs), 3)
+        self.assertEqual(len(jobs), 4)
         self.assertTrue(embedding["enabled"])
         self.assertEqual(embedding["next_run_at"], "2026-05-27T02:20:00Z")
         self.assertEqual(embedding["metadata"]["required_default"], True)
@@ -130,9 +159,9 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 review = store.load_scheduled_graph_job("official_buddy_autonomous_review")
                 embedding = store.load_scheduled_graph_job("official_embedding_maintenance")
 
-        self.assertEqual(first["created_count"], 3)
+        self.assertEqual(first["created_count"], 4)
         self.assertEqual(second["created_count"], 0)
-        self.assertEqual(second["existing_count"], 3)
+        self.assertEqual(second["existing_count"], 4)
         self.assertEqual(second["updated_count"], 2)
         self.assertEqual(review["schedule_expr"], "PT20M")
         self.assertEqual(review["next_run_at"], "2026-05-27T02:20:00Z")
@@ -160,7 +189,7 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 second = official_seed.seed_official_scheduled_graph_jobs(now="2026-05-27T02:00:00Z")
                 embedding = store.load_scheduled_graph_job("official_embedding_maintenance")
 
-        self.assertEqual(first["created_count"], 3)
+        self.assertEqual(first["created_count"], 4)
         self.assertEqual(customized["schedule_expr"], "PT45M")
         self.assertEqual(customized["metadata"]["user_schedule_modified"], True)
         self.assertEqual(second["updated_count"], 0)
@@ -187,12 +216,12 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
                 jobs = store.list_scheduled_graph_jobs(include_disabled=True)
                 embedding = store.load_scheduled_graph_job("official_embedding_maintenance")
 
-        self.assertEqual(first["created_count"], 3)
+        self.assertEqual(first["created_count"], 4)
         self.assertEqual(second["created_count"], 0)
-        self.assertEqual(second["existing_count"], 3)
+        self.assertEqual(second["existing_count"], 4)
         self.assertEqual(second["updated_count"], 0)
         self.assertEqual(second["removed_count"], 0)
-        self.assertEqual(len(jobs), 3)
+        self.assertEqual(len(jobs), 4)
         self.assertFalse(disabled["enabled"])
         self.assertEqual(disabled["metadata"]["user_disabled"], True)
         self.assertFalse(embedding["enabled"])
@@ -235,6 +264,7 @@ class SchedulerOfficialSeedTests(unittest.TestCase):
         self.assertEqual(result["removed"], [{"job_id": "official_buddy_capability_curator"}])
         self.assertNotIn("official_buddy_capability_curator", jobs)
         self.assertIn("official_embedding_maintenance", jobs)
+        self.assertIn("official_knowledge_embedding_drain", jobs)
         self.assertEqual(deprecated_runs, [])
 
 

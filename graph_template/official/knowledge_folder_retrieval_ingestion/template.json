@@ -296,6 +296,7 @@
         "staticInputs": {
           "source_kind": "knowledge_document",
           "embedding_model_refs": "",
+          "operation_id": "",
           "sync_mode": "sync_scope",
           "scope": {
             "collection": "knowledge_action_policy"

@@ -20,6 +20,14 @@
       "color": "#0f766e",
       "binding": null
     },
+    "retry_failed": {
+      "name": "Retry Failed Jobs",
+      "description": "是否先把失败的 embedding jobs 重置为 pending，再在同一次维护运行中重新处理。",
+      "type": "boolean",
+      "value": false,
+      "color": "#dc2626",
+      "binding": null
+    },
     "processor_status": {
       "name": "Processor Status",
       "description": "embedding_job_processor 返回的处理状态。",
@@ -151,6 +159,33 @@
         "boundaryType": "text"
       }
     },
+    "input_retry_failed": {
+      "kind": "input",
+      "name": "重试失败任务",
+      "description": "为 true 时，先把失败的 embedding jobs 重置为待处理，再继续执行本次维护。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 700
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "retry_failed",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": false,
+        "boundaryType": "text"
+      }
+    },
     "process_embedding_jobs": {
       "kind": "tool",
       "name": "处理 Embedding 队列",
@@ -188,6 +223,17 @@
             "fieldKey": "limit",
             "managed": true
           }
+        },
+        {
+          "state": "retry_failed",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "embedding_job_processor",
+            "fieldKey": "retry_failed",
+            "managed": true
+          }
         }
       ],
       "writes": [
@@ -213,7 +259,15 @@
         }
       ],
       "config": {
-        "toolKey": "embedding_job_processor"
+        "toolKey": "embedding_job_processor",
+        "staticInputs": {
+          "collection_id": "",
+          "operation_id": "",
+          "source_kind": "",
+          "source_id": "",
+          "time_budget_seconds": 0,
+          "include_retry_wait": false
+        }
       }
     },
     "output_embedding_report": {
@@ -284,6 +338,10 @@
     },
     {
       "source": "input_limit",
+      "target": "process_embedding_jobs"
+    },
+    {
+      "source": "input_retry_failed",
       "target": "process_embedding_jobs"
     },
     {
