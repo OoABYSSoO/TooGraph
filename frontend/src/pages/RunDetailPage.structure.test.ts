@@ -195,8 +195,8 @@ test("RunDetailPage renders prompt snapshots inside context audit", () => {
   assert.match(componentSource, /t\("runDetail\.promptCacheDynamicSuffix"\)/);
 });
 
-test("RunDetailPage renders Buddy background review records and rerun action", () => {
-  assert.match(componentSource, /import \{ fetchBuddyBackgroundReviews, enqueueBuddyBackgroundReview, restoreBuddyRevision \} from "@\/api\/buddy";/);
+test("RunDetailPage renders Buddy background review records without the legacy rerun action", () => {
+  assert.match(componentSource, /import \{ fetchBuddyBackgroundReviews, restoreBuddyRevision \} from "@\/api\/buddy";/);
   assert.match(componentSource, /import \{ buildBackgroundReviewDisplayItems/);
   assert.match(componentSource, /const backgroundReviews = ref/);
   assert.match(componentSource, /const backgroundReviewItems = computed/);
@@ -213,14 +213,15 @@ test("RunDetailPage renders Buddy background review records and rerun action", (
   assert.match(componentSource, /v-for="skipped in item\.skippedCommands"/);
   assert.match(componentSource, /v-for="evidence in item\.evidenceItems"/);
   assert.match(componentSource, /v-for="warning in item\.warnings"/);
-  assert.match(componentSource, /enqueueBuddyBackgroundReview\(/);
+  assert.doesNotMatch(componentSource, /enqueueBuddyBackgroundReview/);
+  assert.doesNotMatch(componentSource, /rerunBackgroundReview/);
   assert.doesNotMatch(componentSource, /startImprovementCandidateReview/);
   assert.doesNotMatch(componentSource, /ImprovementCandidate/);
   assert.match(componentSource, /async function restoreBackgroundReviewRevision\(item: BackgroundReviewDisplayItem, revisionId: string\)/);
   assert.match(componentSource, /await restoreBuddyRevision\(normalizedRevisionId\)/);
   assert.match(componentSource, /void loadBackgroundReviews\(item\.sourceRunId\)/);
   assert.match(componentSource, /t\("runDetail\.backgroundReview"\)/);
-  assert.match(componentSource, /t\("runDetail\.rerunBackgroundReview"\)/);
+  assert.doesNotMatch(componentSource, /t\("runDetail\.rerunBackgroundReview"\)/);
 });
 
 test("RunDetailPage exposes operation journal entries from the dedicated journal API", () => {

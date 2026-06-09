@@ -1,17 +1,14 @@
 import type { GraphNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
-import type { BuddyMemoryReviewInputSource, BuddyMemoryReviewTemplateBinding, BuddyRunInputSource, BuddyRunTemplateBinding } from "../types/buddy.ts";
+import type { BuddyRunInputSource, BuddyRunTemplateBinding } from "../types/buddy.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 import {
   buildBuddyHomeContextValue,
-  resolveEffectiveBuddyMemoryReviewTemplateBinding,
   resolveEffectiveBuddyRunTemplateBinding,
-  validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
 
-export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
 export const BUDDY_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
 export const MAX_BUDDY_HISTORY_MESSAGES = 12;
@@ -83,13 +80,6 @@ export type BuddyActionRuntimeContext = {
   page_path?: string;
   page_snapshot?: unknown;
   page_operation_book?: unknown;
-};
-
-export type BuildBuddyReviewGraphInput = {
-  mainRun: RunDetail;
-  binding: BuddyMemoryReviewTemplateBinding;
-  currentSessionId: string;
-  buddyModel?: unknown;
 };
 
 export function formatBuddyHistory(
@@ -201,66 +191,6 @@ export function buildBuddyChatGraph(
     throw new Error(`Buddy run template binding is invalid: ${validation.issues.join(" ")}`);
   }
   applyBuddyRunTemplateBinding(graph, effectiveBinding, buildBuddyRuntimeSourceValues(input));
-  return graph;
-}
-
-export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBuddyReviewGraphInput): GraphPayload {
-  const graph: GraphPayload = {
-    graph_id: null,
-    name: template.default_graph_name,
-    state_schema: cloneJson(template.state_schema),
-    nodes: cloneJson(template.nodes),
-    edges: cloneJson(template.edges),
-    conditional_edges: cloneJson(template.conditional_edges),
-    metadata: {
-      ...cloneJson(template.metadata),
-      buddy_template_id: template.template_id,
-      buddy_review_run: true,
-      buddy_parent_run_id: input.mainRun.run_id,
-      internal: true,
-    },
-  };
-  applyBuddyModelOverride(graph, input.buddyModel);
-
-  const validation = validateBuddyMemoryReviewTemplateBinding(template, input.binding);
-  if (!validation.valid) {
-    throw new Error(`Buddy memory review template binding is invalid: ${validation.issues.join(" ")}`);
-  }
-  const effectiveBinding = resolveEffectiveBuddyMemoryReviewTemplateBinding(template, input.binding);
-  applyBuddyRunTemplateBinding(graph, effectiveBinding, buildBuddyMemoryReviewRuntimeSourceValues(input));
-
-  const outputDefaults: Record<string, unknown> = {
-    autonomous_review: {},
-    memory_update_plan: { has_updates: false, commands: [] },
-    user_context_update_plan: { has_updates: false, commands: [] },
-    structured_memory_update_plan: { has_updates: false, commands: [] },
-    memory_review_result: "",
-    user_context_review_result: "",
-    memory_write_success: false,
-    applied_memory_commands: [],
-    skipped_memory_commands: [],
-    memory_write_result: "",
-    user_context_write_success: false,
-    applied_user_context_commands: [],
-    skipped_user_context_commands: [],
-    user_context_write_result: "",
-    structured_memory_write_success: false,
-    applied_structured_memory_commands: [],
-    skipped_structured_memory_commands: [],
-    written_structured_memories: [],
-    structured_memory_write_result: "",
-    buddy_identity_update_plan: { has_updates: false, requires_confirmation: false, commands: [] },
-    buddy_identity_review_result: "",
-    buddy_identity_write_success: false,
-    applied_buddy_identity_commands: [],
-    skipped_buddy_identity_commands: [],
-    buddy_identity_write_result: "",
-  };
-
-  for (const [stateName, value] of Object.entries(outputDefaults)) {
-    setStateValueByName(graph, stateName, value);
-  }
-
   return graph;
 }
 
@@ -714,17 +644,9 @@ function stableHashString(value: string) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function buildBuddyMemoryReviewRuntimeSourceValues(
-  input: BuildBuddyReviewGraphInput,
-): BuddyRuntimeSourceValues<BuddyMemoryReviewInputSource> {
-  return {
-    source_run_id: input.mainRun.run_id,
-  };
-}
-
 function applyBuddyRunTemplateBinding(
   graph: GraphPayload,
-  binding: Pick<BuddyRunTemplateBinding, "input_bindings"> | Pick<BuddyMemoryReviewTemplateBinding, "input_bindings">,
+  binding: Pick<BuddyRunTemplateBinding, "input_bindings">,
   sourceValues: Record<string, unknown>,
 ) {
   for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
@@ -749,24 +671,6 @@ function applyBuddyRunTemplateBinding(
       value: cloneJson(value),
     };
   }
-}
-
-function setStateValueByName(graph: GraphPayload, stateName: string, value: unknown) {
-  const stateKey = findStateKeyByName(graph, stateName);
-  if (!stateKey) {
-    return;
-  }
-  setStateValue(graph, stateKey, value);
-}
-
-function setStateValue(graph: GraphPayload, stateKey: string, value: unknown) {
-  if (!graph.state_schema[stateKey]) {
-    return;
-  }
-  graph.state_schema[stateKey] = {
-    ...graph.state_schema[stateKey],
-    value,
-  };
 }
 
 function syncInputNodeValueByName(graph: GraphPayload, stateName: string, value: unknown) {

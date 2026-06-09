@@ -198,7 +198,7 @@ npm start
 - `buddy_messages_fts`、`buddy_messages_fts_trigram`、`retrieval_chunks_fts`、`retrieval_chunks_fts_trigram`、embedding vectors 和 hybrid audit 表已进入统一数据库。
 - `discover` 支持 snippet、bookend_start、messages、bookend_end、messages_before、messages_after、rank/newest/oldest 排序、CJK trigram 和短 token LIKE fallback。
 - `buddy_sessions` 已包含 `parent_session_id`、`source`、`ended_at`、`end_reason` 等字段。
-- `memory_review_template_binding` 已进入 Buddy store 和 command 路径；官方 `buddy_autonomous_review` 不再要求外部绑定 `source_run_id`，复盘来源由图内 `buddy_review_source_selector` Tool 选择，变更仍可记录 revision。
+- Buddy 自主复盘只保留调度任务运行官方 `buddy_autonomous_review` 的新路径；复盘来源由图内 `buddy_review_source_selector` Tool 自动选择尚未复盘的 completed Buddy run，不再提供独立的复盘模板绑定或手动排队入口。
 - `buddy_autonomous_review` is the background review and low-risk memory writeback flow: it selects an unreviewed completed Buddy run through `buddy_review_source_selector`, loads that run snapshot, recalls related sessions, prepares `memory_update_plan`, `user_context_update_plan`, `structured_memory_update_plan`, `buddy_identity_update_plan`, and `capability_usage_update_plan`, then writes safe updates through controlled writer nodes with revisions.
 - `buddy_home_writer` 负责 `memory_document.update` 等低风险 Buddy Home 写回，并留下 command/revision；它仍是唯一写入口，不把写文件逻辑藏进后端策略。
 - `buddy_context_compaction` 是独立内部模板，专门处理会话压缩摘要：保护最近原文，迭代更新 `session_summary`，只允许生成 `session_summary.update` 写回命令，不触碰 `MEMORY.md`、`USER.md`、伙伴身份设定或全局运行权限设置。

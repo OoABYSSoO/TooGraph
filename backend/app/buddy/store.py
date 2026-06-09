@@ -58,10 +58,6 @@ RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_ID = "run_template_binding"
 RUN_TEMPLATE_BINDING_VERSION = 1
-MEMORY_REVIEW_TEMPLATE_BINDING_KEY = "memory_review_template_binding"
-MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_TYPE = "memory_review_template_binding"
-MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_ID = "memory_review_template_binding"
-MEMORY_REVIEW_TEMPLATE_BINDING_VERSION = 1
 CAPABILITY_USAGE_STATS_TARGET_TYPE = "capability_usage_stats"
 CAPABILITY_USAGE_STATS_TARGET_ID = "capability_usage_stats"
 MAX_CAPABILITY_USAGE_RECENT_RUNS = 5
@@ -72,18 +68,6 @@ ALLOWED_RUN_TEMPLATE_INPUT_SOURCES = {
     "buddy_home_context",
     "current_session_id",
 }
-ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
-    "source_run_id",
-    "current_session_id",
-    "user_message",
-    "conversation_history",
-    "buddy_home_context",
-    "request_understanding",
-    "capability_result",
-    "capability_review",
-    "public_response",
-}
-REQUIRED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES: set[str] = set()
 DEFAULT_RUN_TEMPLATE_BINDING = {
     "version": RUN_TEMPLATE_BINDING_VERSION,
     "template_id": "buddy_autonomous_loop",
@@ -91,12 +75,6 @@ DEFAULT_RUN_TEMPLATE_BINDING = {
         "input_user_message": "current_message",
     },
 }
-DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING = {
-    "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
-    "template_id": "buddy_autonomous_review",
-    "input_bindings": {},
-}
-
 
 def initialize_buddy_home() -> None:
     ensure_buddy_home(BUDDY_HOME_DIR)
@@ -486,60 +464,6 @@ def save_run_template_binding(payload: dict[str, Any], *, changed_by: str, chang
         )
         connection.commit()
     return load_run_template_binding()
-
-
-def load_memory_review_template_binding() -> dict[str, Any]:
-    with _connection() as connection:
-        row = connection.execute(
-            "SELECT value_json FROM buddy_kv WHERE key = ?",
-            (MEMORY_REVIEW_TEMPLATE_BINDING_KEY,),
-        ).fetchone()
-    if not row:
-        return _normalize_memory_review_template_binding(DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING)
-    try:
-        value = json.loads(str(row["value_json"] or "{}"))
-    except Exception:
-        value = {}
-    if not isinstance(value, dict):
-        value = {}
-    try:
-        binding = _normalize_memory_review_template_binding(value)
-        if _memory_review_template_binding_needs_repair(value, binding):
-            return _with_memory_review_template_binding_repair_metadata(
-                binding,
-                reason="normalized_saved_binding",
-                previous_value=value,
-            )
-        return binding
-    except Exception as exc:
-        binding = _normalize_memory_review_template_binding(DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING)
-        return _with_memory_review_template_binding_repair_metadata(
-            binding,
-            reason="invalid_saved_binding",
-            previous_value=value,
-            error=str(exc),
-        )
-
-
-def save_memory_review_template_binding(
-    payload: dict[str, Any],
-    *,
-    changed_by: str,
-    change_reason: str,
-) -> dict[str, Any]:
-    next_value = _normalize_memory_review_template_binding(payload)
-    previous = load_memory_review_template_binding()
-    _write_with_revision(
-        MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_TYPE,
-        MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_ID,
-        "update",
-        previous,
-        next_value,
-        changed_by,
-        change_reason,
-    )
-    _write_kv(MEMORY_REVIEW_TEMPLATE_BINDING_KEY, next_value, next_value["updated_at"])
-    return load_memory_review_template_binding()
 
 
 def create_background_review_run(
@@ -2610,19 +2534,6 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
                 (RUN_TEMPLATE_BINDING_KEY, _json_dumps(restored), utc_now_iso()),
             )
             connection.commit()
-    elif target_type == MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_TYPE:
-        current = load_memory_review_template_binding()
-        restored = _normalize_memory_review_template_binding(restored)
-        _write_with_revision(
-            MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_TYPE,
-            MEMORY_REVIEW_TEMPLATE_BINDING_TARGET_ID,
-            "restore",
-            current,
-            restored,
-            changed_by,
-            change_reason,
-        )
-        _write_kv(MEMORY_REVIEW_TEMPLATE_BINDING_KEY, restored, utc_now_iso())
     else:
         raise ValueError(f"Unsupported revision target type: {target_type}")
     return {"target_type": target_type, "target_id": target_id, "current_value": restored}
@@ -2802,25 +2713,6 @@ def _resolve_template_runtime_input_bindings(template: dict[str, Any] | None) ->
     return input_bindings
 
 
-def _resolve_memory_review_template_runtime_input_bindings(template: dict[str, Any] | None) -> dict[str, str]:
-    metadata = template.get("metadata") if isinstance(template, dict) and isinstance(template.get("metadata"), dict) else {}
-    raw_bindings = metadata.get("buddyMemoryReviewRuntimeInputBindings") if isinstance(metadata, dict) else None
-    if not isinstance(raw_bindings, dict):
-        return {}
-    input_bindings: dict[str, str] = {}
-    for node_id, source in raw_bindings.items():
-        normalized_node_id = str(node_id or "").strip()
-        normalized_source = str(source or "").strip()
-        if not normalized_node_id or not normalized_source:
-            continue
-        if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
-            raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
-        if normalized_source in input_bindings.values():
-            raise ValueError(f"Buddy memory review input source is already declared: {normalized_source}")
-        input_bindings[normalized_node_id] = normalized_source
-    return input_bindings
-
-
 def _validate_template_runtime_input_binding_nodes(template: dict[str, Any] | None, input_bindings: dict[str, str]) -> None:
     nodes = template.get("nodes") if isinstance(template, dict) and isinstance(template.get("nodes"), dict) else {}
     state_schema = template.get("state_schema") if isinstance(template, dict) and isinstance(template.get("state_schema"), dict) else {}
@@ -2866,86 +2758,6 @@ def _with_run_template_binding_repair_metadata(
     }
 
 
-def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
-    template_id = str(payload.get("template_id") or "").strip()
-    if not template_id:
-        raise ValueError("template_id is required.")
-    _ensure_memory_review_template_can_be_bound(template_id)
-    template = _load_run_template_record_for_binding(template_id)
-    runtime_input_bindings = _resolve_memory_review_template_runtime_input_bindings(template)
-    raw_bindings = payload.get("input_bindings")
-    if not isinstance(raw_bindings, dict):
-        raise ValueError("input_bindings must be an object.")
-    if runtime_input_bindings:
-        _validate_template_runtime_input_binding_nodes(template, runtime_input_bindings)
-        for node_id, source in raw_bindings.items():
-            normalized_node_id = str(node_id or "").strip()
-            normalized_source = str(source or "").strip()
-            if not normalized_node_id or not normalized_source:
-                continue
-            if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
-                continue
-            if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
-                raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
-            declared_source = runtime_input_bindings.get(normalized_node_id)
-            if not declared_source:
-                raise ValueError(f"Buddy memory review input node is not declared as a runtime input: {normalized_node_id}")
-            if normalized_source != declared_source:
-                raise ValueError(f"Buddy memory review input node {normalized_node_id} must be bound to {declared_source}.")
-        source_run_count = sum(1 for source in runtime_input_bindings.values() if source == "source_run_id")
-        if source_run_count != 1:
-            raise ValueError("source_run_id must be bound exactly once.")
-        return {
-            "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
-            "template_id": template_id,
-            "input_bindings": dict(runtime_input_bindings),
-            "updated_at": str(payload.get("updated_at") or utc_now_iso()),
-        }
-
-    for source in raw_bindings.values():
-        normalized_source = str(source or "").strip()
-        if not normalized_source or normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
-            continue
-        if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
-            raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
-    return {
-        "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
-        "template_id": template_id,
-        "input_bindings": {},
-        "updated_at": str(payload.get("updated_at") or utc_now_iso()),
-    }
-
-
-def _memory_review_template_binding_needs_repair(raw_value: dict[str, Any], normalized_value: dict[str, Any]) -> bool:
-    raw_template_id = str(raw_value.get("template_id") or "").strip()
-    normalized_template_id = str(normalized_value.get("template_id") or "").strip()
-    raw_bindings = raw_value.get("input_bindings") if isinstance(raw_value.get("input_bindings"), dict) else {}
-    normalized_bindings = normalized_value.get("input_bindings")
-    raw_version = int(raw_value.get("version") or MEMORY_REVIEW_TEMPLATE_BINDING_VERSION)
-    normalized_version = int(normalized_value.get("version") or MEMORY_REVIEW_TEMPLATE_BINDING_VERSION)
-    return (
-        raw_template_id != normalized_template_id
-        or raw_bindings != normalized_bindings
-        or raw_version != normalized_version
-    )
-
-
-def _with_memory_review_template_binding_repair_metadata(
-    binding: dict[str, Any],
-    *,
-    reason: str,
-    previous_value: dict[str, Any],
-    error: str = "",
-) -> dict[str, Any]:
-    return {
-        **binding,
-        "repair_recommended": True,
-        "repair_reason": reason,
-        "repair_previous_template_id": str(previous_value.get("template_id") or ""),
-        "repair_error": error,
-    }
-
-
 def _ensure_run_template_can_be_bound(template_id: str) -> None:
     from app.templates.loader import load_template_record, template_has_breakpoint_metadata
 
@@ -2953,18 +2765,6 @@ def _ensure_run_template_can_be_bound(template_id: str) -> None:
     if template_has_breakpoint_metadata(template):
         raise ValueError("Buddy run template binding cannot target a template with breakpoint metadata.")
 
-
-def _ensure_memory_review_template_can_be_bound(template_id: str) -> None:
-    from app.templates.loader import load_template_record, template_has_breakpoint_metadata
-
-    template = load_template_record(template_id)
-    if template_has_breakpoint_metadata(template):
-        raise ValueError("Buddy memory review template binding cannot target a template with breakpoint metadata.")
-    metadata = template.get("metadata") if isinstance(template.get("metadata"), dict) else {}
-    role = str(metadata.get("role") or "").strip()
-    if role == "buddy_autonomous_review" or metadata.get("buddy_memory_review") is True or metadata.get("buddyMemoryReview") is True:
-        return
-    raise ValueError("Buddy memory review template binding must target a Buddy memory review template.")
 
 
 def _write_kv(key: str, payload: dict[str, Any], updated_at: str) -> None:

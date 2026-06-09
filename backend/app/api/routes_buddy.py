@@ -94,14 +94,6 @@ class BuddyMemoryDocumentPayload(BuddyUpdatePayload):
     content: str = Field(min_length=1)
 
 
-class BuddyBackgroundReviewPayload(BaseModel):
-    source_run_id: str = Field(min_length=1)
-    buddy_model_ref: str = ""
-    trigger_reason: str = "visible_buddy_run_completed"
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-
 class BuddyImprovementCandidateValidationRunPayload(BaseModel):
     validation_run_id: str = Field(min_length=1)
 
@@ -177,11 +169,6 @@ def get_run_template_binding_endpoint() -> dict[str, Any]:
     return store.load_run_template_binding()
 
 
-@router.get("/memory-review-template-binding")
-def get_memory_review_template_binding_endpoint() -> dict[str, Any]:
-    return store.load_memory_review_template_binding()
-
-
 @router.get("/background-reviews")
 def list_background_reviews_endpoint(source_run_id: str | None = Query(default=None)) -> list[dict[str, Any]]:
     return background_review.list_background_review_runs(source_run_id=source_run_id)
@@ -253,30 +240,6 @@ def apply_improvement_candidate_endpoint(
         raise HTTPException(status_code=404, detail="Improvement candidate not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.post("/background-reviews")
-def enqueue_background_review_endpoint(
-    payload: BuddyBackgroundReviewPayload,
-    background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
-    try:
-        record = background_review.enqueue_background_review_run(
-            source_run_id=payload.source_run_id,
-            buddy_model_ref=payload.buddy_model_ref,
-            trigger_reason=payload.trigger_reason,
-        )
-        graph, run_state = background_review.load_background_review_runtime(record["review_id"])
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        detail = str(exc)
-        status_code = 409 if "completed source run" in detail else 422
-        raise HTTPException(status_code=status_code, detail=detail) from exc
-    background_tasks.add_task(background_review.run_background_review_worker, graph, run_state, record["review_id"])
-    return record
 
 
 @router.get("/sessions")

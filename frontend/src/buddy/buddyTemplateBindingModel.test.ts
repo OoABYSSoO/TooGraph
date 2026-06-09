@@ -3,19 +3,13 @@ import assert from "node:assert/strict";
 
 import type { TemplateRecord } from "../types/node-system.ts";
 import {
-  BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS,
   BUDDY_RUN_INPUT_SOURCE_OPTIONS,
-  buildBuddyMemoryReviewInputNodeOptions,
-  buildBuddyMemoryReviewTemplateSourceRows,
   buildBuddyRunInputNodeOptions,
   buildBuddyRunTemplateSourceRows,
   buildBuddyHomeContextValue,
-  buildDefaultBuddyMemoryReviewTemplateBinding,
   buildBuddyRunTemplateInputRows,
   buildDefaultBuddyRunTemplateBinding,
-  setBuddyMemoryReviewTemplateSourceBinding,
   setBuddyRunTemplateSourceBinding,
-  validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
 
@@ -105,99 +99,6 @@ function runtimeBindingTemplate(): TemplateRecord {
     },
   };
   return record;
-}
-
-function memoryReviewTemplate(): TemplateRecord {
-  return {
-    template_id: "buddy_autonomous_review",
-    label: "Autonomous Review",
-    description: "Review buddy memory after a run.",
-    default_graph_name: "Autonomous Review",
-    status: "active",
-    state_schema: {
-      source_run_id: { name: "source_run_id", description: "", type: "text", value: "", color: "#475569" },
-      current_session_id: { name: "current_session_id", description: "", type: "text", value: "", color: "#475569" },
-      user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
-      public_response: { name: "public_response", description: "", type: "markdown", value: "", color: "#16a34a" },
-      buddy_context: { name: "buddy_context", description: "", type: "file", value: "", color: "#0f766e" },
-      memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: {}, color: "#22c55e" },
-      structured_memory_update_plan: { name: "structured_memory_update_plan", description: "", type: "json", value: {}, color: "#14b8a6" },
-    },
-    nodes: {
-      input_source_run_id: {
-        kind: "input",
-        name: "Source Run",
-        description: "",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [{ state: "source_run_id", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_current_session_id: {
-        kind: "input",
-        name: "Current Session",
-        description: "",
-        ui: { position: { x: 0, y: 120 } },
-        reads: [],
-        writes: [{ state: "current_session_id", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_user_message: {
-        kind: "input",
-        name: "User Message",
-        description: "",
-        ui: { position: { x: 0, y: 240 } },
-        reads: [],
-        writes: [{ state: "user_message", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_public_response: {
-        kind: "input",
-        name: "Public Response",
-        description: "",
-        ui: { position: { x: 0, y: 360 } },
-        reads: [],
-        writes: [{ state: "public_response", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_buddy_context: {
-        kind: "input",
-        name: "Buddy Context",
-        description: "",
-        ui: { position: { x: 0, y: 480 } },
-        reads: [],
-        writes: [{ state: "buddy_context", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_memory_update_plan: {
-        kind: "input",
-        name: "Memory Update Plan",
-        description: "",
-        ui: { position: { x: 0, y: 600 } },
-        reads: [],
-        writes: [{ state: "memory_update_plan", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_structured_memory_update_plan: {
-        kind: "input",
-        name: "Structured Memory Update Plan",
-        description: "",
-        ui: { position: { x: 0, y: 720 } },
-        reads: [],
-        writes: [{ state: "structured_memory_update_plan", mode: "replace" }],
-        config: { value: "" },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {
-      role: "buddy_autonomous_review",
-      internal: true,
-      buddyMemoryReviewRuntimeInputBindings: {
-        input_source_run_id: "source_run_id",
-      },
-    },
-  };
 }
 
 test("binding model lists input rows with node and state identity", () => {
@@ -387,59 +288,4 @@ test("binding model exposes source options and Buddy Home folder package", () =>
   const defaultRunSources = new Set<string>(Object.values(buildDefaultBuddyRunTemplateBinding().input_bindings));
   assert.equal(defaultRunSources.has("page_context"), false);
   assert.equal(defaultRunSources.has("raw_conversation_history"), false);
-});
-
-test("memory review binding model exposes required automatic source rows", () => {
-  const binding = buildDefaultBuddyMemoryReviewTemplateBinding();
-  const rows = buildBuddyMemoryReviewTemplateSourceRows(binding, memoryReviewTemplate());
-
-  assert.equal(binding.template_id, "buddy_autonomous_review");
-  assert.deepEqual(rows.map((row) => [row.source, row.required, row.selectedNodeId]), [
-    ["source_run_id", true, "input_source_run_id"],
-  ]);
-});
-
-test("memory review binding validation follows template runtime input declarations", () => {
-  const good = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
-    template_id: "buddy_autonomous_review",
-    input_bindings: {
-      input_source_run_id: "source_run_id",
-    },
-  });
-  assert.equal(good.valid, true);
-
-  const missing = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
-    template_id: "buddy_autonomous_review",
-    input_bindings: {},
-  });
-  assert.equal(missing.valid, false);
-  assert.match(missing.issues.join("\n"), /source_run_id/);
-
-  const extra = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
-    template_id: "buddy_autonomous_review",
-    input_bindings: {
-      input_source_run_id: "source_run_id",
-      input_user_message: "user_message",
-    },
-  });
-  assert.equal(extra.valid, false);
-  assert.match(extra.issues.join("\n"), /not declared/);
-});
-
-test("memory review binding model updates source rows without duplication", () => {
-  const initial = buildDefaultBuddyMemoryReviewTemplateBinding();
-
-  const moved = setBuddyMemoryReviewTemplateSourceBinding(initial, "source_run_id", "input_user_message");
-  assert.equal(moved.input_bindings.input_user_message, "source_run_id");
-  assert.equal(Object.values(moved.input_bindings).filter((source) => source === "source_run_id").length, 1);
-
-  const options = buildBuddyMemoryReviewInputNodeOptions(memoryReviewTemplate(), moved, "source_run_id");
-  assert.deepEqual(options.map((option) => [option.value, option.disabled, option.disabledReason]), [
-    ["input_source_run_id", false, ""],
-  ]);
-  assert.deepEqual(BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS.map((option) => option.value).slice(0, 3), [
-    "",
-    "source_run_id",
-    "current_session_id",
-  ]);
 });

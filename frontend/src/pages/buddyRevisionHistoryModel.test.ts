@@ -227,30 +227,9 @@ test("revision history includes run template binding target", () => {
   assert.equal(filterBuddyRevisionHistoryRows(rows, "run_template_binding").length, 1);
 });
 
-test("revision history includes memory review template binding target", () => {
-  assert.ok(BUDDY_REVISION_HISTORY_TARGET_FILTERS.includes("memory_review_template_binding"));
-  const rows = buildBuddyRevisionHistoryRows(
-    [
-      {
-        revision_id: "rev_memory_review_binding",
-        target_type: "memory_review_template_binding",
-        target_id: "memory_review_template_binding",
-        operation: "update",
-        previous_value: { template_id: "buddy_autonomous_review", input_bindings: {} },
-        next_value: { template_id: "custom_memory_review", input_bindings: { input_source_run_id: "source_run_id" } },
-        changed_by: "buddy_command",
-        change_reason: "用户更新伙伴记忆复盘模板绑定。",
-        created_at: "2026-05-12T01:00:00Z",
-      },
-    ],
-    [],
-  );
-
-  assert.equal(filterBuddyRevisionHistoryRows(rows, "memory_review_template_binding").length, 1);
-});
-
 test("revision history filters do not expose legacy report target", () => {
   assert.equal(BUDDY_REVISION_HISTORY_TARGET_FILTERS.includes("report"), false);
+  assert.equal(BUDDY_REVISION_HISTORY_TARGET_FILTERS.includes("memory_review_template_binding"), false);
 });
 
 test("revision history includes capability usage stats target", () => {

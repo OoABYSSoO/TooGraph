@@ -6,7 +6,6 @@ const RESTORABLE_BUDDY_REVISION_TARGET_TYPES = new Set([
   "session_summary",
   "capability_usage_stats",
   "run_template_binding",
-  "memory_review_template_binding",
 ]);
 
 export type BackgroundReviewRevisionItem = {

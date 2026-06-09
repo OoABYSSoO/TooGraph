@@ -5,7 +5,6 @@ import type {
   BuddyCommandRecord,
   BuddyCommandResponse,
   BuddyHomeFiles,
-  BuddyMemoryReviewTemplateBinding,
   BuddyMemoryDocument,
   BuddyIdentity,
   BuddyMemorySearchResult,
@@ -80,25 +79,9 @@ export function updateBuddyRunTemplateBinding(payload: BuddyRunTemplateBinding, 
   return executeBuddyCommand<BuddyRunTemplateBinding>("run_template_binding.update", payload, changeReason);
 }
 
-export function fetchBuddyMemoryReviewTemplateBinding() {
-  return apiGet<BuddyMemoryReviewTemplateBinding>("/api/buddy/memory-review-template-binding");
-}
-
-export function updateBuddyMemoryReviewTemplateBinding(payload: BuddyMemoryReviewTemplateBinding, changeReason: string) {
-  return executeBuddyCommand<BuddyMemoryReviewTemplateBinding>("memory_review_template_binding.update", payload, changeReason);
-}
-
 export function fetchBuddyBackgroundReviews(sourceRunId?: string, init?: Pick<RequestInit, "signal">) {
   const query = sourceRunId ? `?source_run_id=${encodeURIComponent(sourceRunId)}` : "";
   return apiGet<BuddyBackgroundReviewRun[]>(`/api/buddy/background-reviews${query}`, init);
-}
-
-export function enqueueBuddyBackgroundReview(payload: {
-  source_run_id: string;
-  buddy_model_ref?: string;
-  trigger_reason?: string;
-}) {
-  return apiPost<BuddyBackgroundReviewRun>("/api/buddy/background-reviews", payload);
 }
 
 export function fetchBuddyChatSessions(includeDeleted = false) {

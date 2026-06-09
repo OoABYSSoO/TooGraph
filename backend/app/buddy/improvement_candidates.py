@@ -18,7 +18,6 @@ APPLY_COMMAND_ACTIONS = {
     "memory_entry.update",
     "memory_entry.archive",
     "run_template_binding.update",
-    "memory_review_template_binding.update",
 }
 
 

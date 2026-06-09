@@ -126,12 +126,6 @@ def _dispatch_command(
             "run_template_binding",
             "run_template_binding",
         )
-    if action == "memory_review_template_binding.update":
-        return (
-            store.save_memory_review_template_binding(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason),
-            "memory_review_template_binding",
-            "memory_review_template_binding",
-        )
     if action == "revision.restore":
         revision_id = _required_target_id(target_id, action)
         result = store.restore_revision(revision_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)

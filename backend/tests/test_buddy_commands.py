@@ -269,13 +269,10 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(revisions_response.status_code, 200)
         self.assertEqual(revisions_response.json()[-1]["previous_value"]["template_id"], "buddy_autonomous_loop")
 
-    def test_memory_review_template_binding_update_command_records_command_and_revision(self) -> None:
+    def test_memory_review_template_binding_update_command_is_rejected_as_legacy_route(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"), patch.object(
-                store, "_ensure_memory_review_template_can_be_bound", lambda _template_id: None
-            ):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
-                    default_response = client.get("/api/buddy/memory-review-template-binding")
                     response = client.post(
                         "/api/buddy/commands",
                         json={
@@ -294,26 +291,12 @@ class BuddyCommandRouteTests(unittest.TestCase):
                             "change_reason": "Manual memory review binding update.",
                         },
                     )
-                    revisions_response = client.get(
-                        "/api/buddy/revisions",
-                        params={
-                            "target_type": "memory_review_template_binding",
-                            "target_id": "memory_review_template_binding",
-                        },
-                    )
+                    commands_response = client.get("/api/buddy/commands")
 
-        self.assertEqual(default_response.status_code, 200)
-        self.assertEqual(default_response.json()["template_id"], "buddy_autonomous_review")
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["result"]["template_id"], "custom_memory_review")
-        self.assertEqual(body["command"]["action"], "memory_review_template_binding.update")
-        self.assertEqual(body["command"]["target_type"], "memory_review_template_binding")
-        self.assertEqual(body["command"]["target_id"], "memory_review_template_binding")
-        self.assertEqual(body["command"]["run_id"], "run_memory_review_binding_1")
-        self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
-        self.assertEqual(revisions_response.status_code, 200)
-        self.assertEqual(revisions_response.json()[-1]["previous_value"]["template_id"], "buddy_autonomous_review")
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("Unsupported buddy command action", response.json()["detail"])
+        self.assertEqual(commands_response.status_code, 200)
+        self.assertEqual(commands_response.json(), [])
 
     def test_report_create_command_is_rejected_as_legacy_buddy_home_design(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

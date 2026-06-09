@@ -365,15 +365,6 @@
               <span class="run-detail__section-kicker">{{ t("runDetail.backgroundReview") }}</span>
               <h3>{{ t("runDetail.backgroundReviewTitle", { count: backgroundReviewItems.length }) }}</h3>
             </div>
-            <ElButton
-              v-if="backgroundReviewSourceRun"
-              size="small"
-              :loading="rerunningBackgroundReview"
-              :disabled="rerunningBackgroundReview || backgroundReviewSourceRun.status !== 'completed'"
-              @click="rerunBackgroundReview"
-            >
-              {{ t("runDetail.rerunBackgroundReview") }}
-            </ElButton>
           </div>
           <p v-if="backgroundReviewError" class="run-detail__muted">{{ t("common.failedToLoad", { error: backgroundReviewError }) }}</p>
           <p v-else-if="backgroundReviewLoading" class="run-detail__muted">{{ t("common.loading") }}</p>
@@ -761,7 +752,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import { fetchBuddyBackgroundReviews, enqueueBuddyBackgroundReview, restoreBuddyRevision } from "@/api/buddy";
+import { fetchBuddyBackgroundReviews, restoreBuddyRevision } from "@/api/buddy";
 import { restoreGraphRevision } from "@/api/graphs";
 import { fetchOperationJournal } from "@/api/operationJournal";
 import { fetchRun, fetchRunTree, resumeRun } from "@/api/runs";
@@ -811,7 +802,6 @@ const operationJournalError = ref<string | null>(null);
 const backgroundReviews = ref<BuddyBackgroundReviewRun[]>([]);
 const backgroundReviewLoading = ref(false);
 const backgroundReviewError = ref<string | null>(null);
-const rerunningBackgroundReview = ref(false);
 const restoringBackgroundReviewRevisionId = ref("");
 const restoringGraphRevisionKey = ref<string | null>(null);
 const permissionApprovalActionBusy = ref<"approve" | "deny" | "">("");
@@ -877,12 +867,10 @@ const operationJournalVisible = computed(() =>
   operationJournalLoading.value || Boolean(operationJournalError.value) || operationJournalItems.value.length > 0,
 );
 const backgroundReviewItems = computed(() => buildBackgroundReviewDisplayItems(backgroundReviews.value));
-const backgroundReviewSourceRun = computed(() => (viewedRun.value && isBuddyBackgroundReviewSourceRun(viewedRun.value) ? viewedRun.value : null));
 const backgroundReviewVisible = computed(() =>
   backgroundReviewLoading.value ||
   Boolean(backgroundReviewError.value) ||
-  backgroundReviewItems.value.length > 0 ||
-  Boolean(backgroundReviewSourceRun.value),
+  backgroundReviewItems.value.length > 0,
 );
 const liveStreamingOutputItems = computed(() =>
   Object.values(liveStreamingOutputs.value).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
@@ -1096,32 +1084,6 @@ async function loadBackgroundReviews(nextRunId = runId.value) {
         activeBackgroundReviewController = null;
       }
     }
-  }
-}
-
-async function rerunBackgroundReview() {
-  const sourceRun = backgroundReviewSourceRun.value;
-  if (!sourceRun || rerunningBackgroundReview.value) {
-    return;
-  }
-  rerunningBackgroundReview.value = true;
-  try {
-    const metadata = recordFromUnknown(sourceRun.metadata);
-    const review = await enqueueBuddyBackgroundReview({
-      source_run_id: sourceRun.run_id,
-      buddy_model_ref: normalizeText(metadata.buddy_model_ref),
-      trigger_reason: "run_detail_manual_review",
-    });
-    backgroundReviews.value = [
-      review,
-      ...backgroundReviews.value.filter((item) => item.review_id !== review.review_id),
-    ];
-    ElMessage.success(t("runDetail.backgroundReviewQueued"));
-    void loadBackgroundReviews(sourceRun.run_id);
-  } catch (reviewError) {
-    ElMessage.error(reviewError instanceof Error ? reviewError.message : t("common.failedToSave", { error: "" }));
-  } finally {
-    rerunningBackgroundReview.value = false;
   }
 }
 
@@ -1388,19 +1350,10 @@ function resetRunView() {
   backgroundReviews.value = [];
   backgroundReviewLoading.value = false;
   backgroundReviewError.value = null;
-  rerunningBackgroundReview.value = false;
   restoringBackgroundReviewRevisionId.value = "";
   selectedSnapshotIdDraft.value = null;
   expandedContentKeys.value = new Set();
   liveStreamingOutputs.value = {};
-}
-
-function isBuddyBackgroundReviewSourceRun(candidate: RunDetail) {
-  const metadata = recordFromUnknown(candidate.metadata);
-  if (metadata.buddy_review_run === true || metadata.buddy_memory_review === true || normalizeText(metadata.role) === "buddy_background_review") {
-    return false;
-  }
-  return normalizeText(metadata.origin) === "buddy" || normalizeText(metadata.buddy_template_id) === "buddy_autonomous_loop";
 }
 
 function recordFromUnknown(value: unknown): Record<string, unknown> {

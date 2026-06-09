@@ -6,7 +6,7 @@
   "state_schema": {
     "review_source_selection_mode": {
       "name": "review_source_selection_mode",
-      "description": "??????????? auto_unreviewed???????????????? completed Buddy run?",
+      "description": "复盘来源选择模式。默认 auto_unreviewed，自动选择尚未复盘的 completed Buddy run。",
       "type": "text",
       "value": "auto_unreviewed",
       "color": "#0f766e",
@@ -14,7 +14,7 @@
     },
     "source_run_id": {
       "name": "source_run_id",
-      "description": "????????????? Buddy run ID??????????????? completed Buddy run?",
+      "description": "本次复盘要处理的 Buddy run ID；留空时由来源选择器自动选择 completed Buddy run。",
       "type": "text",
       "value": "",
       "color": "#475569",
@@ -28,7 +28,7 @@
     },
     "has_review_source": {
       "name": "has_review_source",
-      "description": "???????????????????? Buddy run?",
+      "description": "复盘来源选择器是否找到了可复盘的 Buddy run。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
@@ -42,7 +42,7 @@
     },
     "review_id": {
       "name": "review_id",
-      "description": "?????????????????????? ID?",
+      "description": "本次后台复盘记录对应的审计 ID。",
       "type": "text",
       "value": "",
       "color": "#7c3aed",
@@ -56,7 +56,7 @@
     },
     "review_source_selection_report": {
       "name": "review_source_selection_report",
-      "description": "?????????????????????????????????",
+      "description": "复盘来源选择报告，说明候选、选择结果、跳过原因和错误。",
       "type": "json",
       "value": {},
       "color": "#64748b",
@@ -597,8 +597,8 @@
   "nodes": {
     "select_review_source": {
       "kind": "tool",
-      "name": "??????",
-      "description": "????????? completed Buddy run???????????????????",
+      "name": "选择复盘来源",
+      "description": "自动选择未复盘的 completed Buddy run，或校验手动指定的来源 run。",
       "ui": {
         "position": {
           "x": 60,
@@ -650,8 +650,8 @@
     },
     "has_review_source": {
       "kind": "condition",
-      "name": "????????",
-      "description": "????????? Buddy run ?????????????????????????",
+      "name": "是否有复盘来源",
+      "description": "判断是否找到了 Buddy run 作为复盘来源；没有来源时直接输出选择报告。",
       "ui": {
         "position": {
           "x": 560,
@@ -690,8 +690,8 @@
     },
     "output_review_source_selection_report": {
       "kind": "output",
-      "name": "????????",
-      "description": "????????????????? no-op ???",
+      "name": "无复盘来源",
+      "description": "输出复盘来源选择报告；没有来源时本次复盘 no-op 结束。",
       "ui": {
         "position": {
           "x": 1040,
@@ -1957,8 +1957,8 @@
     },
     "input_review_source_selection_mode": {
       "kind": "input",
-      "name": "????????",
-      "description": "??????????????????????????? Buddy run?",
+      "name": "复盘来源模式",
+      "description": "选择复盘来源方式；默认自动探测未复盘的 Buddy run。",
       "ui": {
         "position": {
           "x": -420,
