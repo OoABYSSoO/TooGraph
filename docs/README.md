@@ -58,6 +58,12 @@ docker build -t toograph:local .
 docker run --rm -p 3477:3477 -v toograph-data:/app/backend/data --name toograph toograph:local
 ```
 
+Docker Compose：
+
+```bash
+docker compose up --build
+```
+
 更新源码安装：
 
 ```bash
