@@ -248,6 +248,22 @@ Knowledge Ingestion 图负责知识库文件夹或文件批量入库。
 - 不把文件夹扫描隐藏在 Buddy 回复路径里。
 - 大批量 embedding 异步执行，不阻塞前台回复。
 
+## Embedding 队列执行分层
+
+`embedding_jobs` 是统一队列表，但执行图必须按来源分 lane，避免知识库导入、聊天记忆和队列恢复互相混淆。
+
+### `knowledge_embedding_drain`
+
+知识库向量生成由 `knowledge_embedding_drain` 处理。它的输入是 `collection_id` 与 `operation_id`，只处理 `source_kind=knowledge_document` 的 jobs。它不是“每隔一段时间处理一点”的维护任务，而是 operation scoped drain：一次 run 有内部批次上限和时间预算；如果 run 成功且仍有剩余 jobs，调度器继续触发同一个事件，让该 operation 尽快跑完。遇到 provider 不可用、超时或模型暂不可用时，jobs 进入 retry_wait / blocked，知识库页面应显示进度和最后错误。
+
+### `memory_embedding_drain`
+
+记忆向量生成由 `memory_embedding_drain` 处理。它只消费 `buddy_message`、`buddy_session_summary` 和 `memory_entry` 来源。触发来源包括消息入库、会话压缩摘要入库、后台复盘写入结构化记忆后产生的 ready jobs，以及队列维护唤醒。记忆 drain 可以使用较小的 `job_limit` 和时间预算，避免后台记忆索引长期占用模型服务。
+
+### `embedding_maintenance`
+
+`embedding_maintenance` 的正式语义是队列维护，不直接生成 embedding vectors。它定期恢复过期 running jobs、重置可重试 failed jobs、同步知识库 indexing operation 状态，并发现 ready 的知识库 operation 或记忆 jobs，然后通过标准事件触发对应 drain 图。它的价值是恢复、接力和可观测性，而不是替代来源专用 drain。
+
 ## 聊天记录和知识库为何分开模板
 
 聊天记录和知识库共享底层 retrieval substrate，但业务策略不同。
@@ -468,9 +484,11 @@ flowchart TD
   D --> E["Chunking"]
   E --> F["Retrieval Document / Chunk Upsert"]
   F --> G["Embedding Job Queue"]
-  G --> H["Embedding Maintenance 图"]
+  G --> H["knowledge_embedding_drain"]
   H --> I["Embedding Vectors"]
-  F --> J["Ingestion Report"]
+  H -->|remaining jobs| H
+  K["embedding_maintenance"] -->|retry / wake ready operation| H
+  F --> R["Ingestion Report"]
 ```
 
 ### 聊天记忆入库
@@ -480,12 +498,15 @@ flowchart TD
   A["Buddy Message"] --> B["Persist Message"]
   B --> C["Project buddy_message to retrieval"]
   C --> D["Queue message embedding"]
+  D --> K["memory_embedding_drain"]
+  K --> L["Embedding Vectors"]
   B --> E["Visible Buddy Run"]
   E --> F["Review Trigger Policy"]
   F -->|high signal / cadence| G["Buddy Autonomous Review 图"]
   G --> H["Memory / USER / Identity Plans"]
   H --> I["Writer Actions with Revisions"]
   I --> J["Project memory entries to retrieval"]
+  J --> K
 ```
 
 ### 上下文压缩入库
@@ -497,6 +518,7 @@ flowchart TD
   C --> D["Revision"]
   C --> E["Project buddy_session_summary to retrieval"]
   E --> F["Queue summary embedding"]
+  F --> G["memory_embedding_drain"]
 ```
 
 ### 召回消费
@@ -526,7 +548,8 @@ flowchart TD
 - 建立 Knowledge Ingestion 图模板。
 - 文件夹输入统一为 local_folder source package。
 - 文档解析、chunking、metadata、hash、delete sync、rebuild report 走图模板。
-- embedding maintenance 作为批处理图处理 pending jobs。
+- `knowledge_embedding_drain` 作为 operation scoped drain 尽快跑完知识库入库产生的 jobs。
+- `embedding_maintenance` 只做队列恢复、retry 唤醒和 operation 状态同步。
 - Knowledge Retrieval Query 输出 citation-aware context package。
 
 第三阶段：统一可视化和治理。

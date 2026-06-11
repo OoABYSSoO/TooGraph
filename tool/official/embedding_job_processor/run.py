@@ -21,9 +21,11 @@ def embedding_job_processor(payload: dict[str, Any] | None) -> dict[str, Any]:
             collection_id=_text(inputs.get("collection_id")),
             operation_id=_text(inputs.get("operation_id")),
             source_kind=_text(inputs.get("source_kind")),
+            source_kinds=inputs.get("source_kinds"),
             source_id=_text(inputs.get("source_id")),
             time_budget_seconds=_int(inputs.get("time_budget_seconds"), default=0),
             include_retry_wait=_bool(inputs.get("include_retry_wait")),
+            maintenance_only=_bool(inputs.get("maintenance_only")),
         )
     except Exception as exc:
         return {
@@ -36,8 +38,12 @@ def embedding_job_processor(payload: dict[str, Any] | None) -> dict[str, Any]:
             "retry_wait_count": 0,
             "blocked_count": 0,
             "retried_failed_count": 0,
+            "reset_stale_running_count": 0,
             "reset_blocked_dimension_mismatch_count": 0,
             "remaining_count": 0,
+            "ready_memory_job_count": 0,
+            "ready_knowledge_operation_count": 0,
+            "synced_operation_count": 0,
             "scope": {
                 "collection_id": _text(inputs.get("collection_id")),
                 "operation_id": _text(inputs.get("operation_id")),
@@ -45,6 +51,7 @@ def embedding_job_processor(payload: dict[str, Any] | None) -> dict[str, Any]:
                 "source_id": _text(inputs.get("source_id")),
             },
             "processed_jobs": [],
+            "maintenance_report": {},
         }
 
 

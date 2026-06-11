@@ -70,13 +70,25 @@ class EmbeddingJobProcessorToolTests(unittest.TestCase):
                 "collection_id",
                 "operation_id",
                 "source_kind",
+                "source_kinds",
                 "source_id",
                 "time_budget_seconds",
                 "include_retry_wait",
                 "batch_size",
+                "maintenance_only",
             }.issubset(input_keys)
         )
-        self.assertTrue({"retry_wait_count", "blocked_count"}.issubset(output_keys))
+        self.assertTrue(
+            {
+                "retry_wait_count",
+                "blocked_count",
+                "reset_stale_running_count",
+                "ready_memory_job_count",
+                "ready_knowledge_operation_count",
+                "synced_operation_count",
+                "maintenance_report",
+            }.issubset(output_keys)
+        )
 
     def test_tool_processes_pending_provider_embedding_jobs(self) -> None:
         from app.core.storage.embedding_store import queue_embedding_job, register_embedding_model
@@ -227,9 +239,19 @@ class EmbeddingJobProcessorToolTests(unittest.TestCase):
                 "scope": {},
                 "processed_jobs": [],
             }
-            module.embedding_job_processor({"model_ref": "local/embed", "limit": 250, "batch_size": 64})
+            module.embedding_job_processor(
+                {
+                    "model_ref": "local/embed",
+                    "limit": 250,
+                    "batch_size": 64,
+                    "source_kinds": ["buddy_message", "memory_entry"],
+                    "maintenance_only": True,
+                }
+            )
 
         self.assertEqual(process_jobs.call_args.kwargs["batch_size"], 64)
+        self.assertEqual(process_jobs.call_args.kwargs["source_kinds"], ["buddy_message", "memory_entry"])
+        self.assertIs(process_jobs.call_args.kwargs["maintenance_only"], True)
 
 
 if __name__ == "__main__":

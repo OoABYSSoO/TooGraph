@@ -120,6 +120,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "knowledge_embedding_drain",
                 "knowledge_folder_retrieval_ingestion",
                 "knowledge_retrieval_qa",
+                "memory_embedding_drain",
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
@@ -141,6 +142,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "knowledge_embedding_drain",
                 "knowledge_folder_retrieval_ingestion",
                 "knowledge_retrieval_qa",
+                "memory_embedding_drain",
                 "toograph_page_operation_workflow",
             ],
         )
@@ -293,26 +295,41 @@ class TemplateLayoutTests(unittest.TestCase):
 
         embedding_template = templates["embedding_maintenance"]
         self.assertEqual(embedding_template["source"], "official")
-        self.assertEqual(embedding_template["label"], "Embedding 维护")
-        self.assertEqual(embedding_template["default_graph_name"], "Embedding 维护")
-        self.assertEqual(embedding_template["metadata"]["role"], "embedding_maintenance")
+        self.assertEqual(embedding_template["label"], "Embedding 队列维护")
+        self.assertEqual(embedding_template["default_graph_name"], "Embedding 队列维护")
+        self.assertEqual(embedding_template["metadata"]["role"], "embedding_queue_maintenance")
         self.assertEqual(embedding_template["metadata"]["requiredTools"], ["embedding_job_processor"])
         self.assertIs(embedding_template["capabilityDiscoverable"], False)
         self.assertEqual(
             sorted(node_id for node_id, node in embedding_template["nodes"].items() if node["kind"] == "input"),
-            ["input_batch_size", "input_limit", "input_model_ref", "input_retry_failed"],
+            ["input_model_ref"],
         )
-        self.assertEqual(embedding_template["state_schema"]["batch_size"]["type"], "number")
-        self.assertEqual(embedding_template["state_schema"]["batch_size"]["value"], 32)
-        self.assertEqual(embedding_template["state_schema"]["retry_failed"]["type"], "boolean")
-        self.assertEqual(embedding_template["nodes"]["input_retry_failed"]["config"]["value"], False)
-        self.assertEqual(embedding_template["nodes"]["process_embedding_jobs"]["kind"], "tool")
+        self.assertNotIn("job_limit", embedding_template["state_schema"])
+        self.assertEqual(embedding_template["state_schema"]["maintenance_report"]["type"], "json")
+        self.assertEqual(embedding_template["state_schema"]["ready_memory_job_count"]["type"], "number")
+        self.assertEqual(embedding_template["nodes"]["maintain_embedding_queue"]["kind"], "tool")
         self.assertEqual(
-            embedding_template["nodes"]["process_embedding_jobs"]["config"]["toolKey"],
+            embedding_template["nodes"]["maintain_embedding_queue"]["config"]["toolKey"],
             "embedding_job_processor",
         )
         self.assertEqual(
-            _read_contracts(embedding_template["nodes"]["process_embedding_jobs"]["reads"]),
+            embedding_template["nodes"]["maintain_embedding_queue"]["config"]["staticInputs"],
+            {
+                "maintenance_only": True,
+                "retry_failed": True,
+                "include_retry_wait": True,
+                "limit": 500,
+                "batch_size": 1,
+                "collection_id": "",
+                "operation_id": "",
+                "source_kind": "",
+                "source_kinds": [],
+                "source_id": "",
+                "time_budget_seconds": 0,
+            },
+        )
+        self.assertEqual(
+            _read_contracts(embedding_template["nodes"]["maintain_embedding_queue"]["reads"]),
             [
                 {
                     "state": "model_ref",
@@ -324,57 +341,24 @@ class TemplateLayoutTests(unittest.TestCase):
                         "fieldKey": "model_ref",
                         "managed": True,
                     },
-                },
-                {
-                    "state": "job_limit",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "embedding_job_processor",
-                        "fieldKey": "limit",
-                        "managed": True,
-                    },
-                },
-                {
-                    "state": "retry_failed",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "embedding_job_processor",
-                        "fieldKey": "retry_failed",
-                        "managed": True,
-                    },
-                },
-                {
-                    "state": "batch_size",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "embedding_job_processor",
-                        "fieldKey": "batch_size",
-                        "managed": True,
-                    },
-                },
+                }
             ],
         )
         self.assertEqual(
-            embedding_template["nodes"]["process_embedding_jobs"]["writes"],
+            embedding_template["nodes"]["maintain_embedding_queue"]["writes"],
             [
                 {"state": "processor_status", "mode": "replace"},
-                {"state": "processed_count", "mode": "replace"},
-                {"state": "completed_count", "mode": "replace"},
-                {"state": "failed_count", "mode": "replace"},
-                {"state": "processed_jobs", "mode": "replace"},
+                {"state": "reset_stale_running_count", "mode": "replace"},
+                {"state": "retried_failed_count", "mode": "replace"},
+                {"state": "ready_memory_job_count", "mode": "replace"},
+                {"state": "ready_knowledge_operation_count", "mode": "replace"},
+                {"state": "synced_operation_count", "mode": "replace"},
+                {"state": "remaining_count", "mode": "replace"},
+                {"state": "maintenance_report", "mode": "replace"},
             ],
         )
-        self.assertIn({"source": "input_model_ref", "target": "process_embedding_jobs"}, embedding_template["edges"])
-        self.assertIn({"source": "input_limit", "target": "process_embedding_jobs"}, embedding_template["edges"])
-        self.assertIn({"source": "input_retry_failed", "target": "process_embedding_jobs"}, embedding_template["edges"])
-        self.assertIn({"source": "input_batch_size", "target": "process_embedding_jobs"}, embedding_template["edges"])
-        self.assertIn({"source": "process_embedding_jobs", "target": "output_embedding_report"}, embedding_template["edges"])
+        self.assertIn({"source": "input_model_ref", "target": "maintain_embedding_queue"}, embedding_template["edges"])
+        self.assertIn({"source": "maintain_embedding_queue", "target": "output_maintenance_report"}, embedding_template["edges"])
 
         page_operation_template = templates["toograph_page_operation_workflow"]
         self.assertEqual(page_operation_template["source"], "official")
@@ -917,7 +901,6 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 "input_batch_size",
                 "input_collection_id",
-                "input_job_limit",
                 "input_model_ref",
                 "input_operation_id",
                 "input_time_budget_seconds",
@@ -927,10 +910,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["operation_id"]["type"], "text")
         self.assertEqual(states["model_ref"]["type"], "text")
         self.assertEqual(states["model_ref"]["value"], "")
-        self.assertEqual(states["job_limit"]["type"], "number")
-        self.assertEqual(states["job_limit"]["value"], 250)
+        self.assertNotIn("job_limit", states)
         self.assertEqual(states["batch_size"]["type"], "number")
-        self.assertEqual(states["batch_size"]["value"], 32)
+        self.assertEqual(states["batch_size"]["value"], 64)
         self.assertEqual(states["time_budget_seconds"]["type"], "number")
         self.assertEqual(states["time_budget_seconds"]["value"], 300)
         for state_key in [
@@ -953,12 +935,8 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 "output_processor_status",
                 "output_processor_report",
-                "output_processed_count",
-                "output_completed_count",
-                "output_failed_count",
-                "output_retry_wait_count",
-                "output_blocked_count",
                 "output_remaining_count",
+                "output_completed_count",
             ],
         )
 
@@ -970,8 +948,11 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 "retry_failed": False,
                 "include_retry_wait": True,
-                "source_kind": "",
+                "maintenance_only": False,
+                "source_kind": "knowledge_document",
+                "source_kinds": [],
                 "source_id": "",
+                "limit": 500,
             },
         )
         self.assertEqual(
@@ -1007,17 +988,6 @@ class TemplateLayoutTests(unittest.TestCase):
                         "actionKey": "",
                         "toolKey": "embedding_job_processor",
                         "fieldKey": "model_ref",
-                        "managed": True,
-                    },
-                },
-                {
-                    "state": "job_limit",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "embedding_job_processor",
-                        "fieldKey": "limit",
                         "managed": True,
                     },
                 },
@@ -1064,17 +1034,12 @@ class TemplateLayoutTests(unittest.TestCase):
                 {"source": "input_collection_id", "target": "process_scoped_embedding_jobs"},
                 {"source": "input_operation_id", "target": "process_scoped_embedding_jobs"},
                 {"source": "input_model_ref", "target": "process_scoped_embedding_jobs"},
-                {"source": "input_job_limit", "target": "process_scoped_embedding_jobs"},
                 {"source": "input_time_budget_seconds", "target": "process_scoped_embedding_jobs"},
                 {"source": "input_batch_size", "target": "process_scoped_embedding_jobs"},
                 {"source": "process_scoped_embedding_jobs", "target": "output_processor_status"},
                 {"source": "process_scoped_embedding_jobs", "target": "output_processor_report"},
-                {"source": "process_scoped_embedding_jobs", "target": "output_processed_count"},
-                {"source": "process_scoped_embedding_jobs", "target": "output_completed_count"},
-                {"source": "process_scoped_embedding_jobs", "target": "output_failed_count"},
-                {"source": "process_scoped_embedding_jobs", "target": "output_retry_wait_count"},
-                {"source": "process_scoped_embedding_jobs", "target": "output_blocked_count"},
                 {"source": "process_scoped_embedding_jobs", "target": "output_remaining_count"},
+                {"source": "process_scoped_embedding_jobs", "target": "output_completed_count"},
             ],
         )
         self.assertEqual(
@@ -1091,34 +1056,14 @@ class TemplateLayoutTests(unittest.TestCase):
                     "label": "Knowledge embedding drain audit",
                 },
                 {
-                    "state": "processed_count",
+                    "state": "remaining_count",
                     "role": "metric",
-                    "label": "Processed scoped embedding jobs",
+                    "label": "Remaining scoped embedding jobs",
                 },
                 {
                     "state": "completed_count",
                     "role": "metric",
                     "label": "Completed scoped embedding jobs",
-                },
-                {
-                    "state": "failed_count",
-                    "role": "metric",
-                    "label": "Failed scoped embedding jobs",
-                },
-                {
-                    "state": "retry_wait_count",
-                    "role": "metric",
-                    "label": "Scoped embedding jobs waiting for retry",
-                },
-                {
-                    "state": "blocked_count",
-                    "role": "metric",
-                    "label": "Blocked scoped embedding jobs",
-                },
-                {
-                    "state": "remaining_count",
-                    "role": "metric",
-                    "label": "Remaining scoped embedding jobs",
                 },
             ],
         )
@@ -1131,6 +1076,74 @@ class TemplateLayoutTests(unittest.TestCase):
                     if key not in {"template_id", "label", "description", "default_graph_name", "source"}
                 },
                 "graph_id": "test_knowledge_embedding_drain",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_memory_embedding_drain_template_processes_memory_embedding_jobs(self) -> None:
+        template = load_template_record("memory_embedding_drain")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["role"], "memory_embedding_drain")
+        self.assertEqual(metadata["requiredTools"], ["embedding_job_processor"])
+        self.assertIs(metadata["capabilityDiscoverableDefault"], False)
+        self.assertIs(template["capabilityDiscoverable"], False)
+        self.assertEqual(
+            sorted(node_id for node_id, node in nodes.items() if node["kind"] == "input"),
+            ["input_batch_size", "input_job_limit", "input_model_ref", "input_time_budget_seconds"],
+        )
+        self.assertEqual(states["job_limit"]["type"], "number")
+        self.assertEqual(states["job_limit"]["value"], 50)
+        self.assertEqual(states["batch_size"]["value"], 32)
+        self.assertEqual(states["time_budget_seconds"]["value"], 120)
+        processor_node = nodes["process_memory_embedding_jobs"]
+        self.assertEqual(processor_node["kind"], "tool")
+        self.assertEqual(processor_node["config"]["toolKey"], "embedding_job_processor")
+        self.assertEqual(
+            processor_node["config"]["staticInputs"],
+            {
+                "retry_failed": False,
+                "include_retry_wait": True,
+                "maintenance_only": False,
+                "source_kind": "",
+                "source_kinds": ["buddy_message", "buddy_session_summary", "memory_entry"],
+                "collection_id": "",
+                "operation_id": "",
+                "source_id": "",
+            },
+        )
+        self.assertEqual(
+            [read["binding"]["fieldKey"] for read in processor_node["reads"]],
+            ["model_ref", "limit", "time_budget_seconds", "batch_size"],
+        )
+        self.assertEqual(
+            processor_node["writes"],
+            [
+                {"state": "processor_status", "mode": "replace"},
+                {"state": "processed_count", "mode": "replace"},
+                {"state": "completed_count", "mode": "replace"},
+                {"state": "failed_count", "mode": "replace"},
+                {"state": "retry_wait_count", "mode": "replace"},
+                {"state": "blocked_count", "mode": "replace"},
+                {"state": "remaining_count", "mode": "replace"},
+                {"state": "processor_report", "mode": "replace"},
+            ],
+        )
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_memory_embedding_drain",
                 "name": template["default_graph_name"],
             }
         )

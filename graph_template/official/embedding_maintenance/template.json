@@ -1,44 +1,20 @@
 {
   "template_id": "embedding_maintenance",
-  "label": "Embedding 维护",
-  "description": "处理统一数据库中的 pending embedding jobs，把记忆和检索 chunk 的 embedding 队列变成可审计图运行。",
-  "default_graph_name": "Embedding 维护",
+  "label": "Embedding 队列维护",
+  "description": "定期维护 embedding 队列：恢复过期运行、重置可重试失败、同步知识库入库状态，并唤醒可继续处理的记忆或知识库入库图；本图不直接生成向量。",
+  "default_graph_name": "Embedding 队列维护",
   "state_schema": {
     "model_ref": {
       "name": "Embedding Model Ref",
-      "description": "可选 embedding model id 或 provider:model；留空时处理所有可本地执行的 pending jobs。",
+      "description": "可选 embedding model id 或 provider:model；留空时维护所有模型的队列。",
       "type": "text",
       "value": "",
       "color": "#2563eb",
       "binding": null
     },
-    "job_limit": {
-      "name": "Job Limit",
-      "description": "本次最多处理的 pending embedding jobs 数量。",
-      "type": "number",
-      "value": 50,
-      "color": "#0f766e",
-      "binding": null
-    },
-    "retry_failed": {
-      "name": "Retry Failed Jobs",
-      "description": "是否先把失败的 embedding jobs 重置为 pending，再在同一次维护运行中重新处理。",
-      "type": "boolean",
-      "value": false,
-      "color": "#dc2626",
-      "binding": null
-    },
-    "batch_size": {
-      "name": "Batch Size",
-      "description": "每次 provider embedding 请求中合并处理的 job 数量；1 表示单条请求。",
-      "type": "number",
-      "value": 32,
-      "color": "#0891b2",
-      "binding": null
-    },
     "processor_status": {
       "name": "Processor Status",
-      "description": "embedding_job_processor 返回的处理状态。",
+      "description": "embedding_job_processor 返回的维护状态。",
       "type": "text",
       "value": "",
       "color": "#475569",
@@ -46,44 +22,29 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_embedding_jobs",
+        "nodeId": "maintain_embedding_queue",
         "fieldKey": "status",
         "managed": true
       }
     },
-    "processed_count": {
-      "name": "Processed Count",
-      "description": "本次检查的 embedding jobs 数量。",
+    "reset_stale_running_count": {
+      "name": "Reset Stale Running Count",
+      "description": "本次维护恢复的过期 running jobs 数量。",
       "type": "number",
       "value": 0,
-      "color": "#7c3aed",
+      "color": "#d97706",
       "binding": {
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_embedding_jobs",
-        "fieldKey": "processed_count",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "reset_stale_running_count",
         "managed": true
       }
     },
-    "completed_count": {
-      "name": "Completed Count",
-      "description": "本次完成的 embedding jobs 数量。",
-      "type": "number",
-      "value": 0,
-      "color": "#16a34a",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "embedding_job_processor",
-        "nodeId": "process_embedding_jobs",
-        "fieldKey": "completed_count",
-        "managed": true
-      }
-    },
-    "failed_count": {
-      "name": "Failed Count",
-      "description": "本次失败的 embedding jobs 数量。",
+    "retried_failed_count": {
+      "name": "Retried Failed Count",
+      "description": "本次维护重置为 pending 的 failed jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#dc2626",
@@ -91,23 +52,83 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_embedding_jobs",
-        "fieldKey": "failed_count",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "retried_failed_count",
         "managed": true
       }
     },
-    "processed_jobs": {
-      "name": "Processed Jobs",
-      "description": "每个 embedding job 的处理审计记录。",
-      "type": "json",
-      "value": [],
+    "ready_memory_job_count": {
+      "name": "Ready Memory Job Count",
+      "description": "当前可由记忆 embedding drain 处理的 jobs 数量。",
+      "type": "number",
+      "value": 0,
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "embedding_job_processor",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "ready_memory_job_count",
+        "managed": true
+      }
+    },
+    "ready_knowledge_operation_count": {
+      "name": "Ready Knowledge Operation Count",
+      "description": "当前可继续处理的知识库入库 operation 数量。",
+      "type": "number",
+      "value": 0,
+      "color": "#0f766e",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "embedding_job_processor",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "ready_knowledge_operation_count",
+        "managed": true
+      }
+    },
+    "synced_operation_count": {
+      "name": "Synced Operation Count",
+      "description": "本次维护同步过状态的知识库入库 operation 数量。",
+      "type": "number",
+      "value": 0,
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "embedding_job_processor",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "synced_operation_count",
+        "managed": true
+      }
+    },
+    "remaining_count": {
+      "name": "Remaining Count",
+      "description": "维护范围内仍可处理的 embedding jobs 数量。",
+      "type": "number",
+      "value": 0,
       "color": "#9333ea",
       "binding": {
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_embedding_jobs",
-        "fieldKey": "processed_jobs",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "remaining_count",
+        "managed": true
+      }
+    },
+    "maintenance_report": {
+      "name": "Maintenance Report",
+      "description": "本次队列维护与知识库 operation 同步报告。",
+      "type": "json",
+      "value": {},
+      "color": "#64748b",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "embedding_job_processor",
+        "nodeId": "maintain_embedding_queue",
+        "fieldKey": "maintenance_report",
         "managed": true
       }
     }
@@ -116,125 +137,27 @@
     "input_model_ref": {
       "kind": "input",
       "name": "Embedding Model",
-      "description": "限定本次处理的 embedding model。",
+      "description": "可选模型过滤；通常保持为空，由各 drain 图按默认模型策略处理。",
       "ui": {
-        "position": {
-          "x": 80,
-          "y": 120
-        },
+        "position": { "x": 80, "y": 120 },
         "collapsed": false,
-        "size": {
-          "width": 360,
-          "height": 180
-        }
+        "size": { "width": 360, "height": 180 }
       },
       "reads": [],
-      "writes": [
-        {
-          "state": "model_ref",
-          "mode": "replace"
-        }
-      ],
+      "writes": [{ "state": "model_ref", "mode": "replace" }],
       "config": {
         "value": "",
         "boundaryType": "text"
       }
     },
-    "input_limit": {
-      "kind": "input",
-      "name": "处理数量",
-      "description": "限制本次维护 run 处理的 pending job 数量。",
-      "ui": {
-        "position": {
-          "x": 80,
-          "y": 420
-        },
-        "collapsed": false,
-        "size": {
-          "width": 360,
-          "height": 180
-        }
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "job_limit",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": 50,
-        "boundaryType": "text"
-      }
-    },
-    "input_retry_failed": {
-      "kind": "input",
-      "name": "重试失败任务",
-      "description": "为 true 时，先把失败的 embedding jobs 重置为待处理，再继续执行本次维护。",
-      "ui": {
-        "position": {
-          "x": 80,
-          "y": 700
-        },
-        "collapsed": false,
-        "size": {
-          "width": 360,
-          "height": 180
-        }
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "retry_failed",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": false,
-        "boundaryType": "text"
-      }
-    },
-    "input_batch_size": {
-      "kind": "input",
-      "name": "Batch Size",
-      "description": "每次 embedding provider 请求合并处理的 job 数量。",
-      "ui": {
-        "position": {
-          "x": 80,
-          "y": 980
-        },
-        "collapsed": false,
-        "size": {
-          "width": 360,
-          "height": 180
-        }
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "batch_size",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": 32,
-        "boundaryType": "text"
-      }
-    },
-    "process_embedding_jobs": {
+    "maintain_embedding_queue": {
       "kind": "tool",
-      "name": "处理 Embedding 队列",
-      "description": "调用 embedding_job_processor，把 pending embedding jobs 转成 embedding vectors，并记录失败原因。",
+      "name": "维护 Embedding 队列",
+      "description": "调用 embedding_job_processor 的 maintenance-only 模式，只做队列恢复、失败重试准备和状态同步。",
       "ui": {
-        "position": {
-          "x": 620,
-          "y": 240
-        },
+        "position": { "x": 620, "y": 160 },
         "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 320
-        }
+        "size": { "width": 500, "height": 360 }
       },
       "reads": [
         {
@@ -247,97 +170,63 @@
             "fieldKey": "model_ref",
             "managed": true
           }
-        },
-        {
-          "state": "job_limit",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "embedding_job_processor",
-            "fieldKey": "limit",
-            "managed": true
-          }
-        },
-        {
-          "state": "retry_failed",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "embedding_job_processor",
-            "fieldKey": "retry_failed",
-            "managed": true
-          }
-        },
-        {
-          "state": "batch_size",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "embedding_job_processor",
-            "fieldKey": "batch_size",
-            "managed": true
-          }
         }
       ],
       "writes": [
-        {
-          "state": "processor_status",
-          "mode": "replace"
-        },
-        {
-          "state": "processed_count",
-          "mode": "replace"
-        },
-        {
-          "state": "completed_count",
-          "mode": "replace"
-        },
-        {
-          "state": "failed_count",
-          "mode": "replace"
-        },
-        {
-          "state": "processed_jobs",
-          "mode": "replace"
-        }
+        { "state": "processor_status", "mode": "replace" },
+        { "state": "reset_stale_running_count", "mode": "replace" },
+        { "state": "retried_failed_count", "mode": "replace" },
+        { "state": "ready_memory_job_count", "mode": "replace" },
+        { "state": "ready_knowledge_operation_count", "mode": "replace" },
+        { "state": "synced_operation_count", "mode": "replace" },
+        { "state": "remaining_count", "mode": "replace" },
+        { "state": "maintenance_report", "mode": "replace" }
       ],
       "config": {
         "toolKey": "embedding_job_processor",
         "staticInputs": {
+          "maintenance_only": true,
+          "retry_failed": true,
+          "include_retry_wait": true,
+          "limit": 500,
+          "batch_size": 1,
           "collection_id": "",
           "operation_id": "",
           "source_kind": "",
+          "source_kinds": [],
           "source_id": "",
-          "time_budget_seconds": 0,
-          "include_retry_wait": false
+          "time_budget_seconds": 0
         }
       }
     },
-    "output_embedding_report": {
+    "output_queue_status": {
       "kind": "output",
-      "name": "Embedding 处理明细",
-      "description": "展示本次处理的 embedding job 审计记录。",
+      "name": "维护状态",
+      "description": "显示队列维护状态。",
       "ui": {
-        "position": {
-          "x": 1240,
-          "y": 120
-        },
+        "position": { "x": 1240, "y": 80 },
         "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 320
-        }
+        "size": { "width": 420, "height": 160 }
       },
-      "reads": [
-        {
-          "state": "processed_jobs",
-          "required": true,
-          "binding": null
-        }
-      ],
+      "reads": [{ "state": "processor_status", "required": false, "binding": null }],
+      "writes": [],
+      "config": {
+        "displayMode": "plain",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_ready_memory": {
+      "kind": "output",
+      "name": "可处理记忆任务",
+      "description": "显示可由记忆 drain 消费的 jobs 数量。",
+      "ui": {
+        "position": { "x": 1240, "y": 300 },
+        "collapsed": false,
+        "size": { "width": 420, "height": 160 }
+      },
+      "reads": [{ "state": "ready_memory_job_count", "required": false, "binding": null }],
       "writes": [],
       "config": {
         "displayMode": "json",
@@ -346,28 +235,34 @@
         "fileNameTemplate": ""
       }
     },
-    "output_embedding_counts": {
+    "output_ready_knowledge": {
       "kind": "output",
-      "name": "完成数量",
-      "description": "展示完成数量，用于运行列表快速检查维护结果。",
+      "name": "可继续知识库任务",
+      "description": "显示可继续处理的知识库 operation 数量。",
       "ui": {
-        "position": {
-          "x": 1240,
-          "y": 520
-        },
+        "position": { "x": 1240, "y": 520 },
         "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 260
-        }
+        "size": { "width": 420, "height": 160 }
       },
-      "reads": [
-        {
-          "state": "completed_count",
-          "required": false,
-          "binding": null
-        }
-      ],
+      "reads": [{ "state": "ready_knowledge_operation_count", "required": false, "binding": null }],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_maintenance_report": {
+      "kind": "output",
+      "name": "维护报告",
+      "description": "显示本次维护的结构化报告。",
+      "ui": {
+        "position": { "x": 1740, "y": 160 },
+        "collapsed": false,
+        "size": { "width": 460, "height": 320 }
+      },
+      "reads": [{ "state": "maintenance_report", "required": false, "binding": null }],
       "writes": [],
       "config": {
         "displayMode": "json",
@@ -378,50 +273,24 @@
     }
   },
   "edges": [
-    {
-      "source": "input_model_ref",
-      "target": "process_embedding_jobs"
-    },
-    {
-      "source": "input_limit",
-      "target": "process_embedding_jobs"
-    },
-    {
-      "source": "input_retry_failed",
-      "target": "process_embedding_jobs"
-    },
-    {
-      "source": "input_batch_size",
-      "target": "process_embedding_jobs"
-    },
-    {
-      "source": "process_embedding_jobs",
-      "target": "output_embedding_report"
-    },
-    {
-      "source": "process_embedding_jobs",
-      "target": "output_embedding_counts"
-    }
+    { "source": "input_model_ref", "target": "maintain_embedding_queue" },
+    { "source": "maintain_embedding_queue", "target": "output_queue_status" },
+    { "source": "maintain_embedding_queue", "target": "output_ready_memory" },
+    { "source": "maintain_embedding_queue", "target": "output_ready_knowledge" },
+    { "source": "maintain_embedding_queue", "target": "output_maintenance_report" }
   ],
   "conditional_edges": [],
   "metadata": {
-    "origin": "system",
-    "role": "embedding_maintenance",
+    "graphProtocol": "node_system",
+    "origin": "embedding",
+    "role": "embedding_queue_maintenance",
     "capabilityDiscoverableDefault": false,
-    "requiredTools": [
-      "embedding_job_processor"
-    ],
+    "requiredTools": ["embedding_job_processor"],
     "outputContract": [
-      {
-        "state": "processed_jobs",
-        "role": "audit",
-        "label": "Embedding processing audit"
-      },
-      {
-        "state": "completed_count",
-        "role": "metric",
-        "label": "Completed embedding jobs"
-      }
+      { "state": "processor_status", "role": "status", "label": "Embedding queue maintenance status" },
+      { "state": "ready_memory_job_count", "role": "metric", "label": "Ready memory embedding jobs" },
+      { "state": "ready_knowledge_operation_count", "role": "metric", "label": "Ready knowledge embedding operations" },
+      { "state": "maintenance_report", "role": "audit", "label": "Embedding queue maintenance report" }
     ]
   }
 }

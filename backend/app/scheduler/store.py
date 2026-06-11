@@ -185,6 +185,37 @@ def _official_schedule_fields_changed(existing: dict[str, Any], incoming_payload
     return False
 
 
+def _should_migrate_official_default_schedule(
+    *,
+    job_id: str,
+    current_expr: str,
+    seed_expr: str,
+    metadata: dict[str, Any],
+) -> bool:
+    normalized_current = _compact_text(current_expr)
+    normalized_seed = _compact_text(seed_expr)
+    if not normalized_seed or normalized_current == normalized_seed:
+        return False
+    recommended_interval = _compact_text(metadata.get("recommended_interval"))
+    legacy_defaults = {"PT1H"}
+    if job_id == "official_embedding_maintenance":
+        legacy_defaults.add("PT20M")
+        if recommended_interval in {"hourly", "every_20_minutes"}:
+            return True
+    if recommended_interval == "hourly":
+        return True
+    return normalized_current in legacy_defaults
+
+
+def _sync_official_input_bindings(existing_bindings: Any, seed_bindings: Any) -> dict[str, Any]:
+    existing = existing_bindings if isinstance(existing_bindings, dict) else {}
+    seed = seed_bindings if isinstance(seed_bindings, dict) else {}
+    return {
+        str(key): existing[key] if key in existing else value
+        for key, value in seed.items()
+    }
+
+
 def delete_scheduled_graph_job(job_id: str) -> bool:
     normalized_job_id = _compact_text(job_id)
     if not normalized_job_id:
@@ -323,14 +354,22 @@ def sync_official_scheduled_graph_job_seed(job_id: str, seed_payload: dict[str, 
     seed_schedule_kind = _compact_text(seed_payload.get("schedule_kind")).lower()
     seed_schedule_expr = _compact_text(seed_payload.get("schedule_expr"))
     seed_timezone = _compact_text(seed_payload.get("timezone")) or timezone_value
+    input_bindings = _sync_official_input_bindings(
+        existing.get("input_bindings"),
+        seed_payload.get("input_bindings"),
+    )
     schedule_changed = False
     if (
         required_default
         and not user_schedule_modified
         and schedule_kind == "interval"
-        and schedule_expr == "PT1H"
         and seed_schedule_kind == "interval"
-        and seed_schedule_expr == "PT20M"
+        and _should_migrate_official_default_schedule(
+            job_id=job_id,
+            current_expr=schedule_expr,
+            seed_expr=seed_schedule_expr,
+            metadata=existing_metadata,
+        )
     ):
         schedule_expr = seed_schedule_expr
         timezone_value = seed_timezone
@@ -361,6 +400,7 @@ def sync_official_scheduled_graph_job_seed(job_id: str, seed_payload: dict[str, 
             """
             UPDATE scheduled_graph_jobs
             SET name = ?,
+                input_bindings_json = ?,
                 schedule_kind = ?,
                 schedule_expr = ?,
                 timezone = ?,
@@ -373,6 +413,7 @@ def sync_official_scheduled_graph_job_seed(job_id: str, seed_payload: dict[str, 
             """,
             (
                 name,
+                _json_dumps(input_bindings),
                 schedule_kind,
                 schedule_expr,
                 timezone_value,

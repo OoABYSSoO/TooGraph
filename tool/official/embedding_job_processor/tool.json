@@ -55,6 +55,12 @@
       "description": "Optional retrieval source kind scope."
     },
     {
+      "key": "source_kinds",
+      "name": "Source Kinds",
+      "valueType": "json",
+      "description": "Optional list of retrieval source kinds to process as one lane."
+    },
+    {
       "key": "source_id",
       "name": "Source ID",
       "valueType": "text",
@@ -71,6 +77,12 @@
       "name": "Include Retry Wait",
       "valueType": "boolean",
       "description": "Allow due retry-wait jobs to resume in this scoped drain."
+    },
+    {
+      "key": "maintenance_only",
+      "name": "Maintenance Only",
+      "valueType": "boolean",
+      "description": "Run queue maintenance and status synchronization without generating embeddings."
     }
   ],
   "outputSchema": [
@@ -117,6 +129,12 @@
       "description": "Number of failed jobs reset to pending in this run."
     },
     {
+      "key": "reset_stale_running_count",
+      "name": "Reset Stale Running Count",
+      "valueType": "number",
+      "description": "Number of expired running jobs returned to the queue."
+    },
+    {
       "key": "reset_blocked_dimension_mismatch_count",
       "name": "Reset Dimension Mismatch Count",
       "valueType": "number",
@@ -129,6 +147,24 @@
       "description": "Number of eligible jobs still remaining in the same scope."
     },
     {
+      "key": "ready_memory_job_count",
+      "name": "Ready Memory Job Count",
+      "valueType": "number",
+      "description": "Number of ready memory embedding jobs discovered during queue maintenance."
+    },
+    {
+      "key": "ready_knowledge_operation_count",
+      "name": "Ready Knowledge Operation Count",
+      "valueType": "number",
+      "description": "Number of ready knowledge indexing operations discovered during queue maintenance."
+    },
+    {
+      "key": "synced_operation_count",
+      "name": "Synced Operation Count",
+      "valueType": "number",
+      "description": "Number of knowledge indexing operations synchronized during queue maintenance."
+    },
+    {
       "key": "scope",
       "name": "Scope",
       "valueType": "json",
@@ -139,12 +175,18 @@
       "name": "Processed Jobs",
       "valueType": "json",
       "description": "Audit records for each processed job."
+    },
+    {
+      "key": "maintenance_report",
+      "name": "Maintenance Report",
+      "valueType": "json",
+      "description": "Queue maintenance and operation sync report."
     }
   ],
   "localized": {
     "zh-CN": {
       "name": "Embedding 任务处理器",
-      "description": "通过已注册的 embedding provider 处理待执行的 embedding jobs。"
+      "description": "通过已注册的 embedding provider 处理待执行的 embedding jobs，也可执行队列维护与状态同步。"
     },
     "en-US": {
       "name": "Embedding Job Processor",

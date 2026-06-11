@@ -45,7 +45,7 @@ test("formatSchedule renders common interval expressions", () => {
   assert.equal(formatSchedule({ schedule_kind: "event", schedule_expr: "buddy.message.created" }), "事件：buddy.message.created");
 });
 
-test("buildScheduledGraphJobTriggerProfile explains official memory background tasks", () => {
+test("buildScheduledGraphJobTriggerProfile explains official memory and embedding background tasks", () => {
   const messageIngestion = {
     ...createJob("official_buddy_message_retrieval_ingestion", false, "official_seed"),
     schedule_kind: "event",
@@ -58,21 +58,31 @@ test("buildScheduledGraphJobTriggerProfile explains official memory background t
   };
   const embeddingMaintenance = {
     ...createJob("official_embedding_maintenance", false, "official_seed"),
-    metadata: { source: "official_seed", purpose: "embedding_maintenance" },
+    metadata: { source: "official_seed", purpose: "embedding_queue_maintenance" },
+  };
+  const memoryEmbeddingDrain = {
+    ...createJob("official_memory_embedding_drain", false, "official_seed"),
+    schedule_kind: "event",
+    schedule_expr: "memory.embedding.queued",
+    metadata: { source: "official_seed", purpose: "memory_embedding_drain" },
+  };
+  const knowledgeEmbeddingDrain = {
+    ...createJob("official_knowledge_embedding_drain", false, "official_seed"),
+    schedule_kind: "event",
+    schedule_expr: "knowledge.ingestion.completed",
+    metadata: { source: "official_seed", purpose: "knowledge_embedding_drain" },
   };
 
-  assert.deepEqual(buildScheduledGraphJobTriggerProfile(messageIngestion), {
-    modeLabel: "事件触发",
-    description: "每条 Buddy 消息写入后触发，把原始消息投影为可检索材料并排队 embedding。",
-  });
-  assert.deepEqual(buildScheduledGraphJobTriggerProfile(memoryReview), {
-    modeLabel: "间隔触发",
-    description: "定时探测尚未复盘的 completed Buddy run，由复盘图内 selector 选择来源。",
-  });
-  assert.deepEqual(buildScheduledGraphJobTriggerProfile(embeddingMaintenance), {
-    modeLabel: "间隔触发",
-    description: "定期处理 pending embedding jobs，把已入库 chunk 的向量落盘。",
-  });
+  assert.equal(buildScheduledGraphJobTriggerProfile(messageIngestion).modeLabel, "事件触发");
+  assert.match(buildScheduledGraphJobTriggerProfile(messageIngestion).description, /Buddy 消息/);
+  assert.equal(buildScheduledGraphJobTriggerProfile(memoryReview).modeLabel, "间隔触发");
+  assert.match(buildScheduledGraphJobTriggerProfile(memoryReview).description, /复盘/);
+  assert.equal(buildScheduledGraphJobTriggerProfile(embeddingMaintenance).modeLabel, "间隔触发");
+  assert.match(buildScheduledGraphJobTriggerProfile(embeddingMaintenance).description, /维护 embedding 队列/);
+  assert.equal(buildScheduledGraphJobTriggerProfile(memoryEmbeddingDrain).modeLabel, "事件触发");
+  assert.match(buildScheduledGraphJobTriggerProfile(memoryEmbeddingDrain).description, /记忆/);
+  assert.equal(buildScheduledGraphJobTriggerProfile(knowledgeEmbeddingDrain).modeLabel, "事件触发");
+  assert.match(buildScheduledGraphJobTriggerProfile(knowledgeEmbeddingDrain).description, /知识库/);
 });
 
 test("sortScheduledGraphJobs keeps enabled jobs first and then template order", () => {

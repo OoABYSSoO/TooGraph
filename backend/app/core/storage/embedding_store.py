@@ -12,6 +12,7 @@ from app.tools.model_provider_client import embed_text_with_model_ref, embed_tex
 
 
 SUPPORTED_EMBEDDING_JOB_STATUSES = {"pending", "running", "retry_wait", "completed", "failed", "blocked"}
+MEMORY_EMBEDDING_SOURCE_KINDS = ("buddy_message", "buddy_session_summary", "memory_entry")
 DEFAULT_DISTANCE_METRIC = "cosine"
 DEFAULT_VECTOR_FORMAT = "json"
 EMBEDDING_JOB_LEASE_MINUTES = 15
@@ -581,14 +582,18 @@ def process_pending_embedding_jobs(
     collection_id: str = "",
     operation_id: str = "",
     source_kind: str = "",
+    source_kinds: list[str] | tuple[str, ...] | str | None = None,
     source_id: str = "",
     time_budget_seconds: int = 0,
     include_retry_wait: bool = False,
+    maintenance_only: bool = False,
 ) -> dict[str, Any]:
     normalized_limit = _bounded_int(limit, default=50, minimum=1, maximum=500)
     normalized_collection_id = str(collection_id or "").strip()
     normalized_operation_id = str(operation_id or "").strip()
     normalized_source_kind = str(source_kind or "").strip()
+    normalized_source_kinds = _normalize_source_kind_filter(source_kinds if source_kinds is not None else normalized_source_kind)
+    normalized_source_kind_scope = _source_kind_scope_label(normalized_source_kinds, normalized_source_kind)
     normalized_source_id = str(source_id or "").strip()
     normalized_time_budget_seconds = _bounded_int(time_budget_seconds, default=0, minimum=0, maximum=86_400)
     normalized_batch_size = _bounded_int(batch_size, default=1, minimum=1, maximum=256)
@@ -597,7 +602,7 @@ def process_pending_embedding_jobs(
         return _paused_embedding_operation_report(
             collection_id=normalized_collection_id,
             operation_id=normalized_operation_id,
-            source_kind=normalized_source_kind,
+            source_kind=normalized_source_kind_scope,
             source_id=normalized_source_id,
             now=now,
         )
@@ -605,16 +610,16 @@ def process_pending_embedding_jobs(
     scoped_drain = bool(
         normalized_collection_id
         or normalized_operation_id
-        or normalized_source_kind
+        or normalized_source_kinds
         or normalized_source_id
         or normalized_time_budget_seconds
     )
     retry_wait_enabled = bool(include_retry_wait) or not scoped_drain
-    reset_stale_running_embedding_jobs(
+    reset_stale_running_count = reset_stale_running_embedding_jobs(
         model_id=model_id,
         collection_id=normalized_collection_id,
         operation_id=normalized_operation_id,
-        source_kind=normalized_source_kind,
+        source_kind=normalized_source_kind_scope,
         source_id=normalized_source_id,
         now=now,
     )
@@ -622,10 +627,45 @@ def process_pending_embedding_jobs(
         model_id=model_id,
         collection_id=normalized_collection_id,
         operation_id=normalized_operation_id,
-        source_kind=normalized_source_kind,
+        source_kind=normalized_source_kind_scope,
         source_id=normalized_source_id,
         limit=normalized_limit,
     ) if retry_failed else 0
+    if maintenance_only:
+        sync_report = sync_knowledge_indexing_operation_statuses()
+        remaining_count = _count_remaining_embedding_jobs(
+            model_id=model_id,
+            collection_id=normalized_collection_id,
+            operation_id=normalized_operation_id,
+            source_kind=normalized_source_kind_scope,
+            source_id=normalized_source_id,
+            now=now,
+            include_retry_wait=True,
+        )
+        return {
+            "status": "succeeded",
+            "processed_count": 0,
+            "completed_count": 0,
+            "failed_count": 0,
+            "retry_wait_count": 0,
+            "blocked_count": 0,
+            "retried_failed_count": retried_failed_count,
+            "reset_stale_running_count": reset_stale_running_count,
+            "reset_blocked_dimension_mismatch_count": 0,
+            "batch_size": normalized_batch_size,
+            "remaining_count": remaining_count,
+            "ready_memory_job_count": ready_memory_embedding_job_count(now=now),
+            "ready_knowledge_operation_count": len(list_ready_knowledge_embedding_operations(now=now)),
+            "synced_operation_count": sync_report["synced_count"],
+            "scope": {
+                "collection_id": normalized_collection_id,
+                "operation_id": normalized_operation_id,
+                "source_kind": normalized_source_kind_scope,
+                "source_id": normalized_source_id,
+            },
+            "processed_jobs": [],
+            "maintenance_report": sync_report,
+        }
     if retry_wait_enabled:
         status_where = """
         (
@@ -644,9 +684,10 @@ def process_pending_embedding_jobs(
     if normalized_operation_id:
         clauses.append("j.operation_id = ?")
         params.append(normalized_operation_id)
-    if normalized_source_kind:
-        clauses.append("j.source_kind = ?")
-        params.append(normalized_source_kind)
+    source_kind_sql, source_kind_params = _source_kind_filter_sql("j", normalized_source_kinds)
+    if source_kind_sql:
+        clauses.append(source_kind_sql)
+        params.extend(source_kind_params)
     if normalized_source_id:
         clauses.append("j.source_id = ?")
         params.append(normalized_source_id)
@@ -854,7 +895,7 @@ def process_pending_embedding_jobs(
         model_id=model_id,
         collection_id=normalized_collection_id,
         operation_id=normalized_operation_id,
-        source_kind=normalized_source_kind,
+        source_kind=normalized_source_kind_scope,
         source_id=normalized_source_id,
         now=now,
         include_retry_wait=retry_wait_enabled,
@@ -884,13 +925,14 @@ def process_pending_embedding_jobs(
         "retry_wait_count": retry_wait_count,
         "blocked_count": blocked_count,
         "retried_failed_count": retried_failed_count,
+        "reset_stale_running_count": reset_stale_running_count,
         "reset_blocked_dimension_mismatch_count": reset_blocked_dimension_mismatch_count,
         "batch_size": normalized_batch_size,
         "remaining_count": remaining_count,
         "scope": {
             "collection_id": normalized_collection_id,
             "operation_id": normalized_operation_id,
-            "source_kind": normalized_source_kind,
+            "source_kind": normalized_source_kind_scope,
             "source_id": normalized_source_id,
         },
         "processed_jobs": processed_jobs,
@@ -1054,6 +1096,113 @@ def _sync_knowledge_operation_status_after_embedding_processing(operation_id: st
         )
 
 
+def sync_knowledge_indexing_operation_statuses(*, limit: int = 1000) -> dict[str, Any]:
+    normalized_limit = _bounded_int(limit, default=1000, minimum=1, maximum=10_000)
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT operation_id
+            FROM knowledge_indexing_operations
+            WHERE status != 'paused'
+            ORDER BY updated_at ASC, operation_id ASC
+            LIMIT ?
+            """,
+            (normalized_limit,),
+        ).fetchall()
+    operation_ids = [str(row["operation_id"] or "").strip() for row in rows if str(row["operation_id"] or "").strip()]
+    for operation_id in operation_ids:
+        _sync_knowledge_operation_status_after_embedding_processing(operation_id)
+    return {
+        "status": "succeeded",
+        "synced_count": len(operation_ids),
+        "operation_ids": operation_ids,
+    }
+
+
+def list_ready_knowledge_embedding_operations(*, now: str | None = None, limit: int = 25) -> list[dict[str, Any]]:
+    normalized_now = str(now or "").strip() or _utc_now_sql()
+    normalized_limit = _bounded_int(limit, default=25, minimum=1, maximum=100)
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                kop.operation_id,
+                kop.collection_id,
+                kop.status,
+                kop.stage,
+                COUNT(*) AS ready_count,
+                MIN(j.priority) AS min_priority,
+                MIN(j.created_at) AS first_created_at
+            FROM knowledge_indexing_operations AS kop
+            JOIN embedding_jobs AS j ON j.operation_id = kop.operation_id
+            JOIN retrieval_chunks AS c
+              ON c.chunk_id = j.chunk_id
+             AND c.content_hash = j.content_hash
+            WHERE kop.status != 'paused'
+              AND (
+                j.status = 'pending'
+                OR (j.status = 'retry_wait' AND j.next_retry_at != '' AND j.next_retry_at <= ?)
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM embedding_jobs AS running
+                WHERE running.operation_id = kop.operation_id
+                  AND running.status = 'running'
+              )
+            GROUP BY kop.operation_id, kop.collection_id, kop.status, kop.stage
+            ORDER BY min_priority ASC, first_created_at ASC, kop.operation_id ASC
+            LIMIT ?
+            """,
+            (normalized_now, normalized_limit),
+        ).fetchall()
+    return [
+        {
+            "operation_id": str(row["operation_id"] or ""),
+            "collection_id": str(row["collection_id"] or ""),
+            "status": str(row["status"] or ""),
+            "stage": str(row["stage"] or ""),
+            "ready_count": int(row["ready_count"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def ready_memory_embedding_job_count(*, now: str | None = None) -> int:
+    return _count_remaining_embedding_jobs(
+        source_kind=",".join(MEMORY_EMBEDDING_SOURCE_KINDS),
+        now=str(now or "").strip() or _utc_now_sql(),
+        include_retry_wait=True,
+    )
+
+
+def has_running_memory_embedding_jobs() -> bool:
+    return has_running_embedding_jobs(source_kind=",".join(MEMORY_EMBEDDING_SOURCE_KINDS))
+
+
+def has_running_embedding_jobs(*, operation_id: str = "", source_kind: str = "") -> bool:
+    clauses = ["j.status = 'running'"]
+    params: list[Any] = []
+    normalized_operation_id = str(operation_id or "").strip()
+    if normalized_operation_id:
+        clauses.append("j.operation_id = ?")
+        params.append(normalized_operation_id)
+    source_kind_sql, source_kind_params = _source_kind_filter_sql("j", _normalize_source_kind_filter(source_kind))
+    if source_kind_sql:
+        clauses.append(source_kind_sql)
+        params.extend(source_kind_params)
+    with get_connection() as connection:
+        row = connection.execute(
+            f"""
+            SELECT 1
+            FROM embedding_jobs AS j
+            WHERE {' AND '.join(clauses)}
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+    return row is not None
+
+
 def _count_remaining_embedding_jobs(
     *,
     model_id: str = "",
@@ -1065,6 +1214,7 @@ def _count_remaining_embedding_jobs(
     include_retry_wait: bool,
     include_paused_operations: bool = False,
 ) -> int:
+    normalized_source_kinds = _normalize_source_kind_filter(source_kind)
     if include_retry_wait:
         status_where = """
         (
@@ -1083,9 +1233,10 @@ def _count_remaining_embedding_jobs(
     if operation_id:
         clauses.append("j.operation_id = ?")
         params.append(operation_id)
-    if source_kind:
-        clauses.append("j.source_kind = ?")
-        params.append(source_kind)
+    source_kind_sql, source_kind_params = _source_kind_filter_sql("j", normalized_source_kinds)
+    if source_kind_sql:
+        clauses.append(source_kind_sql)
+        params.extend(source_kind_params)
     if source_id:
         clauses.append("j.source_id = ?")
         params.append(source_id)
@@ -1196,6 +1347,7 @@ def reset_stale_running_embedding_jobs(
     normalized_collection_id = str(collection_id or "").strip()
     normalized_operation_id = str(operation_id or "").strip()
     normalized_source_kind = str(source_kind or "").strip()
+    normalized_source_kinds = _normalize_source_kind_filter(normalized_source_kind)
     normalized_source_id = str(source_id or "").strip()
     normalized_now = str(now or "").strip() or _utc_now_sql()
     where = "WHERE j.status = 'running' AND (j.lease_expires_at = '' OR j.lease_expires_at <= ?)"
@@ -1206,9 +1358,10 @@ def reset_stale_running_embedding_jobs(
     if normalized_operation_id:
         where += " AND j.operation_id = ?"
         params.append(normalized_operation_id)
-    if normalized_source_kind:
-        where += " AND j.source_kind = ?"
-        params.append(normalized_source_kind)
+    source_kind_sql, source_kind_params = _source_kind_filter_sql("j", normalized_source_kinds)
+    if source_kind_sql:
+        where += f" AND {source_kind_sql}"
+        params.extend(source_kind_params)
     if normalized_source_id:
         where += " AND j.source_id = ?"
         params.append(normalized_source_id)
@@ -1265,6 +1418,7 @@ def _reset_failed_embedding_jobs(
     normalized_collection_id = str(collection_id or "").strip()
     normalized_operation_id = str(operation_id or "").strip()
     normalized_source_kind = str(source_kind or "").strip()
+    normalized_source_kinds = _normalize_source_kind_filter(normalized_source_kind)
     normalized_source_id = str(source_id or "").strip()
     where = "WHERE j.status = 'failed' AND j.last_error_type != 'superseded_content_hash'"
     params: list[Any] = []
@@ -1274,9 +1428,10 @@ def _reset_failed_embedding_jobs(
     if normalized_operation_id:
         where += " AND j.operation_id = ?"
         params.append(normalized_operation_id)
-    if normalized_source_kind:
-        where += " AND j.source_kind = ?"
-        params.append(normalized_source_kind)
+    source_kind_sql, source_kind_params = _source_kind_filter_sql("j", normalized_source_kinds)
+    if source_kind_sql:
+        where += f" AND {source_kind_sql}"
+        params.extend(source_kind_params)
     if normalized_source_id:
         where += " AND j.source_id = ?"
         params.append(normalized_source_id)
@@ -1548,6 +1703,39 @@ def _job_from_row(row: Any) -> dict[str, Any]:
     if row is None:
         raise FileNotFoundError("Embedding job does not exist.")
     return dict(row)
+
+
+def _normalize_source_kind_filter(value: list[str] | tuple[str, ...] | str | None) -> list[str]:
+    if value is None:
+        return []
+    raw_items: list[Any]
+    if isinstance(value, str):
+        raw_items = value.replace("\n", ",").split(",")
+    elif isinstance(value, (list, tuple)):
+        raw_items = list(value)
+    else:
+        raw_items = [value]
+    normalized: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text and text not in normalized:
+            normalized.append(text)
+    return normalized
+
+
+def _source_kind_scope_label(source_kinds: list[str], fallback: str = "") -> str:
+    return ",".join(source_kinds) if source_kinds else str(fallback or "").strip()
+
+
+def _source_kind_filter_sql(alias: str, source_kinds: list[str]) -> tuple[str, list[Any]]:
+    normalized_alias = str(alias or "j").strip() or "j"
+    normalized = _normalize_source_kind_filter(source_kinds)
+    if not normalized:
+        return "", []
+    if len(normalized) == 1:
+        return f"{normalized_alias}.source_kind = ?", [normalized[0]]
+    placeholders = ",".join("?" for _ in normalized)
+    return f"{normalized_alias}.source_kind IN ({placeholders})", list(normalized)
 
 
 def _normalize_label(value: str, *, field_name: str) -> str:

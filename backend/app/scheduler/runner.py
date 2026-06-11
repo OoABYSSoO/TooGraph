@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import re
+import threading
 from typing import Any
 from uuid import uuid4
 
@@ -46,6 +47,12 @@ class _InlineBackgroundTasks:
 
     def add_task(self, func: Any, *args: Any, **kwargs: Any) -> None:
         self.tasks.append((func, args, kwargs))
+
+
+class _DaemonBackgroundTasks:
+    def add_task(self, func: Any, *args: Any, **kwargs: Any) -> None:
+        thread = threading.Thread(target=func, args=args, kwargs=kwargs, daemon=True)
+        thread.start()
 
 
 def start_scheduled_graph_job_run(
@@ -288,6 +295,7 @@ def _run_scheduled_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[
         if job_run_id:
             store.update_scheduled_graph_job_run(job_run_id, status=str(run_state.get("status") or "completed"))
             message_outlet.deliver_scheduled_graph_job_outputs(job_run_id, run_state)
+        _trigger_embedding_drain_followups(run_state)
         _finalize_scheduled_buddy_memory_review(run_state)
     except Exception as exc:  # pragma: no cover - defensive runtime path
         logger.exception("Scheduled graph run %s failed: %s", run_state.get("run_id"), exc)
@@ -404,3 +412,127 @@ def _finalize_scheduled_buddy_memory_review(run_state: dict[str, Any], *, error:
         )
     except KeyError:
         return
+
+
+def _trigger_embedding_drain_followups(run_state: dict[str, Any]) -> None:
+    if str(run_state.get("status") or "") != "completed":
+        return
+    try:
+        _trigger_knowledge_embedding_continuation_if_needed(run_state)
+        _trigger_memory_embedding_after_memory_ingestion_if_needed(run_state)
+        _trigger_ready_lanes_after_queue_maintenance_if_needed(run_state)
+    except Exception as exc:  # pragma: no cover - defensive follow-up path
+        logger.exception("Failed to trigger embedding drain follow-up for run %s: %s", run_state.get("run_id"), exc)
+
+
+def _trigger_knowledge_embedding_continuation_if_needed(run_state: dict[str, Any]) -> None:
+    if str(run_state.get("template_id") or "") != "knowledge_embedding_drain":
+        return
+    values = _run_state_values(run_state)
+    if _text(values.get("processor_status")) != "succeeded":
+        return
+    remaining_count = _int(values.get("remaining_count"))
+    processed_count = _int(values.get("processed_count"))
+    completed_count = _int(values.get("completed_count"))
+    if remaining_count <= 0 or max(processed_count, completed_count) <= 0:
+        return
+    collection_id = _text(values.get("collection_id"))
+    operation_id = _text(values.get("operation_id"))
+    event_payload = _scheduled_event_payload(run_state)
+    collection_id = collection_id or _text(event_payload.get("collection_id"))
+    operation_id = operation_id or _text(event_payload.get("operation_id"))
+    if not collection_id or not operation_id:
+        return
+    run_event_scheduled_graph_jobs(
+        "knowledge.ingestion.completed",
+        event={
+            "collection_id": collection_id,
+            "operation_id": operation_id,
+            "continuation_parent_run_id": _text(run_state.get("run_id")),
+            "remaining_count": remaining_count,
+        },
+        background_tasks=_DaemonBackgroundTasks(),  # type: ignore[arg-type]
+        requested_by="knowledge_embedding_continuation",
+    )
+
+
+def _trigger_memory_embedding_after_memory_ingestion_if_needed(run_state: dict[str, Any]) -> None:
+    template_id = str(run_state.get("template_id") or "")
+    if template_id not in {"buddy_message_retrieval_ingestion", "buddy_autonomous_review"}:
+        return
+    _trigger_memory_embedding_if_ready(
+        requested_by=f"{template_id}_completed",
+        event={
+            "source_template_id": template_id,
+            "source_run_id": _text(run_state.get("run_id")),
+        },
+    )
+
+
+def _trigger_ready_lanes_after_queue_maintenance_if_needed(run_state: dict[str, Any]) -> None:
+    metadata = run_state.get("metadata") if isinstance(run_state.get("metadata"), dict) else {}
+    if str(run_state.get("template_id") or "") != "embedding_maintenance" and metadata.get("role") != "embedding_queue_maintenance":
+        return
+    from app.core.storage.embedding_store import list_ready_knowledge_embedding_operations
+
+    for operation in list_ready_knowledge_embedding_operations():
+        collection_id = _text(operation.get("collection_id"))
+        operation_id = _text(operation.get("operation_id"))
+        if not collection_id or not operation_id:
+            continue
+        run_event_scheduled_graph_jobs(
+            "knowledge.ingestion.completed",
+            event={
+                "collection_id": collection_id,
+                "operation_id": operation_id,
+                "source": "embedding_queue_maintenance",
+                "ready_count": int(operation.get("ready_count") or 0),
+            },
+            background_tasks=_DaemonBackgroundTasks(),  # type: ignore[arg-type]
+            requested_by="embedding_queue_maintenance",
+        )
+    _trigger_memory_embedding_if_ready(
+        requested_by="embedding_queue_maintenance",
+        event={"source": "embedding_queue_maintenance"},
+    )
+
+
+def _trigger_memory_embedding_if_ready(*, requested_by: str, event: dict[str, Any]) -> None:
+    from app.core.storage.embedding_store import has_running_memory_embedding_jobs, ready_memory_embedding_job_count
+
+    ready_count = ready_memory_embedding_job_count()
+    if ready_count <= 0 or has_running_memory_embedding_jobs():
+        return
+    run_event_scheduled_graph_jobs(
+        "memory.embedding.queued",
+        event={**event, "ready_count": ready_count},
+        background_tasks=_DaemonBackgroundTasks(),  # type: ignore[arg-type]
+        requested_by=requested_by,
+    )
+
+
+def _run_state_values(run_state: dict[str, Any]) -> dict[str, Any]:
+    values = run_state.get("state_values")
+    if isinstance(values, dict):
+        return values
+    snapshot = run_state.get("state_snapshot") if isinstance(run_state.get("state_snapshot"), dict) else {}
+    snapshot_values = snapshot.get("values")
+    return snapshot_values if isinstance(snapshot_values, dict) else {}
+
+
+def _scheduled_event_payload(run_state: dict[str, Any]) -> dict[str, Any]:
+    metadata = run_state.get("metadata") if isinstance(run_state.get("metadata"), dict) else {}
+    event = metadata.get("scheduled_graph_event") if isinstance(metadata.get("scheduled_graph_event"), dict) else {}
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    return payload
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _int(value: Any) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0

@@ -261,7 +261,7 @@ class SchedulerRunnerTests(unittest.TestCase):
         self.assertEqual(embedding_jobs[0][3], model_row[0])
         self.assertEqual(embedding_jobs[0][4], "pending")
 
-    def test_due_embedding_maintenance_job_processes_pending_jobs_into_vectors(self) -> None:
+    def test_memory_embedding_event_job_processes_pending_jobs_into_vectors(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
             db_path = data_dir / "toograph.db"
@@ -320,22 +320,23 @@ class SchedulerRunnerTests(unittest.TestCase):
                 )
                 job = store.create_scheduled_graph_job(
                     {
-                        "job_id": "embedding_maintenance_due",
-                        "name": "Embedding maintenance due",
-                        "template_id": "embedding_maintenance",
-                        "input_bindings": {"model_ref": model["embedding_model_id"], "job_limit": 5},
-                        "schedule_kind": "interval",
-                        "schedule_expr": "PT1H",
+                        "job_id": "memory_embedding_event",
+                        "name": "Memory embedding event",
+                        "template_id": "memory_embedding_drain",
+                        "input_bindings": {"model_ref": model["embedding_model_id"], "job_limit": 5, "batch_size": 32},
+                        "schedule_kind": "event",
+                        "schedule_expr": "memory.embedding.queued",
                         "enabled": True,
                     },
                     now="2026-05-27T00:00:00Z",
                 )
                 background_tasks = CapturingBackgroundTasks()
 
-                result = runner.run_due_scheduled_graph_jobs(
+                result = runner.run_event_scheduled_graph_jobs(
+                    "memory.embedding.queued",
+                    event={"ready_count": 1},
                     background_tasks=background_tasks,
-                    now="2026-05-27T01:00:01Z",
-                    requested_by="scheduler",
+                    requested_by="memory_ingestion_completed",
                 )
                 task_func, task_args, task_kwargs = background_tasks.tasks[0]
                 task_func(*task_args, **task_kwargs)
@@ -371,7 +372,7 @@ class SchedulerRunnerTests(unittest.TestCase):
         self.assertEqual(embedding_server.requests[0]["path"], "/v1/embeddings")
         self.assertEqual(embedding_server.requests[0]["payload"]["input"], "Maintenance should turn queued jobs into vectors.")
 
-    def test_message_ingestion_then_embedding_maintenance_enables_hybrid_recall(self) -> None:
+    def test_message_ingestion_then_memory_embedding_drain_enables_hybrid_recall(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
             db_path = data_dir / "toograph.db"
@@ -442,26 +443,27 @@ class SchedulerRunnerTests(unittest.TestCase):
                 ingestion_func, ingestion_args, ingestion_kwargs = ingestion_tasks.tasks[0]
                 ingestion_func(*ingestion_args, **ingestion_kwargs)
 
-                maintenance_job = store.create_scheduled_graph_job(
+                memory_embedding_job = store.create_scheduled_graph_job(
                     {
-                        "job_id": "embedding_maintenance_due",
-                        "name": "Embedding maintenance due",
-                        "template_id": "embedding_maintenance",
-                        "input_bindings": {"model_ref": "", "job_limit": 10},
-                        "schedule_kind": "interval",
-                        "schedule_expr": "PT1H",
+                        "job_id": "memory_embedding_event",
+                        "name": "Memory embedding event",
+                        "template_id": "memory_embedding_drain",
+                        "input_bindings": {"model_ref": "", "job_limit": 10, "batch_size": 32},
+                        "schedule_kind": "event",
+                        "schedule_expr": "memory.embedding.queued",
                         "enabled": True,
                     },
                     now="2026-05-27T00:00:00Z",
                 )
-                maintenance_tasks = CapturingBackgroundTasks()
-                maintenance_result = runner.run_due_scheduled_graph_jobs(
-                    background_tasks=maintenance_tasks,
-                    now="2026-05-27T01:00:01Z",
-                    requested_by="scheduler",
+                memory_embedding_tasks = CapturingBackgroundTasks()
+                memory_embedding_result = runner.run_event_scheduled_graph_jobs(
+                    "memory.embedding.queued",
+                    event={"ready_count": 1},
+                    background_tasks=memory_embedding_tasks,
+                    requested_by="memory_ingestion_completed",
                 )
-                maintenance_func, maintenance_args, maintenance_kwargs = maintenance_tasks.tasks[0]
-                maintenance_func(*maintenance_args, **maintenance_kwargs)
+                memory_embedding_func, memory_embedding_args, memory_embedding_kwargs = memory_embedding_tasks.tasks[0]
+                memory_embedding_func(*memory_embedding_args, **memory_embedding_kwargs)
 
                 with patch("app.tools.model_provider_client.load_app_settings", return_value=embedding_settings):
                     recall = buddy_store.search_chat_sessions(
@@ -476,8 +478,8 @@ class SchedulerRunnerTests(unittest.TestCase):
                     ).fetchone()[0]
 
         self.assertEqual(ingestion_result["started_count"], 1)
-        self.assertEqual(maintenance_result["started_count"], 1)
-        self.assertEqual(maintenance_result["started"][0]["job"]["job_id"], maintenance_job["job_id"])
+        self.assertEqual(memory_embedding_result["started_count"], 1)
+        self.assertEqual(memory_embedding_result["started"][0]["job"]["job_id"], memory_embedding_job["job_id"])
         self.assertGreaterEqual(vector_count, 1)
         self.assertGreaterEqual(completed_job_count, 1)
         self.assertEqual(recall["kind"], "buddy_session_search")
@@ -486,6 +488,67 @@ class SchedulerRunnerTests(unittest.TestCase):
         self.assertEqual(recall["sessions"][0]["session_id"], session["session_id"])
         self.assertEqual(recall["sessions"][0]["match_message_id"], message["message_id"])
         self.assertEqual(recall["sessions"][0]["retrieval"]["mode"], "hybrid")
+
+    def test_completed_knowledge_embedding_drain_triggers_continuation_when_jobs_remain(self) -> None:
+        run_state = {
+            "status": "completed",
+            "template_id": "knowledge_embedding_drain",
+            "run_id": "run_knowledge_drain_1",
+            "state_values": {
+                "processor_status": "succeeded",
+                "remaining_count": 12,
+                "processed_count": 500,
+                "completed_count": 500,
+                "collection_id": "policy_qa",
+                "operation_id": "kop_policy",
+            },
+        }
+
+        with patch("app.scheduler.runner.run_event_scheduled_graph_jobs") as run_event_jobs:
+            runner._trigger_embedding_drain_followups(run_state)
+
+        run_event_jobs.assert_called_once()
+        args, kwargs = run_event_jobs.call_args
+        self.assertEqual(args[0], "knowledge.ingestion.completed")
+        self.assertEqual(kwargs["requested_by"], "knowledge_embedding_continuation")
+        self.assertEqual(kwargs["event"]["collection_id"], "policy_qa")
+        self.assertEqual(kwargs["event"]["operation_id"], "kop_policy")
+        self.assertEqual(kwargs["event"]["remaining_count"], 12)
+
+    def test_embedding_queue_maintenance_triggers_ready_knowledge_and_memory_lanes(self) -> None:
+        run_state = {
+            "status": "completed",
+            "template_id": "embedding_maintenance",
+            "run_id": "run_maintenance_1",
+            "metadata": {"role": "embedding_queue_maintenance"},
+            "state_values": {"processor_status": "succeeded"},
+        }
+
+        with (
+            patch(
+                "app.core.storage.embedding_store.list_ready_knowledge_embedding_operations",
+                return_value=[
+                    {
+                        "collection_id": "policy_qa",
+                        "operation_id": "kop_policy",
+                        "ready_count": 80,
+                    }
+                ],
+            ),
+            patch("app.core.storage.embedding_store.ready_memory_embedding_job_count", return_value=6),
+            patch("app.core.storage.embedding_store.has_running_memory_embedding_jobs", return_value=False),
+            patch("app.scheduler.runner.run_event_scheduled_graph_jobs") as run_event_jobs,
+        ):
+            runner._trigger_embedding_drain_followups(run_state)
+
+        self.assertEqual(run_event_jobs.call_count, 2)
+        calls = run_event_jobs.call_args_list
+        self.assertEqual(calls[0].args[0], "knowledge.ingestion.completed")
+        self.assertEqual(calls[0].kwargs["requested_by"], "embedding_queue_maintenance")
+        self.assertEqual(calls[0].kwargs["event"]["operation_id"], "kop_policy")
+        self.assertEqual(calls[1].args[0], "memory.embedding.queued")
+        self.assertEqual(calls[1].kwargs["requested_by"], "embedding_queue_maintenance")
+        self.assertEqual(calls[1].kwargs["event"]["ready_count"], 6)
 
 
 if __name__ == "__main__":

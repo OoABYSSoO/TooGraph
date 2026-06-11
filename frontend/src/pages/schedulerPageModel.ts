@@ -303,8 +303,14 @@ function officialScheduledGraphJobDescription(purpose: string): string {
   if (purpose === "buddy_autonomous_review") {
     return translate("scheduler.officialPurposeBuddyAutonomousReview");
   }
-  if (purpose === "embedding_maintenance") {
+  if (purpose === "embedding_maintenance" || purpose === "embedding_queue_maintenance") {
     return translate("scheduler.officialPurposeEmbeddingMaintenance");
+  }
+  if (purpose === "memory_embedding_drain") {
+    return translate("scheduler.officialPurposeMemoryEmbeddingDrain");
+  }
+  if (purpose === "knowledge_embedding_drain") {
+    return translate("scheduler.officialPurposeKnowledgeEmbeddingDrain");
   }
   return translate("scheduler.triggerProfileFallback");
 }

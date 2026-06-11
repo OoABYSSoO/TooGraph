@@ -1,25 +1,9 @@
 {
-  "template_id": "knowledge_embedding_drain",
-  "label": "知识库 Embedding 入库",
-  "description": "在知识库入库完成或队列维护唤醒后，按 collection_id 与 operation_id 处理本次知识库入库范围内的 embedding jobs；若仍有剩余 jobs，调度器会继续触发本图直到该 operation 完成或进入重试/阻塞状态。",
-  "default_graph_name": "知识库 Embedding 入库",
+  "template_id": "memory_embedding_drain",
+  "label": "记忆 Embedding 入库",
+  "description": "处理 Buddy 聊天消息、会话摘要和结构化记忆产生的 embedding jobs；它只消费记忆来源，不处理知识库文档。",
+  "default_graph_name": "记忆 Embedding 入库",
   "state_schema": {
-    "collection_id": {
-      "name": "Collection ID",
-      "description": "需要处理 embedding jobs 的知识库 collection 标识。",
-      "type": "text",
-      "value": "",
-      "color": "#0f766e",
-      "binding": null
-    },
-    "operation_id": {
-      "name": "Operation ID",
-      "description": "触发本次 drain 的知识库入库 operation 标识。",
-      "type": "text",
-      "value": "",
-      "color": "#2563eb",
-      "binding": null
-    },
     "model_ref": {
       "name": "Embedding Model Ref",
       "description": "可选 embedding model id 或 provider:model；留空时使用系统默认 embedding 模型策略。",
@@ -28,19 +12,27 @@
       "color": "#4f46e5",
       "binding": null
     },
+    "job_limit": {
+      "name": "Job Limit",
+      "description": "本次最多处理的记忆 embedding jobs 数量。",
+      "type": "number",
+      "value": 50,
+      "color": "#0f766e",
+      "binding": null
+    },
     "time_budget_seconds": {
       "name": "Time Budget Seconds",
       "description": "本次 drain run 的处理时间预算秒数。",
       "type": "number",
-      "value": 300,
+      "value": 120,
       "color": "#d97706",
       "binding": null
     },
     "batch_size": {
       "name": "Batch Size",
-      "description": "每次 provider embedding 请求中合并处理的 job 数量。",
+      "description": "每次 provider embedding 请求中合并处理的记忆 job 数量。",
       "type": "number",
-      "value": 64,
+      "value": 32,
       "color": "#0891b2",
       "binding": null
     },
@@ -54,14 +46,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "status",
         "managed": true
       }
     },
     "processed_count": {
       "name": "Processed Count",
-      "description": "本次检查或处理的 scoped embedding jobs 数量。",
+      "description": "本次检查或处理的记忆 embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#7c3aed",
@@ -69,14 +61,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "processed_count",
         "managed": true
       }
     },
     "completed_count": {
       "name": "Completed Count",
-      "description": "本次成功完成的 scoped embedding jobs 数量。",
+      "description": "本次成功完成的记忆 embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#16a34a",
@@ -84,14 +76,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "completed_count",
         "managed": true
       }
     },
     "failed_count": {
       "name": "Failed Count",
-      "description": "本次失败的 scoped embedding jobs 数量。",
+      "description": "本次失败的记忆 embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#dc2626",
@@ -99,14 +91,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "failed_count",
         "managed": true
       }
     },
     "retry_wait_count": {
       "name": "Retry Wait Count",
-      "description": "本次进入 retry-wait 的 scoped embedding jobs 数量。",
+      "description": "本次进入 retry-wait 的记忆 embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#ea580c",
@@ -114,14 +106,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "retry_wait_count",
         "managed": true
       }
     },
     "blocked_count": {
       "name": "Blocked Count",
-      "description": "本次被不可重试错误阻塞的 scoped embedding jobs 数量。",
+      "description": "本次被不可重试错误阻塞的记忆 embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#dc2626",
@@ -129,14 +121,14 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "blocked_count",
         "managed": true
       }
     },
     "remaining_count": {
       "name": "Remaining Count",
-      "description": "同一 operation 内仍待处理的 eligible embedding jobs 数量。",
+      "description": "记忆来源中仍待处理的 eligible embedding jobs 数量。",
       "type": "number",
       "value": 0,
       "color": "#0891b2",
@@ -144,7 +136,7 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "remaining_count",
         "managed": true
       }
@@ -159,45 +151,19 @@
         "kind": "tool_output",
         "actionKey": "",
         "toolKey": "embedding_job_processor",
-        "nodeId": "process_scoped_embedding_jobs",
+        "nodeId": "process_memory_embedding_jobs",
         "fieldKey": "processed_jobs",
         "managed": true
       }
     }
   },
   "nodes": {
-    "input_collection_id": {
-      "kind": "input",
-      "name": "Collection ID",
-      "description": "由 knowledge.ingestion.completed 事件传入的知识库 collection 标识。",
-      "ui": {
-        "position": { "x": 80, "y": 80 },
-        "collapsed": false,
-        "size": { "width": 360, "height": 180 }
-      },
-      "reads": [],
-      "writes": [{ "state": "collection_id", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
-    },
-    "input_operation_id": {
-      "kind": "input",
-      "name": "Operation ID",
-      "description": "由 knowledge.ingestion.completed 事件传入的知识库入库 operation 标识。",
-      "ui": {
-        "position": { "x": 80, "y": 320 },
-        "collapsed": false,
-        "size": { "width": 360, "height": 180 }
-      },
-      "reads": [],
-      "writes": [{ "state": "operation_id", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
-    },
     "input_model_ref": {
       "kind": "input",
       "name": "Embedding Model",
-      "description": "可选模型过滤；留空时按默认模型策略处理事件 scope 内的 jobs。",
+      "description": "可选模型过滤；留空时按默认模型策略处理记忆 jobs。",
       "ui": {
-        "position": { "x": 80, "y": 560 },
+        "position": { "x": 80, "y": 120 },
         "collapsed": false,
         "size": { "width": 360, "height": 180 }
       },
@@ -205,64 +171,55 @@
       "writes": [{ "state": "model_ref", "mode": "replace" }],
       "config": { "value": "", "boundaryType": "text" }
     },
+    "input_job_limit": {
+      "kind": "input",
+      "name": "Job Limit",
+      "description": "限制本次记忆 drain 最多处理的 jobs 数量。",
+      "ui": {
+        "position": { "x": 80, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 360, "height": 180 }
+      },
+      "reads": [],
+      "writes": [{ "state": "job_limit", "mode": "replace" }],
+      "config": { "value": 50, "boundaryType": "text" }
+    },
     "input_time_budget_seconds": {
       "kind": "input",
       "name": "Time Budget",
-      "description": "限制本次事件 drain 的处理时间预算秒数。",
+      "description": "限制本次记忆 drain 的处理时间预算秒数。",
       "ui": {
-        "position": { "x": 80, "y": 800 },
+        "position": { "x": 80, "y": 600 },
         "collapsed": false,
         "size": { "width": 360, "height": 180 }
       },
       "reads": [],
       "writes": [{ "state": "time_budget_seconds", "mode": "replace" }],
-      "config": { "value": 300, "boundaryType": "text" }
+      "config": { "value": 120, "boundaryType": "text" }
     },
     "input_batch_size": {
       "kind": "input",
       "name": "Batch Size",
-      "description": "每次 embedding provider 请求合并处理的 scoped job 数量。",
+      "description": "每次 embedding provider 请求合并处理的记忆 job 数量。",
       "ui": {
-        "position": { "x": 80, "y": 1040 },
+        "position": { "x": 80, "y": 840 },
         "collapsed": false,
         "size": { "width": 360, "height": 180 }
       },
       "reads": [],
       "writes": [{ "state": "batch_size", "mode": "replace" }],
-      "config": { "value": 64, "boundaryType": "text" }
+      "config": { "value": 32, "boundaryType": "text" }
     },
-    "process_scoped_embedding_jobs": {
+    "process_memory_embedding_jobs": {
       "kind": "tool",
-      "name": "处理知识库 Embedding 队列",
-      "description": "调用 embedding_job_processor，按 collection_id 与 operation_id 处理本次知识库入库范围内的 knowledge_document jobs。",
+      "name": "处理记忆 Embedding 队列",
+      "description": "调用 embedding_job_processor，只处理 Buddy 消息、会话摘要和结构化记忆来源的 embedding jobs。",
       "ui": {
-        "position": { "x": 620, "y": 280 },
+        "position": { "x": 620, "y": 260 },
         "collapsed": false,
         "size": { "width": 500, "height": 420 }
       },
       "reads": [
-        {
-          "state": "collection_id",
-          "required": true,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "embedding_job_processor",
-            "fieldKey": "collection_id",
-            "managed": true
-          }
-        },
-        {
-          "state": "operation_id",
-          "required": true,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "embedding_job_processor",
-            "fieldKey": "operation_id",
-            "managed": true
-          }
-        },
         {
           "state": "model_ref",
           "required": false,
@@ -271,6 +228,17 @@
             "actionKey": "",
             "toolKey": "embedding_job_processor",
             "fieldKey": "model_ref",
+            "managed": true
+          }
+        },
+        {
+          "state": "job_limit",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "embedding_job_processor",
+            "fieldKey": "limit",
             "managed": true
           }
         },
@@ -313,19 +281,20 @@
           "retry_failed": false,
           "include_retry_wait": true,
           "maintenance_only": false,
-          "source_kind": "knowledge_document",
-          "source_kinds": [],
-          "source_id": "",
-          "limit": 500
+          "source_kind": "",
+          "source_kinds": ["buddy_message", "buddy_session_summary", "memory_entry"],
+          "collection_id": "",
+          "operation_id": "",
+          "source_id": ""
         }
       }
     },
     "output_processor_status": {
       "kind": "output",
       "name": "Embedding Drain Status",
-      "description": "显示本次知识库 embedding drain 的处理状态。",
+      "description": "显示本次记忆 embedding drain 的处理状态。",
       "ui": {
-        "position": { "x": 1260, "y": 20 },
+        "position": { "x": 1260, "y": 80 },
         "collapsed": false,
         "size": { "width": 460, "height": 160 }
       },
@@ -336,9 +305,9 @@
     "output_processor_report": {
       "kind": "output",
       "name": "Embedding Drain Report",
-      "description": "显示本次知识库 embedding drain 的逐 job 审计记录。",
+      "description": "显示本次记忆 embedding drain 的逐 job 审计记录。",
       "ui": {
-        "position": { "x": 1260, "y": 240 },
+        "position": { "x": 1260, "y": 300 },
         "collapsed": false,
         "size": { "width": 460, "height": 320 }
       },
@@ -346,56 +315,55 @@
       "writes": [],
       "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
     },
-    "output_remaining_count": {
-      "kind": "output",
-      "name": "Remaining Jobs",
-      "description": "显示同一 operation 内仍待处理的 eligible embedding jobs 数量。",
-      "ui": {
-        "position": { "x": 1800, "y": 20 },
-        "collapsed": false,
-        "size": { "width": 460, "height": 160 }
-      },
-      "reads": [{ "state": "remaining_count", "required": false, "binding": null }],
-      "writes": [],
-      "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
-    },
     "output_completed_count": {
       "kind": "output",
       "name": "Completed Jobs",
-      "description": "显示本次 scoped embedding jobs 的完成数量。",
+      "description": "显示本次记忆 embedding jobs 的完成数量。",
       "ui": {
-        "position": { "x": 1800, "y": 240 },
+        "position": { "x": 1800, "y": 80 },
         "collapsed": false,
         "size": { "width": 460, "height": 160 }
       },
       "reads": [{ "state": "completed_count", "required": false, "binding": null }],
       "writes": [],
       "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_remaining_count": {
+      "kind": "output",
+      "name": "Remaining Jobs",
+      "description": "显示记忆来源中仍待处理的 eligible embedding jobs 数量。",
+      "ui": {
+        "position": { "x": 1800, "y": 300 },
+        "collapsed": false,
+        "size": { "width": 460, "height": 160 }
+      },
+      "reads": [{ "state": "remaining_count", "required": false, "binding": null }],
+      "writes": [],
+      "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
     }
   },
   "edges": [
-    { "source": "input_collection_id", "target": "process_scoped_embedding_jobs" },
-    { "source": "input_operation_id", "target": "process_scoped_embedding_jobs" },
-    { "source": "input_model_ref", "target": "process_scoped_embedding_jobs" },
-    { "source": "input_time_budget_seconds", "target": "process_scoped_embedding_jobs" },
-    { "source": "input_batch_size", "target": "process_scoped_embedding_jobs" },
-    { "source": "process_scoped_embedding_jobs", "target": "output_processor_status" },
-    { "source": "process_scoped_embedding_jobs", "target": "output_processor_report" },
-    { "source": "process_scoped_embedding_jobs", "target": "output_remaining_count" },
-    { "source": "process_scoped_embedding_jobs", "target": "output_completed_count" }
+    { "source": "input_model_ref", "target": "process_memory_embedding_jobs" },
+    { "source": "input_job_limit", "target": "process_memory_embedding_jobs" },
+    { "source": "input_time_budget_seconds", "target": "process_memory_embedding_jobs" },
+    { "source": "input_batch_size", "target": "process_memory_embedding_jobs" },
+    { "source": "process_memory_embedding_jobs", "target": "output_processor_status" },
+    { "source": "process_memory_embedding_jobs", "target": "output_processor_report" },
+    { "source": "process_memory_embedding_jobs", "target": "output_completed_count" },
+    { "source": "process_memory_embedding_jobs", "target": "output_remaining_count" }
   ],
   "conditional_edges": [],
   "metadata": {
     "graphProtocol": "node_system",
     "origin": "embedding",
-    "role": "knowledge_embedding_drain",
+    "role": "memory_embedding_drain",
     "capabilityDiscoverableDefault": false,
     "requiredTools": ["embedding_job_processor"],
     "outputContract": [
-      { "state": "processor_status", "role": "status", "label": "Knowledge embedding drain status" },
-      { "state": "processor_report", "role": "audit", "label": "Knowledge embedding drain audit" },
-      { "state": "remaining_count", "role": "metric", "label": "Remaining scoped embedding jobs" },
-      { "state": "completed_count", "role": "metric", "label": "Completed scoped embedding jobs" }
+      { "state": "processor_status", "role": "status", "label": "Memory embedding drain status" },
+      { "state": "processor_report", "role": "audit", "label": "Memory embedding drain audit" },
+      { "state": "completed_count", "role": "metric", "label": "Completed memory embedding jobs" },
+      { "state": "remaining_count", "role": "metric", "label": "Remaining memory embedding jobs" }
     ]
   }
 }
