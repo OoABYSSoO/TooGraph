@@ -20,6 +20,7 @@ FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV PORT=3477
 ENV TOOGRAPH_HOST=0.0.0.0
+ENV TOOGRAPH_SKIP_DEP_INSTALL=1
 ENV PYTHON=/opt/toograph/venv/bin/python
 ENV PATH=/opt/toograph/venv/bin:$PATH
 
@@ -39,10 +40,11 @@ COPY scripts ./scripts
 COPY backend ./backend
 COPY docs ./docs
 COPY examples ./examples
+COPY action ./action
 COPY graph_template ./graph_template
 COPY knowledge ./knowledge
 COPY node_preset ./node_preset
-COPY skill ./skill
+COPY tool ./tool
 
 COPY frontend/index.html frontend/package.json frontend/package-lock.json frontend/tsconfig*.json frontend/vite.config.* ./frontend/
 COPY frontend/src ./frontend/src

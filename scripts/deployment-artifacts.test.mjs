@@ -20,6 +20,10 @@ test("Docker packaging runs the standard single-port start flow with persistent 
   assert.match(dockerfile, /python3 -m venv \/opt\/toograph\/venv/);
   assert.match(dockerfile, /ENV TOOGRAPH_HOST=0\.0\.0\.0/);
   assert.match(dockerfile, /ENV PORT=3477/);
+  assert.match(dockerfile, /ENV TOOGRAPH_SKIP_DEP_INSTALL=1/);
+  assert.match(dockerfile, /COPY action \.\/action/);
+  assert.match(dockerfile, /COPY tool \.\/tool/);
+  assert.doesNotMatch(dockerfile, /COPY skill \.\/skill/);
   assert.match(dockerfile, /VOLUME \["\/app\/backend\/data"\]/);
   assert.match(dockerfile, /EXPOSE 3477/);
   assert.match(dockerfile, /HEALTHCHECK/);
@@ -44,6 +48,22 @@ test("Docker ignore file keeps local runtime state and generated build output ou
   }
 });
 
+test("Docker Compose config reuses the image build and persistent data volume", () => {
+  assert.equal(existsSync(resolve(rootDir, "docker-compose.yml")), true);
+  const compose = readText("docker-compose.yml");
+
+  assert.match(compose, /services:/);
+  assert.match(compose, /toograph:/);
+  assert.match(compose, /context: \./);
+  assert.match(compose, /dockerfile: Dockerfile/);
+  assert.match(compose, /image: toograph:local/);
+  assert.match(compose, /"3477:3477"/);
+  assert.match(compose, /TOOGRAPH_HOST: 0\.0\.0\.0/);
+  assert.match(compose, /TOOGRAPH_SKIP_DEP_INSTALL: "1"/);
+  assert.match(compose, /toograph-data:\/app\/backend\/data/);
+  assert.match(compose, /host\.docker\.internal:host-gateway/);
+});
+
 test("consolidated documentation describes source and Docker paths without model environment variables", () => {
   assert.equal(existsSync(resolve(rootDir, "docs", "README.md")), true);
   const docs = readText("docs/README.md");
@@ -52,6 +72,7 @@ test("consolidated documentation describes source and Docker paths without model
   assert.match(docs, /npm start/);
   assert.match(docs, /docker build -t toograph:local \./);
   assert.match(docs, /docker run --rm -p 3477:3477/);
+  assert.match(docs, /docker compose up --build/);
   assert.match(docs, /TOOGRAPH_HOST=0\.0\.0\.0/);
   assert.match(docs, /\/app\/backend\/data/);
   assert.match(docs, /Model Providers/);
