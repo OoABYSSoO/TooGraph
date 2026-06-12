@@ -31,7 +31,13 @@ class EmbeddingStoreTests(unittest.TestCase):
             patcher.stop()
         self._temp_dir.cleanup()
 
-    def _insert_knowledge_indexing_operation(self, operation_id: str, *, status: str = "paused") -> None:
+    def _insert_knowledge_indexing_operation(
+        self,
+        operation_id: str,
+        *,
+        status: str = "paused",
+        stage: str | None = None,
+    ) -> None:
         with closing(sqlite3.connect(database.DB_PATH)) as connection:
             connection.execute(
                 """
@@ -46,7 +52,7 @@ class EmbeddingStoreTests(unittest.TestCase):
                     "knowledge/policy_qa/source",
                     "knowledge_folder_retrieval_ingestion",
                     status,
-                    "user_paused" if status == "paused" else "embedding_queued",
+                    stage or ("user_paused" if status == "paused" else "embedding_queued"),
                     "2026-06-08T00:00:00Z",
                     "2026-06-08T00:00:00Z",
                     "{}",
@@ -1145,6 +1151,114 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertEqual(operation_row[0], "completed")
         self.assertEqual(operation_row[1], "embedding_completed")
         self.assertTrue(operation_row[2])
+
+    def test_ready_knowledge_embedding_operations_only_returns_embedding_lifecycle_operations(self) -> None:
+        from app.core.storage.embedding_store import (
+            list_ready_knowledge_embedding_operations,
+            queue_embedding_job,
+            register_embedding_model,
+        )
+        from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+        self._insert_knowledge_indexing_operation("kop_ready", status="embedding")
+        self._insert_knowledge_indexing_operation("kop_ingesting", status="ingesting", stage="ingestion_batch_completed")
+        self._insert_knowledge_indexing_operation("kop_failed_ingestion", status="failed", stage="ingestion_failed")
+        model = register_embedding_model(provider_key="local", model="test-embedding", dimensions=3)
+        for operation_id in ("kop_ready", "kop_ingesting", "kop_failed_ingestion"):
+            document = upsert_retrieval_document(
+                source_kind="knowledge_document",
+                source_id=f"doc_{operation_id}",
+                scope={"collection": "policy_qa"},
+            )
+            upsert_retrieval_chunks(
+                document["document_id"],
+                [{"chunk_id": f"chunk_{operation_id}", "content": f"Ready content for {operation_id}."}],
+            )
+            queue_embedding_job(
+                "knowledge_document",
+                f"doc_{operation_id}",
+                model["embedding_model_id"],
+                operation_id=operation_id,
+            )
+
+        ready_operations = list_ready_knowledge_embedding_operations()
+
+        self.assertEqual([operation["operation_id"] for operation in ready_operations], ["kop_ready"])
+
+    def test_sync_knowledge_indexing_operation_statuses_preserves_ingestion_failed_operation(self) -> None:
+        from app.core.storage.embedding_store import (
+            queue_embedding_job,
+            register_embedding_model,
+            sync_knowledge_indexing_operation_statuses,
+        )
+        from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+        self._insert_knowledge_indexing_operation(
+            "kop_failed_ingestion",
+            status="failed",
+            stage="ingestion_failed",
+        )
+        model = register_embedding_model(provider_key="local", model="test-embedding", dimensions=3)
+        document = upsert_retrieval_document(source_kind="knowledge_document", source_id="doc_failed_ingestion")
+        upsert_retrieval_chunks(
+            document["document_id"],
+            [{"chunk_id": "chunk_failed_ingestion", "content": "Partially written content."}],
+        )
+        queue_embedding_job(
+            "knowledge_document",
+            "doc_failed_ingestion",
+            model["embedding_model_id"],
+            operation_id="kop_failed_ingestion",
+        )
+
+        sync_knowledge_indexing_operation_statuses()
+
+        with closing(sqlite3.connect(database.DB_PATH)) as connection:
+            operation_row = connection.execute(
+                "SELECT status, stage, completed_at FROM knowledge_indexing_operations WHERE operation_id = ?",
+                ("kop_failed_ingestion",),
+            ).fetchone()
+
+        self.assertEqual(operation_row, ("failed", "ingestion_failed", ""))
+
+    def test_sync_knowledge_indexing_operation_statuses_recovers_completed_operation_with_pending_sources(self) -> None:
+        from app.core.storage.embedding_store import sync_knowledge_indexing_operation_statuses
+
+        self._insert_knowledge_indexing_operation(
+            "kop_completed_with_pending_source",
+            status="completed",
+            stage="embedding_completed",
+        )
+        with closing(sqlite3.connect(database.DB_PATH)) as connection:
+            connection.execute(
+                """
+                INSERT INTO knowledge_indexing_files (
+                    file_id, operation_id, collection_id, root_path, relative_path,
+                    status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "kfile_pending_source",
+                    "kop_completed_with_pending_source",
+                    "policy_qa",
+                    "knowledge/policy_qa/source",
+                    "guide.md",
+                    "pending",
+                    "2026-06-08T00:00:00Z",
+                    "2026-06-08T00:00:00Z",
+                ),
+            )
+            connection.commit()
+
+        sync_knowledge_indexing_operation_statuses()
+
+        with closing(sqlite3.connect(database.DB_PATH)) as connection:
+            operation_row = connection.execute(
+                "SELECT status, stage, completed_at FROM knowledge_indexing_operations WHERE operation_id = ?",
+                ("kop_completed_with_pending_source",),
+            ).fetchone()
+
+        self.assertEqual(operation_row, ("ingesting", "ingestion_batch_completed", ""))
 
     def test_process_pending_embedding_jobs_scopes_by_collection_and_source(self) -> None:
         from app.core.storage.embedding_store import process_pending_embedding_jobs, queue_embedding_job, register_embedding_model
@@ -2263,6 +2377,8 @@ class EmbeddingStoreTests(unittest.TestCase):
                 filters={"source_kind": "buddy_message", "metadata_filter": {"topic": "refund"}},
                 embedding_model_ref=model["embedding_model_id"],
                 limit=5,
+                run_id="run_hybrid_1",
+                session_id="session_hybrid_1",
             )
 
         embed.assert_called_once_with(
@@ -2278,13 +2394,18 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertGreater(results[0]["retrieval"]["recency_boost"], 0)
 
         with closing(sqlite3.connect(database.DB_PATH)) as connection:
-            query_row = connection.execute("SELECT query_id, query_text FROM retrieval_queries").fetchone()
+            query_row = connection.execute(
+                "SELECT query_id, query_text, filters_json, run_id, session_id FROM retrieval_queries"
+            ).fetchone()
             result_row = connection.execute(
                 "SELECT chunk_id, source_ref_json FROM retrieval_results WHERE query_id = ?",
                 (query_row[0],),
             ).fetchone()
 
         self.assertEqual(query_row[1], "refund audit")
+        self.assertEqual(json.loads(query_row[2]), {"source_kind": "buddy_message", "metadata_filter": {"topic": "refund"}})
+        self.assertEqual(query_row[3], "run_hybrid_1")
+        self.assertEqual(query_row[4], "session_hybrid_1")
         self.assertEqual(result_row[0], "chunk_refund")
         self.assertEqual(json.loads(result_row[1])["source_kind"], "buddy_message")
 

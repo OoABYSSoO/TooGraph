@@ -1185,6 +1185,35 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_knowledge_indexing_operations_status
             ON knowledge_indexing_operations(status, next_retry_at);
 
+        CREATE TABLE IF NOT EXISTS knowledge_indexing_files (
+            file_id TEXT PRIMARY KEY,
+            operation_id TEXT NOT NULL,
+            collection_id TEXT NOT NULL,
+            root_path TEXT NOT NULL DEFAULT '',
+            relative_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            batch_id TEXT NOT NULL DEFAULT '',
+            run_id TEXT NOT NULL DEFAULT '',
+            document_id TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL DEFAULT '',
+            mime_type TEXT NOT NULL DEFAULT '',
+            file_size INTEGER NOT NULL DEFAULT 0,
+            text_like INTEGER NOT NULL DEFAULT 0,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_error_type TEXT NOT NULL DEFAULT '',
+            last_error TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT NOT NULL DEFAULT '',
+            UNIQUE(operation_id, relative_path),
+            FOREIGN KEY(operation_id) REFERENCES knowledge_indexing_operations(operation_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_knowledge_indexing_files_operation_status
+            ON knowledge_indexing_files(operation_id, status, relative_path);
+        CREATE INDEX IF NOT EXISTS idx_knowledge_indexing_files_collection
+            ON knowledge_indexing_files(collection_id, status);
+
         CREATE TABLE IF NOT EXISTS embedding_jobs (
             job_id TEXT PRIMARY KEY,
             source_kind TEXT NOT NULL,

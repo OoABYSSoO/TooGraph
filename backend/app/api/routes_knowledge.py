@@ -78,15 +78,16 @@ def retry_knowledge_operation_endpoint(
 ) -> dict[str, Any]:
     try:
         base = retry_knowledge_indexing_operation(collection_id, operation_id)
-        runner.run_event_scheduled_graph_jobs(
-            "knowledge.ingestion.completed",
-            event={
-                "collection_id": base["collection_id"],
-                "operation_id": str(operation_id or "").strip(),
-            },
-            background_tasks=background_tasks,
-            requested_by="knowledge_operation_retry",
-        )
+        if _should_schedule_embedding_drain(base):
+            runner.run_event_scheduled_graph_jobs(
+                "knowledge.ingestion.completed",
+                event={
+                    "collection_id": base["collection_id"],
+                    "operation_id": str(operation_id or "").strip(),
+                },
+                background_tasks=background_tasks,
+                requested_by="knowledge_operation_retry",
+            )
         return base
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -102,15 +103,16 @@ def retry_knowledge_base_endpoint(
     try:
         base = retry_knowledge_base_indexing(collection_id)
         operation = base.get("current_operation") if isinstance(base.get("current_operation"), dict) else {}
-        runner.run_event_scheduled_graph_jobs(
-            "knowledge.ingestion.completed",
-            event={
-                "collection_id": base["collection_id"],
-                "operation_id": str(operation.get("operation_id") or ""),
-            },
-            background_tasks=background_tasks,
-            requested_by="knowledge_collection_retry",
-        )
+        if _should_schedule_embedding_drain(base):
+            runner.run_event_scheduled_graph_jobs(
+                "knowledge.ingestion.completed",
+                event={
+                    "collection_id": base["collection_id"],
+                    "operation_id": str(operation.get("operation_id") or ""),
+                },
+                background_tasks=background_tasks,
+                requested_by="knowledge_collection_retry",
+            )
         return base
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -136,17 +138,23 @@ def resume_knowledge_operation_endpoint(
 ) -> dict[str, Any]:
     try:
         base = resume_knowledge_indexing_operation(collection_id, operation_id)
-        runner.run_event_scheduled_graph_jobs(
-            "knowledge.ingestion.completed",
-            event={
-                "collection_id": base["collection_id"],
-                "operation_id": str(operation_id or "").strip(),
-            },
-            background_tasks=background_tasks,
-            requested_by="knowledge_operation_resume",
-        )
+        if _should_schedule_embedding_drain(base):
+            runner.run_event_scheduled_graph_jobs(
+                "knowledge.ingestion.completed",
+                event={
+                    "collection_id": base["collection_id"],
+                    "operation_id": str(operation_id or "").strip(),
+                },
+                background_tasks=background_tasks,
+                requested_by="knowledge_operation_resume",
+            )
         return base
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _should_schedule_embedding_drain(base: dict[str, Any]) -> bool:
+    operation = base.get("current_operation") if isinstance(base.get("current_operation"), dict) else {}
+    return str(operation.get("status") or "") == "embedding"

@@ -123,6 +123,69 @@ class RetrievalIngestionWriterToolTests(unittest.TestCase):
         self.assertIn("semantic memory", chunk_row[2])
         self.assertEqual(job_row[0], "kop_embedding_design")
 
+    def test_tool_marks_operation_source_files_completed_after_successful_write(self) -> None:
+        from app.core.storage.embedding_store import register_embedding_model
+        from app.core.storage.knowledge_store import (
+            claim_knowledge_ingestion_file_batch,
+            import_knowledge_folder,
+            knowledge_ingestion_file_stats,
+        )
+
+        module = _load_tool_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            repo_root.mkdir()
+            data_dir = Path(temp_dir) / "data"
+            source_root = repo_root / "raw_policy"
+            source_root.mkdir()
+            (source_root / "guide.md").write_text("Policy guide", encoding="utf-8")
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+                patch("app.core.storage.local_input_sources.REPO_ROOT", repo_root),
+                patch("app.core.storage.knowledge_store.REPO_ROOT", repo_root),
+                patch("app.core.storage.knowledge_store.KNOWLEDGE_ROOT", repo_root / "knowledge"),
+            ):
+                database.initialize_storage()
+                imported = import_knowledge_folder(name="Policy", source_path=str(source_root), collection_id="policy_qa")
+                operation_id = imported["operation"]["operation_id"]
+                claim_knowledge_ingestion_file_batch(operation_id, batch_size=1, run_id="run_batch")
+                model = register_embedding_model(provider_key="openai", model="text-embedding-3-small", dimensions=3)
+
+                result = module.retrieval_ingestion_writer(
+                    {
+                        "source_kind": "knowledge_document",
+                        "source": {
+                            "documents": [
+                                {
+                                    "document_id": "doc_policy_guide",
+                                    "title": "guide.md",
+                                    "source_path": "guide.md",
+                                    "content": "Policy guide",
+                                    "metadata": {"collection": "policy_qa", "source_path": "guide.md"},
+                                }
+                            ]
+                        },
+                        "chunks": [
+                            {
+                                "chunk_id": "chunk_policy_guide",
+                                "source_id": "doc_policy_guide",
+                                "content": "Policy guide content.",
+                                "metadata": {"source_path": "guide.md"},
+                            }
+                        ],
+                        "embedding_model_refs": [model["embedding_model_id"]],
+                        "scope": {"collection": "policy_qa"},
+                        "operation_id": operation_id,
+                        "sync_mode": "upsert",
+                    }
+                )
+                stats = knowledge_ingestion_file_stats(operation_id)
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(stats["completed_source_file_count"], 1)
+        self.assertEqual(stats["processing_source_file_count"], 0)
+
     def test_sync_scope_prunes_documents_chunks_indexes_jobs_and_vectors_missing_from_current_run(self) -> None:
         from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector
 

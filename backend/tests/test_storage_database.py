@@ -156,12 +156,23 @@ class StorageDatabaseTests(unittest.TestCase):
                     }
 
         self.assertIn("knowledge_indexing_operations", table_names)
+        self.assertIn("knowledge_indexing_files", table_names)
         self.assertIn("operation_id", operation_columns)
         self.assertIn("collection_id", operation_columns)
         self.assertIn("status", operation_columns)
         self.assertIn("stage", operation_columns)
         self.assertIn("last_error_type", operation_columns)
         self.assertIn("next_retry_at", operation_columns)
+        with closing(sqlite3.connect(database.DB_PATH)) as connection:
+            operation_file_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(knowledge_indexing_files)").fetchall()
+            }
+        self.assertIn("operation_id", operation_file_columns)
+        self.assertIn("relative_path", operation_file_columns)
+        self.assertIn("status", operation_file_columns)
+        self.assertIn("batch_id", operation_file_columns)
+        self.assertIn("document_id", operation_file_columns)
         self.assertIn("operation_id", embedding_job_columns)
         self.assertIn("priority", embedding_job_columns)
         self.assertIn("last_error_type", embedding_job_columns)

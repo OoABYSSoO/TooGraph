@@ -80,13 +80,17 @@ class RetrievalQueryContextLoaderToolTests(unittest.TestCase):
             ],
         )
 
-        result = module.retrieval_query_context_loader(
-            {
-                "query": "unified query tool",
-                "filters": {"source_kind": "knowledge_document"},
-                "limits": {"limit": 5, "max_chars": 2000},
-            }
-        )
+        with patch(
+            "app.core.storage.embedding_model_sync.get_default_embedding_model_ref_from_settings",
+            return_value="",
+        ):
+            result = module.retrieval_query_context_loader(
+                {
+                    "query": "unified query tool",
+                    "filters": {"source_kind": "knowledge_document"},
+                    "limits": {"limit": 5, "max_chars": 2000},
+                }
+            )
 
         self.assertEqual(result["status"], "succeeded")
         package = result["context_package"]
@@ -99,6 +103,40 @@ class RetrievalQueryContextLoaderToolTests(unittest.TestCase):
         self.assertIn("chunk_embedding_design_1", [chunk["chunk_id"] for chunk in result["ranked_chunks"]])
         self.assertEqual(result["ranking_report"]["query_text"], "unified query tool")
         self.assertEqual(result["ranking_report"]["result_count"], 1)
+
+    def test_tool_uses_default_embedding_model_and_passes_audit_context(self) -> None:
+        module = _load_tool_module()
+        captured_calls: list[dict] = []
+
+        def fake_hybrid_search(*args, **kwargs):
+            captured_calls.append({"args": args, "kwargs": kwargs})
+            return []
+
+        filters = {
+            "source_kind": "knowledge_document",
+            "metadata_filter": {"collection": "policy_qa"},
+        }
+        with patch(
+            "app.core.storage.embedding_model_sync.get_default_embedding_model_ref_from_settings",
+            return_value="local/default-embedding",
+        ), patch("app.core.storage.retrieval_store.hybrid_search", side_effect=fake_hybrid_search), patch.dict(
+            "os.environ",
+            {"TOOGRAPH_ACTION_RUN_ID": "run_knowledge_qa_1"},
+            clear=False,
+        ):
+            result = module.retrieval_query_context_loader(
+                {
+                    "query": "就业政策",
+                    "filters": filters,
+                    "limits": {"limit": 5, "max_chars": 2000},
+                }
+            )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(captured_calls[0]["args"], ("就业政策",))
+        self.assertEqual(captured_calls[0]["kwargs"]["filters"], filters)
+        self.assertEqual(captured_calls[0]["kwargs"]["embedding_model_ref"], "local/default-embedding")
+        self.assertEqual(captured_calls[0]["kwargs"]["run_id"], "run_knowledge_qa_1")
 
 
 if __name__ == "__main__":

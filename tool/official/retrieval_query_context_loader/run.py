@@ -31,8 +31,9 @@ def retrieval_query_context_loader(payload: dict[str, Any] | None) -> dict[str, 
             minimum=512,
             maximum=50000,
         )
-        embedding_model_ref = _as_text(inputs.get("embedding_model_ref"))
+        embedding_model_ref = _resolve_embedding_model_ref(inputs)
         reranker_model_ref = _as_text(inputs.get("reranker_model_ref"))
+        audit_context = _resolve_audit_context(inputs)
 
         ranked = hybrid_search(
             query,
@@ -40,6 +41,8 @@ def retrieval_query_context_loader(payload: dict[str, Any] | None) -> dict[str, 
             embedding_model_ref=embedding_model_ref,
             reranker_model_ref=reranker_model_ref,
             limit=limit,
+            run_id=audit_context["run_id"],
+            session_id=audit_context["session_id"],
         )
         rendered_text, source_refs, ranked_chunks, budget = _render_ranked_chunks(
             query=query,
@@ -336,6 +339,61 @@ def _ensure_backend_path() -> None:
     backend_path = repo_root / "backend"
     if str(backend_path) not in sys.path:
         sys.path.insert(0, str(backend_path))
+
+
+def _resolve_embedding_model_ref(inputs: dict[str, Any]) -> str:
+    explicit_ref = _as_text(inputs.get("embedding_model_ref"))
+    if explicit_ref:
+        return explicit_ref
+    try:
+        from app.core.storage.embedding_model_sync import get_default_embedding_model_ref_from_settings
+
+        return _as_text(get_default_embedding_model_ref_from_settings())
+    except Exception:
+        return ""
+
+
+def _resolve_audit_context(inputs: dict[str, Any]) -> dict[str, str]:
+    runtime_context = _coerce_dict(inputs.get("runtime_context"))
+    env_context = _read_runtime_context_from_environment()
+    return {
+        "run_id": _as_text(
+            inputs.get("run_id")
+            or runtime_context.get("run_id")
+            or env_context.get("run_id")
+            or os.environ.get("TOOGRAPH_ACTION_RUN_ID")
+        ),
+        "session_id": _as_text(
+            inputs.get("session_id")
+            or runtime_context.get("session_id")
+            or runtime_context.get("buddy_session_id")
+            or env_context.get("session_id")
+            or env_context.get("buddy_session_id")
+        ),
+    }
+
+
+def _read_runtime_context_from_environment() -> dict[str, Any]:
+    inline_context = _decode_json_object(_as_text(os.environ.get("TOOGRAPH_ACTION_RUNTIME_CONTEXT")))
+    if inline_context:
+        return inline_context
+    file_path = _as_text(os.environ.get("TOOGRAPH_ACTION_RUNTIME_CONTEXT_FILE"))
+    if not file_path:
+        return {}
+    try:
+        return _decode_json_object(Path(file_path).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _decode_json_object(raw: str) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except Exception:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _dedupe(values: list[str]) -> list[str]:

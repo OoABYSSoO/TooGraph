@@ -79,7 +79,47 @@ class KnowledgeStoreTests(unittest.TestCase):
         self.assertEqual(operation["status"], "ingesting")
         self.assertEqual(operation["stage"], "source_imported")
         self.assertEqual(base["indexing_status"], "ingesting")
+        self.assertEqual(base["source_file_count"], 1)
+        self.assertEqual(base["pending_source_file_count"], 1)
         self.assertEqual(response["operation"], operation)
+
+    def test_import_knowledge_folder_creates_claimable_operation_file_manifest(self) -> None:
+        from app.core.storage.knowledge_store import (
+            claim_knowledge_ingestion_file_batch,
+            import_knowledge_folder,
+            knowledge_ingestion_file_stats,
+            mark_knowledge_ingestion_files_completed,
+        )
+
+        source_dir = self.repo_root / "policy_source"
+        source_dir.mkdir()
+        for index in range(3):
+            (source_dir / f"guide_{index}.md").write_text(f"Policy guide {index}", encoding="utf-8")
+
+        response = import_knowledge_folder(name="Policy", source_path=str(source_dir), collection_id="policy_qa")
+        operation_id = response["operation"]["operation_id"]
+
+        first_batch = claim_knowledge_ingestion_file_batch(operation_id, batch_size=2, run_id="run_batch_1")
+        self.assertEqual(first_batch["batch_size"], 2)
+        self.assertEqual([item["relative_path"] for item in first_batch["files"]], ["guide_0.md", "guide_1.md"])
+        stats = knowledge_ingestion_file_stats(operation_id)
+        self.assertEqual(stats["source_file_count"], 3)
+        self.assertEqual(stats["processing_source_file_count"], 2)
+        self.assertEqual(stats["pending_source_file_count"], 1)
+
+        mark_knowledge_ingestion_files_completed(
+            operation_id,
+            ["guide_0.md", "guide_1.md"],
+            run_id="run_batch_1",
+            document_ids=["doc_0", "doc_1"],
+        )
+        second_batch = claim_knowledge_ingestion_file_batch(operation_id, batch_size=2, run_id="run_batch_2")
+
+        self.assertEqual([item["relative_path"] for item in second_batch["files"]], ["guide_2.md"])
+        stats = knowledge_ingestion_file_stats(operation_id)
+        self.assertEqual(stats["completed_source_file_count"], 2)
+        self.assertEqual(stats["processing_source_file_count"], 1)
+        self.assertEqual(stats["pending_source_file_count"], 0)
 
     def test_reimporting_same_collection_creates_distinct_indexing_operations(self) -> None:
         from app.core.storage.knowledge_store import import_knowledge_folder
@@ -109,6 +149,7 @@ class KnowledgeStoreTests(unittest.TestCase):
     def test_record_knowledge_base_run_does_not_downgrade_operation_that_already_started_embedding(self) -> None:
         from app.core.storage.knowledge_store import (
             import_knowledge_folder,
+            mark_knowledge_ingestion_files_completed,
             record_knowledge_base_run,
             update_knowledge_indexing_operation,
         )
@@ -118,6 +159,7 @@ class KnowledgeStoreTests(unittest.TestCase):
         (source_dir / "guide.md").write_text("Policy guide", encoding="utf-8")
         imported = import_knowledge_folder(name="Policy", source_path=str(source_dir), collection_id="policy_qa")
         operation_id = imported["operation"]["operation_id"]
+        mark_knowledge_ingestion_files_completed(operation_id, ["guide.md"], document_ids=["policy_source/guide.md"])
         update_knowledge_indexing_operation(
             operation_id,
             ingestion_run_id="run_fast_ingestion",
@@ -144,7 +186,12 @@ class KnowledgeStoreTests(unittest.TestCase):
             register_embedding_model,
             upsert_embedding_vector,
         )
-        from app.core.storage.knowledge_store import import_knowledge_folder, list_knowledge_bases
+        from app.core.storage.knowledge_store import (
+            import_knowledge_folder,
+            list_knowledge_bases,
+            mark_knowledge_ingestion_files_completed,
+            update_knowledge_indexing_operation,
+        )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
         source_root = self.repo_root / "raw_policy"
@@ -187,15 +234,48 @@ class KnowledgeStoreTests(unittest.TestCase):
         self.assertNotIn("knowledge_documents", table_names)
         self.assertNotIn("knowledge_chunks", table_names)
 
+    def test_list_knowledge_bases_does_not_report_ready_when_source_files_are_pending(self) -> None:
+        from app.core.storage.knowledge_store import (
+            import_knowledge_folder,
+            list_knowledge_bases,
+            update_knowledge_indexing_operation,
+        )
+
+        source_root = self.repo_root / "raw_policy"
+        source_root.mkdir()
+        (source_root / "guide.md").write_text("Policy guide", encoding="utf-8")
+        imported = import_knowledge_folder(name="Policy", source_path="raw_policy", collection_id="policy_qa")
+        update_knowledge_indexing_operation(
+            imported["operation"]["operation_id"],
+            status="completed",
+            stage="embedding_completed",
+            completed_at="2026-06-08T12:00:00Z",
+        )
+
+        [base] = list_knowledge_bases()
+
+        self.assertEqual(base["pending_source_file_count"], 1)
+        self.assertEqual(base["indexing_status"], "ingesting")
+        self.assertEqual(base["current_operation"]["status"], "ingesting")
+        self.assertEqual(base["current_operation"]["stage"], "ingestion_batch_completed")
+
     def test_list_knowledge_bases_reports_embedding_job_distribution(self) -> None:
         from app.core.storage.embedding_store import register_embedding_model, upsert_embedding_vector
-        from app.core.storage.knowledge_store import import_knowledge_folder, list_knowledge_bases
+        from app.core.storage.knowledge_store import (
+            import_knowledge_folder,
+            list_knowledge_bases,
+            mark_knowledge_ingestion_files_completed,
+            update_knowledge_indexing_operation,
+        )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
         source_root = self.repo_root / "raw_policy"
         source_root.mkdir()
         (source_root / "guide.md").write_text("Policy guide", encoding="utf-8")
-        import_knowledge_folder(name="Policy", source_path="raw_policy", collection_id="policy_qa")
+        imported = import_knowledge_folder(name="Policy", source_path="raw_policy", collection_id="policy_qa")
+        operation_id = imported["operation"]["operation_id"]
+        mark_knowledge_ingestion_files_completed(operation_id, ["guide.md"], document_ids=["raw_policy/guide.md"])
+        update_knowledge_indexing_operation(operation_id, status="embedding", stage="embedding_queued")
 
         model = register_embedding_model(provider_key="local", model="embedding", dimensions=3)
         document = upsert_retrieval_document(
@@ -267,13 +347,21 @@ class KnowledgeStoreTests(unittest.TestCase):
 
     def test_list_knowledge_bases_ignores_stale_embedding_jobs_vectors_errors_and_retries(self) -> None:
         from app.core.storage.embedding_store import queue_embedding_job, register_embedding_model, upsert_embedding_vector
-        from app.core.storage.knowledge_store import import_knowledge_folder, list_knowledge_bases
+        from app.core.storage.knowledge_store import (
+            import_knowledge_folder,
+            list_knowledge_bases,
+            mark_knowledge_ingestion_files_completed,
+            update_knowledge_indexing_operation,
+        )
         from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
 
         source_root = self.repo_root / "raw_policy"
         source_root.mkdir()
         (source_root / "guide.md").write_text("Policy guide", encoding="utf-8")
-        import_knowledge_folder(name="Policy", source_path="raw_policy", collection_id="policy_qa")
+        imported = import_knowledge_folder(name="Policy", source_path="raw_policy", collection_id="policy_qa")
+        operation_id = imported["operation"]["operation_id"]
+        mark_knowledge_ingestion_files_completed(operation_id, ["guide.md"], document_ids=["raw_policy/guide.md"])
+        update_knowledge_indexing_operation(operation_id, status="embedding", stage="embedding_queued")
 
         model = register_embedding_model(provider_key="local", model="embedding", dimensions=3)
         document = upsert_retrieval_document(

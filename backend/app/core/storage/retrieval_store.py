@@ -323,6 +323,8 @@ def hybrid_search(
     embedding_model_ref: str = "",
     reranker_model_ref: str = "",
     limit: int = 10,
+    run_id: str = "",
+    session_id: str = "",
 ) -> list[dict[str, Any]]:
     from app.core.storage.embedding_store import (
         resolve_embedding_model,
@@ -411,6 +413,8 @@ def hybrid_search(
         mode="hybrid",
         results=results,
         ranking_metadata=ranking_metadata,
+        run_id=run_id,
+        session_id=session_id,
     )
     for result in results:
         result["retrieval"]["query_id"] = query_id
@@ -771,10 +775,12 @@ def _record_retrieval_audit(
     mode: str,
     results: list[dict[str, Any]],
     ranking_metadata: dict[str, Any] | None = None,
+    run_id: str = "",
+    session_id: str = "",
 ) -> str:
     query_id = f"rquery_{uuid4().hex[:16]}"
-    run_id = str(filters.get("run_id") or "")
-    session_id = str(filters.get("session_id") or "")
+    normalized_run_id = str(run_id or "").strip()
+    normalized_session_id = str(session_id or "").strip()
     with get_connection() as connection:
         connection.execute(
             """
@@ -798,8 +804,8 @@ def _record_retrieval_audit(
                 reranker_model_ref,
                 mode,
                 _json_dumps(ranking_metadata or {}),
-                run_id,
-                session_id,
+                normalized_run_id,
+                normalized_session_id,
             ),
         )
         for index, result in enumerate(results, start=1):

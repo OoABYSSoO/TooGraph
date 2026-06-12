@@ -4,12 +4,12 @@
   "name": "Retrieval Ingestion Writer",
   "description": "把切片候选写入统一 retrieval_documents / retrieval_chunks，并按选定 embedding 模型排队 embedding_jobs；不负责切片、不直接生成向量。",
   "version": "0.1.0",
-  "timeoutSeconds": 30,
+  "timeoutSeconds": 120,
   "permissions": [],
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",
-    "timeoutSeconds": 30
+    "timeoutSeconds": 120
   },
   "inputPresentation": {
     "source_kind": {

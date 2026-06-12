@@ -13,6 +13,7 @@ from app.tools.model_provider_client import embed_text_with_model_ref, embed_tex
 
 SUPPORTED_EMBEDDING_JOB_STATUSES = {"pending", "running", "retry_wait", "completed", "failed", "blocked"}
 MEMORY_EMBEDDING_SOURCE_KINDS = ("buddy_message", "buddy_session_summary", "memory_entry")
+KNOWLEDGE_EMBEDDING_PROCESSABLE_STATUSES = {"embedding", "retrying"}
 DEFAULT_DISTANCE_METRIC = "cosine"
 DEFAULT_VECTOR_FORMAT = "json"
 EMBEDDING_JOB_LEASE_MINUTES = 15
@@ -951,6 +952,34 @@ def _knowledge_indexing_operation_is_paused(operation_id: str) -> bool:
     return row is not None and str(row["status"] or "") == "paused"
 
 
+def _knowledge_operation_has_unfinished_source_files(connection: Any, operation_id: str) -> bool:
+    row = connection.execute(
+        """
+        SELECT COUNT(*) AS unfinished_count
+        FROM knowledge_indexing_files
+        WHERE operation_id = ?
+          AND status IN ('pending', 'processing', 'failed')
+        """,
+        (operation_id,),
+    ).fetchone()
+    return int(row["unfinished_count"] or 0) > 0 if row is not None else False
+
+
+def _knowledge_operation_embedding_is_processable(connection: Any, operation_id: str) -> bool:
+    normalized_operation_id = str(operation_id or "").strip()
+    if not normalized_operation_id:
+        return True
+    row = connection.execute(
+        "SELECT status FROM knowledge_indexing_operations WHERE operation_id = ?",
+        (normalized_operation_id,),
+    ).fetchone()
+    if row is None:
+        return True
+    if str(row["status"] or "") not in KNOWLEDGE_EMBEDDING_PROCESSABLE_STATUSES:
+        return False
+    return not _knowledge_operation_has_unfinished_source_files(connection, normalized_operation_id)
+
+
 def _paused_embedding_operation_report(
     *,
     collection_id: str,
@@ -1000,7 +1029,26 @@ def _sync_knowledge_operation_status_after_embedding_processing(operation_id: st
             "SELECT status FROM knowledge_indexing_operations WHERE operation_id = ?",
             (normalized_operation_id,),
         ).fetchone()
-        if operation_row is None or str(operation_row["status"] or "") == "paused":
+        if operation_row is None:
+            return
+        operation_status = str(operation_row["status"] or "")
+        if operation_status == "paused":
+            return
+        if _knowledge_operation_has_unfinished_source_files(connection, normalized_operation_id):
+            if operation_status in {"embedding", "retrying", "blocked", "completed"}:
+                connection.execute(
+                    """
+                    UPDATE knowledge_indexing_operations
+                    SET status = 'ingesting',
+                        stage = 'ingestion_batch_completed',
+                        completed_at = '',
+                        updated_at = ?
+                    WHERE operation_id = ?
+                    """,
+                    (now, normalized_operation_id),
+                )
+            return
+        if operation_status not in {"embedding", "retrying", "blocked"}:
             return
         count_rows = connection.execute(
             """
@@ -1103,7 +1151,7 @@ def sync_knowledge_indexing_operation_statuses(*, limit: int = 1000) -> dict[str
             """
             SELECT operation_id
             FROM knowledge_indexing_operations
-            WHERE status != 'paused'
+            WHERE status IN ('embedding', 'retrying', 'blocked', 'completed')
             ORDER BY updated_at ASC, operation_id ASC
             LIMIT ?
             """,
@@ -1138,7 +1186,13 @@ def list_ready_knowledge_embedding_operations(*, now: str | None = None, limit: 
             JOIN retrieval_chunks AS c
               ON c.chunk_id = j.chunk_id
              AND c.content_hash = j.content_hash
-            WHERE kop.status != 'paused'
+            WHERE kop.status IN ('embedding', 'retrying')
+              AND NOT EXISTS (
+                SELECT 1
+                FROM knowledge_indexing_files AS kif
+                WHERE kif.operation_id = kop.operation_id
+                  AND kif.status IN ('pending', 'processing', 'failed')
+              )
               AND (
                 j.status = 'pending'
                 OR (j.status = 'retry_wait' AND j.next_retry_at != '' AND j.next_retry_at <= ?)
@@ -1272,6 +1326,30 @@ def _not_paused_operation_sql(job_alias: str) -> str:
     )
 
 
+def _embedding_processable_operation_sql(job_alias: str) -> str:
+    alias = str(job_alias or "j").strip() or "j"
+    statuses = ", ".join(f"'{status}'" for status in sorted(KNOWLEDGE_EMBEDDING_PROCESSABLE_STATUSES))
+    return (
+        "("
+        f"{alias}.operation_id = '' "
+        "OR NOT EXISTS ("
+        "SELECT 1 FROM knowledge_indexing_operations AS missing_kop "
+        f"WHERE missing_kop.operation_id = {alias}.operation_id"
+        ") "
+        "OR EXISTS ("
+        "SELECT 1 FROM knowledge_indexing_operations AS kop "
+        f"WHERE kop.operation_id = {alias}.operation_id "
+        f"AND kop.status IN ({statuses}) "
+        "AND NOT EXISTS ("
+        "SELECT 1 FROM knowledge_indexing_files AS kif "
+        "WHERE kif.operation_id = kop.operation_id "
+        "AND kif.status IN ('pending', 'processing', 'failed')"
+        ")"
+        ")"
+        ")"
+    )
+
+
 def _select_embedding_job_candidate_rows(
     *,
     where: str,
@@ -1304,7 +1382,7 @@ def _select_embedding_job_candidate_rows(
                 JOIN retrieval_documents AS d ON d.document_id = c.document_id
                 JOIN embedding_models AS m ON m.embedding_model_id = j.embedding_model_id
                 {where}
-                AND {_not_paused_operation_sql("j")}
+                AND {_embedding_processable_operation_sql("j")}
                 ORDER BY j.priority ASC, j.created_at ASC, c.document_id ASC, c.ordinal ASC, j.job_id ASC
                 LIMIT ? OFFSET ?
                 """,

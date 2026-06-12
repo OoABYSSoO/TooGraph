@@ -12,6 +12,7 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
     try:
         _ensure_backend_path()
         from app.core.storage.embedding_store import queue_embedding_job
+        from app.core.storage.knowledge_store import mark_knowledge_ingestion_files_completed
         from app.core.storage.retrieval_store import (
             prune_retrieval_scope,
             upsert_retrieval_chunks,
@@ -41,6 +42,8 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
         indexed_chunks: list[dict[str, Any]] = []
         embedding_jobs: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
+        completed_source_paths: list[str] = []
+        completed_document_ids: list[str] = []
 
         for source_id, source_chunks in chunks_by_source.items():
             source_doc = source_documents.get(source_id, {})
@@ -58,6 +61,10 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
                 },
             )
             documents.append(_public_document(document))
+            source_path = _as_text(source_doc.get("source_path")) or _as_text(_coerce_dict(source_doc.get("metadata")).get("source_path"))
+            if operation_id and source_path:
+                completed_source_paths.append(source_path)
+                completed_document_ids.append(_as_text(document.get("source_id")) or source_id)
             indexed = upsert_retrieval_chunks(
                 document["document_id"],
                 [
@@ -97,6 +104,13 @@ def retrieval_ingestion_writer(payload: dict[str, Any] | None) -> dict[str, Any]
                             "embedding_model_ref": model_ref,
                         }
                     )
+
+        if operation_id and completed_source_paths:
+            mark_knowledge_ingestion_files_completed(
+                operation_id,
+                completed_source_paths,
+                document_ids=completed_document_ids,
+            )
 
         prune_report = {
             "pruned_document_count": 0,

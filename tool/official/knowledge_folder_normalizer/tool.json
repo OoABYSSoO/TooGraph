@@ -22,6 +22,16 @@
       "control": "text",
       "default": "knowledge_document"
     },
+    "operation_id": {
+      "mode": "static",
+      "control": "text",
+      "default": ""
+    },
+    "batch_size": {
+      "mode": "static",
+      "control": "number",
+      "default": 100
+    },
     "max_files": {
       "mode": "static",
       "control": "number",
@@ -50,6 +60,18 @@
       "name": "Collection",
       "valueType": "text",
       "description": "本批知识库文档的集合标识，会写入 source package 的 scope 和 metadata。"
+    },
+    {
+      "key": "operation_id",
+      "name": "Operation ID",
+      "valueType": "text",
+      "description": "Knowledge indexing operation id. When present, the tool claims one source-file batch from the operation manifest instead of expanding the entire folder."
+    },
+    {
+      "key": "batch_size",
+      "name": "Batch Size",
+      "valueType": "number",
+      "description": "Maximum number of source files to claim for one operation-backed ingestion batch."
     },
     {
       "key": "max_files",
